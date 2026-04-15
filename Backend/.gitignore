@@ -1,0 +1,16 @@
+# .gitignore
+
+# Variables de Entorno (¡CRÍTICO!)
+.env
+
+# Binarios de Go
+/libreria-backend
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Archivos de Sistema Operativo
+.DS_Store
+Thumbs.db
