@@ -1,0 +1,555 @@
+<!-- src/app/pages/inventario/inventario.component.html -->
+<div class="page">
+
+  <!-- ── Header ── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Inventario</h1>
+      <p class="page-subtitle">Catálogo de productos activos · {{ productosFiltrados().length }} productos</p>
+    </div>
+    <button id="btn-nuevo-producto" class="btn-primary" (click)="abrirModalIngreso()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Ingresar Producto
+    </button>
+  </div>
+
+  <!-- ── Mensajes Globales ── -->
+  @if (successMsg()) {
+    <div class="alert-success" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      {{ successMsg() }}
+    </div>
+  }
+  @if (errorMsg() && !mostrarModalIngreso() && !mostrarModalBaja() && !mostrarModalDevolucion()) {
+    <div class="alert-error" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {{ errorMsg() }}
+    </div>
+  }
+
+  <!-- ── Tabla de Productos ── -->
+  <div class="table-card">
+    <div class="table-toolbar">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          id="input-buscar-producto"
+          type="text"
+          placeholder="Buscar por nombre o categoría..."
+          class="search-input"
+          (input)="setBusqueda($any($event.target).value)"
+        />
+      </div>
+    </div>
+
+    @if (cargando()) {
+      <div class="loading-state">
+        <div class="spinner-lg"></div>
+        <span>Cargando catálogo...</span>
+      </div>
+    } @else if (productosFiltrados().length === 0 && !errorMsg()) {
+      <div class="empty-state">
+        <svg viewBox="0 0 64 64" fill="none" width="52">
+          <rect x="10" y="14" width="44" height="44" rx="6" stroke="#1e2130" stroke-width="2"/>
+          <path d="M22 14V10a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4" stroke="#4F8EF7" stroke-width="2"/>
+          <line x1="22" y1="30" x2="42" y2="30" stroke="#4F8EF7" stroke-width="2"/>
+          <line x1="22" y1="38" x2="35" y2="38" stroke="#4F8EF7" stroke-width="2" opacity="0.5"/>
+        </svg>
+        @if (busqueda()) {
+          <p>No se encontraron productos para "{{ busqueda() }}".</p>
+        } @else {
+          <p>No hay productos registrados. ¡Ingresa el primero!</p>
+        }
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th>IVA</th>
+              <th>Precio Venta</th>
+              <th>Stock</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of productosFiltrados(); track p.id_producto) {
+              <tr>
+                <td class="product-cell">
+                  <div class="product-icon">{{ p.nombre[0].toUpperCase() }}</div>
+                  <div class="product-meta">
+                    <span class="product-name">{{ p.nombre }}</span>
+                    <span class="product-id"># {{ p.id_producto }}</span>
+                  </div>
+                </td>
+                <td><span class="category-badge">{{ p.nombre_categoria }}</span></td>
+                <td>
+                  <span class="iva-badge" [class.iva-zero]="p.tasa_iva === 0" [class.iva-std]="p.tasa_iva > 0">
+                    {{ p.tasa_iva }}%
+                  </span>
+                </td>
+                <td class="price-cell">{{ formatPrecio(p.precio_venta) }}</td>
+                <td>
+                  <div class="stock-wrapper">
+                    <span class="stock-num"
+                          [class.critico]="stockNivel(p) === 'critico'"
+                          [class.alerta]="stockNivel(p) === 'alerta'">
+                      {{ p.stock_actual }}
+                    </span>
+                    <span class="stock-min">/ min {{ p.stock_alerta_min }}</span>
+                    @if (stockNivel(p) === 'critico') {
+                      <span class="stock-badge critico">Sin stock</span>
+                    } @else if (stockNivel(p) === 'alerta') {
+                      <span class="stock-badge alerta">Stock bajo</span>
+                    }
+                  </div>
+                </td>
+                <td class="actions-cell">
+                  <button class="icon-btn devolucion" (click)="abrirModalDevolucion(p)" title="Registrar devolución">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                  </button>
+                  <button class="icon-btn merma" (click)="abrirModalBaja(p)" title="Registrar baja por merma">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="15" y1="9" x2="9" y2="15"></line>
+                      <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                  </button>
+                  <button class="icon-btn deactivate" (click)="darDeBaja(p)" title="Desactivar del catálogo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Ingreso de Producto                             -->
+<!-- ══════════════════════════════════════════════════════ -->
+@if (mostrarModalIngreso()) {
+  <div class="modal-overlay" (click)="cerrarModalIngreso()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+
+      <!-- Header del modal -->
+      <div class="modal-header">
+        <div>
+          @if (modoModal() === 'actualizar_stock') {
+            <h2 class="modal-title">Actualizar Stock</h2>
+            <p class="modal-subtitle">Producto encontrado — ingresa la cantidad a añadir</p>
+          } @else {
+            <h2 class="modal-title">Ingresar Producto</h2>
+            <p class="modal-subtitle">Escanea el código de barras o completa el formulario</p>
+          }
+        </div>
+        <button class="modal-close" (click)="cerrarModalIngreso()" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Error dentro del modal -->
+      @if (errorMsg()) {
+        <div class="alert-error modal-alert" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          </svg>
+          {{ errorMsg() }}
+        </div>
+      }
+
+      <!-- ── SECCIÓN CÓDIGO DE BARRAS (siempre visible) ── -->
+      <div class="barcode-section">
+        <label for="input-codigo-barras" class="barcode-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <rect x="2" y="4" width="3" height="16"/><rect x="7" y="4" width="1" height="16"/>
+            <rect x="10" y="4" width="2" height="16"/><rect x="14" y="4" width="1" height="16"/>
+            <rect x="17" y="4" width="3" height="16"/><rect x="21" y="4" width="1" height="16"/>
+          </svg>
+          Código de Barras
+          <span class="barcode-hint">Escanea o escribe · Enter para verificar</span>
+        </label>
+        <div class="barcode-input-row">
+          <input
+            id="input-codigo-barras"
+            type="text"
+            placeholder="Apunta el scanner o escribe el código..."
+            class="barcode-input"
+            [formControl]="$any(form.get('codigo_barras'))"
+            (keydown.enter)="buscarPorCodigo()"
+            autocomplete="off"
+          />
+          @if (buscandoCodigo()) {
+            <span class="barcode-spinner">
+              <span class="spinner-sm"></span>
+            </span>
+          } @else {
+            <button
+              type="button"
+              class="btn-barcode-verify"
+              (click)="buscarPorCodigo()"
+              title="Verificar código"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Verificar
+            </button>
+          }
+          @if (modoModal() === 'actualizar_stock') {
+            <button type="button" class="btn-barcode-clear" (click)="limpiarCodigo()" title="Limpiar y crear nuevo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- ══ MODO: ACTUALIZAR STOCK ══ -->
+      @if (modoModal() === 'actualizar_stock' && productoEncontrado()) {
+        <div class="found-product-card">
+          <div class="found-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Producto Encontrado
+          </div>
+          <div class="found-product-info">
+            <div class="found-product-icon">{{ productoEncontrado()!.nombre[0].toUpperCase() }}</div>
+            <div class="found-product-details">
+              <span class="found-product-name">{{ productoEncontrado()!.nombre }}</span>
+              <span class="found-product-meta">
+                {{ productoEncontrado()!.nombre_categoria }} ·
+                {{ formatPrecio(productoEncontrado()!.precio_venta) }} ·
+                IVA {{ productoEncontrado()!.tasa_iva }}%
+              </span>
+            </div>
+            <div class="found-stock-info">
+              <span class="found-stock-label">Stock actual</span>
+              <span class="found-stock-value"
+                    [class.critico]="stockNivel(productoEncontrado()!) === 'critico'"
+                    [class.alerta]="stockNivel(productoEncontrado()!) === 'alerta'">
+                {{ productoEncontrado()!.stock_actual }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Cantidad a agregar -->
+          <div class="cantidad-agregar-row">
+            <label for="input-cantidad-agregar">Cantidad a ingresar *</label>
+            <div class="cantidad-controls">
+              <button type="button" class="qty-btn" (click)="cantidadAgregar.setValue((cantidadAgregar.value ?? 1) - 1)"
+                      [disabled]="(cantidadAgregar.value ?? 1) <= 1">−</button>
+              <input
+                id="input-cantidad-agregar"
+                type="number"
+                min="1"
+                class="qty-input"
+                [formControl]="cantidadAgregar"
+              />
+              <button type="button" class="qty-btn" (click)="cantidadAgregar.setValue((cantidadAgregar.value ?? 1) + 1)">+</button>
+            </div>
+            @if (cantidadAgregar.invalid && cantidadAgregar.touched) {
+              <span class="field-error">La cantidad debe ser al menos 1.</span>
+            }
+            @if (cantidadAgregar.valid) {
+              <span class="stock-preview">
+                Stock resultante: <strong>{{ productoEncontrado()!.stock_actual + (cantidadAgregar.value ?? 0) }}</strong>
+              </span>
+            }
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-ghost" (click)="cerrarModalIngreso()">Cancelar</button>
+            <button
+              id="btn-confirmar-stock"
+              type="button"
+              class="btn-primary"
+              (click)="guardarIngreso()"
+              [disabled]="cantidadAgregar.invalid || guardandoIngreso()">
+              @if (guardandoIngreso()) {
+                <span class="spinner-sm"></span> Guardando...
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Confirmar Ingreso
+              }
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- ══ MODO: CREAR NUEVO PRODUCTO ══ -->
+      @if (modoModal() === 'crear') {
+        <form [formGroup]="form" (ngSubmit)="guardarIngreso()" novalidate class="modal-form">
+
+          <!-- Nombre -->
+          <div class="field-group full-width">
+            <label for="input-nombre-producto">Nombre del producto *</label>
+            <input
+              id="input-nombre-producto"
+              type="text"
+              formControlName="nombre"
+              placeholder="Ej: Cuaderno universitario 100 hojas"
+              [class.invalid]="form.get('nombre')?.invalid && form.get('nombre')?.touched"
+            />
+            @if (form.get('nombre')?.invalid && form.get('nombre')?.touched) {
+              <span class="field-error">Ingresa un nombre de al menos 2 caracteres.</span>
+            }
+          </div>
+
+          <div class="form-row">
+            <!-- Categoría -->
+            <div class="field-group">
+              <label for="select-categoria">Categoría *</label>
+              <select
+                id="select-categoria"
+                formControlName="id_categoria"
+                class="select-input"
+                [class.invalid]="form.get('id_categoria')?.invalid && form.get('id_categoria')?.touched"
+              >
+                <option [value]="null" disabled selected>Selecciona una categoría</option>
+                @for (cat of categorias(); track cat.id_categoria) {
+                  <option [value]="cat.id_categoria">
+                    {{ cat.nombre }} (IVA {{ cat.tasa_iva }}%)
+                  </option>
+                }
+              </select>
+              @if (form.get('id_categoria')?.invalid && form.get('id_categoria')?.touched) {
+                <span class="field-error">Selecciona una categoría.</span>
+              }
+            </div>
+
+            <!-- Precio de venta -->
+            <div class="field-group">
+              <label for="input-precio">Precio de venta (en dólares) *</label>
+              <div class="input-prefix-wrapper">
+                <span class="input-prefix">$</span>
+                <input
+                  id="input-precio"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  formControlName="precio_venta"
+                  placeholder="0.00"
+                  class="with-prefix"
+                  [class.invalid]="form.get('precio_venta')?.invalid && form.get('precio_venta')?.touched"
+                />
+              </div>
+              @if (form.get('precio_venta')?.invalid && form.get('precio_venta')?.touched) {
+                <span class="field-error">Ingresa un precio válido (≥ 0).</span>
+              }
+            </div>
+          </div>
+
+          <div class="form-row">
+            <!-- Stock actual -->
+            <div class="field-group">
+              <label for="input-stock">Stock inicial</label>
+              <input
+                id="input-stock"
+                type="number"
+                min="0"
+                formControlName="stock_actual"
+                placeholder="0"
+                [class.invalid]="form.get('stock_actual')?.invalid && form.get('stock_actual')?.touched"
+              />
+              @if (form.get('stock_actual')?.invalid && form.get('stock_actual')?.touched) {
+                <span class="field-error">El stock no puede ser negativo.</span>
+              }
+            </div>
+
+            <!-- Stock alerta mínimo -->
+            <div class="field-group">
+              <label for="input-alerta">Alerta mínima de stock</label>
+              <input
+                id="input-alerta"
+                type="number"
+                min="0"
+                formControlName="stock_alerta_min"
+                placeholder="5"
+                [class.invalid]="form.get('stock_alerta_min')?.invalid && form.get('stock_alerta_min')?.touched"
+              />
+              @if (form.get('stock_alerta_min')?.invalid && form.get('stock_alerta_min')?.touched) {
+                <span class="field-error">El mínimo no puede ser negativo.</span>
+              }
+            </div>
+          </div>
+
+          <!-- Acciones del formulario -->
+          <div class="form-actions">
+            <button type="button" class="btn-ghost" (click)="cerrarModalIngreso()">Cancelar</button>
+            <button
+              id="btn-guardar-producto"
+              type="submit"
+              class="btn-primary"
+              [disabled]="form.invalid || guardandoIngreso()">
+              @if (guardandoIngreso()) {
+                <span class="spinner-sm"></span> Guardando...
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Crear Producto
+              }
+            </button>
+          </div>
+        </form>
+      }
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Baja de Merma (HU-04)                           -->
+<!-- ══════════════════════════════════════════════════════ -->
+@if (mostrarModalBaja() && productoBaja()) {
+  <div class="modal-overlay" (click)="cerrarModalBaja()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" style="color: #f87171;">Baja por Merma</h2>
+          <p class="modal-subtitle">Dar de baja unidades de "{{ productoBaja()!.nombre }}"</p>
+        </div>
+        <button class="modal-close" (click)="cerrarModalBaja()" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (errorMsg()) {
+        <div class="alert-error modal-alert" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          </svg>
+          {{ errorMsg() }}
+        </div>
+      }
+
+      <div class="stock-info-baja" style="margin-bottom: 16px; font-size: 0.85rem; color: #9ca3af;">
+        Stock disponible: <strong style="color: #e5e7eb;">{{ productoBaja()!.stock_actual }}</strong> unidades
+      </div>
+
+      <form [formGroup]="formBaja" (ngSubmit)="registrarBaja()" novalidate class="modal-form">
+        <div class="field-group full-width">
+          <label for="select-motivo-baja">Motivo de la merma *</label>
+          <select id="select-motivo-baja" formControlName="motivo" class="select-input"
+                  [class.invalid]="formBaja.get('motivo')?.invalid && formBaja.get('motivo')?.touched">
+            <option value="" disabled selected>Selecciona un motivo</option>
+            @for (m of motivos; track m) {
+              <option [value]="m">{{ m }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="field-group full-width">
+          <label for="input-cantidad-baja">Cantidad a dar de baja *</label>
+          <input id="input-cantidad-baja" type="number" min="1" [max]="productoBaja()!.stock_actual"
+                 formControlName="cantidad_baja" class="select-input"
+                 [class.invalid]="formBaja.get('cantidad_baja')?.invalid && formBaja.get('cantidad_baja')?.touched" />
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-ghost" (click)="cerrarModalBaja()">Cancelar</button>
+          <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #ef4444, #dc2626);"
+                  [disabled]="formBaja.invalid || guardandoBaja()">
+            @if (guardandoBaja()) {
+              <span class="spinner-sm"></span> Registrando...
+            } @else {
+              Registrar Baja
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Devolución                                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+@if (mostrarModalDevolucion() && productoDevolucion()) {
+  <div class="modal-overlay" (click)="cerrarModalDevolucion()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" style="color: #4ade80;">Registrar Devolución</h2>
+          <p class="modal-subtitle">Reponer unidades de "{{ productoDevolucion()!.nombre }}"</p>
+        </div>
+        <button class="modal-close" (click)="cerrarModalDevolucion()" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (errorMsg()) {
+        <div class="alert-error modal-alert" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          </svg>
+          {{ errorMsg() }}
+        </div>
+      }
+
+      <form [formGroup]="formDevolucion" (ngSubmit)="registrarDevolucion()" novalidate class="modal-form">
+        <div class="form-row">
+          <div class="field-group">
+            <label for="input-venta-id">ID Venta (Opcional)</label>
+            <input id="input-venta-id" type="number" min="1" formControlName="id_venta" placeholder="Ej: 1042" class="select-input" />
+          </div>
+          <div class="field-group">
+            <label for="input-cantidad-dev">Cantidad Devuelta *</label>
+            <input id="input-cantidad-dev" type="number" min="1" formControlName="cantidad_devuelta" class="select-input"
+                   [class.invalid]="formDevolucion.get('cantidad_devuelta')?.invalid && formDevolucion.get('cantidad_devuelta')?.touched" />
+          </div>
+        </div>
+
+        <div class="field-group full-width">
+          <label for="input-motivo-dev">Motivo de Devolución *</label>
+          <input id="input-motivo-dev" type="text" formControlName="motivo" placeholder="Ej: Cliente canceló la compra" class="select-input"
+                 [class.invalid]="formDevolucion.get('motivo')?.invalid && formDevolucion.get('motivo')?.touched" />
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-ghost" (click)="cerrarModalDevolucion()">Cancelar</button>
+          <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669);"
+                  [disabled]="formDevolucion.invalid || guardandoDevolucion()">
+            @if (guardandoDevolucion()) {
+              <span class="spinner-sm"></span> Registrando...
+            } @else {
+              Registrar Devolución
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -1,0 +1,65 @@
+/* src/app/pages/dashboard/dashboard.component.css */
+.page { display: flex; flex-direction: column; gap: 24px; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.page-title { font-size: 1.5rem; font-weight: 700; color: #f0f2f8; margin: 0 0 4px; }
+.page-subtitle { font-size: 0.875rem; color: #6b7280; margin: 0; }
+.page-subtitle strong { color: #c8cdd8; }
+
+.role-badge {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.role-badge.admin  { background: rgba(167,139,250,0.15); color: #a78bfa; }
+.role-badge.operator { background: rgba(79,142,247,0.15); color: #4F8EF7; }
+
+/* ── KPI Grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.kpi-card {
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.kpi-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.kpi-icon svg { width: 20px; height: 20px; }
+.kpi-icon.blue   { background: rgba(79,142,247,0.15); color: #4F8EF7; }
+.kpi-icon.green  { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.kpi-icon.orange { background: rgba(251,146,60,0.15); color: #fb923c; }
+.kpi-icon.purple { background: rgba(167,139,250,0.15); color: #a78bfa; }
+
+.kpi-info { display: flex; flex-direction: column; }
+.kpi-label { font-size: 0.75rem; color: #6b7280; }
+.kpi-value { font-size: 1.4rem; font-weight: 700; color: #f0f2f8; }
+
+/* ── Empty State ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
+  text-align: center;
+}
+.empty-state p { font-size: 0.875rem; color: #4b5563; margin: 0; }

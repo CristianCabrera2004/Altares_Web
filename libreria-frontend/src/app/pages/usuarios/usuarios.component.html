@@ -1,0 +1,206 @@
+<!-- src/app/pages/usuarios/usuarios.component.html -->
+<div class="page">
+
+  <!-- ── Header ── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Gestión de Usuarios</h1>
+      <p class="page-subtitle">Solo visible para el rol Administrador (CA 21)</p>
+    </div>
+    <button id="btn-nuevo-usuario" class="btn-primary" (click)="toggleForm()">
+      @if (mostrarForm()) {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        Cancelar
+      } @else {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nuevo Usuario
+      }
+    </button>
+  </div>
+
+  <!-- ── Mensajes globales ── -->
+  @if (successMsg()) {
+    <div class="alert-success" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      {{ successMsg() }}
+    </div>
+  }
+  @if (errorMsg()) {
+    <div class="alert-error" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {{ errorMsg() }}
+    </div>
+  }
+
+  <!-- ── Formulario Nuevo Usuario ── -->
+  @if (mostrarForm()) {
+    <div class="form-card">
+      <h2 class="form-title">Registrar Nuevo Usuario</h2>
+      <form [formGroup]="form" (ngSubmit)="crearUsuario()" novalidate class="user-form">
+        <div class="form-row">
+          <div class="field-group">
+            <label>Nombre completo *</label>
+            <input id="input-nombre" type="text" formControlName="nombre" placeholder="Ej: María García"
+              [class.invalid]="form.get('nombre')?.invalid && form.get('nombre')?.touched"/>
+            @if (form.get('nombre')?.invalid && form.get('nombre')?.touched) {
+              <span class="field-error">Mínimo 3 caracteres.</span>
+            }
+          </div>
+          <div class="field-group">
+            <label>Correo electrónico *</label>
+            <input id="input-email" type="email" formControlName="email" placeholder="usuario@losaltares.com"
+              [class.invalid]="form.get('email')?.invalid && form.get('email')?.touched"/>
+            @if (form.get('email')?.invalid && form.get('email')?.touched) {
+              <span class="field-error">Ingresa un email válido.</span>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field-group">
+            <label>Contraseña inicial *</label>
+            <input id="input-password" type="password" formControlName="password" placeholder="Mín. 8 caracteres"
+              [class.invalid]="form.get('password')?.invalid && form.get('password')?.touched"/>
+            @if (form.get('password')?.invalid && form.get('password')?.touched) {
+              <span class="field-error">Mínimo 8 caracteres.</span>
+            }
+          </div>
+          <div class="field-group">
+            <label>Rol *</label>
+            <select id="select-rol" formControlName="rol" class="select-input">
+              <option value="operador_caja">Operador de Caja</option>
+              <option value="admin_libreria">Administrador</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-ghost" (click)="toggleForm()">Cancelar</button>
+          <button id="btn-guardar-usuario" type="submit" class="btn-primary" [disabled]="form.invalid || guardando()">
+            @if (guardando()) { <span class="spinner-sm"></span> Guardando... }
+            @else { Crear Usuario }
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  <!-- ── Tabla de Usuarios ── -->
+  <div class="table-card">
+    @if (cargando()) {
+      <div class="loading-state">
+        <div class="spinner-lg"></div>
+        <span>Cargando usuarios...</span>
+      </div>
+    } @else if (usuarios().length === 0 && !errorMsg()) {
+      <div class="empty-state">
+        <svg viewBox="0 0 64 64" fill="none" width="48">
+          <circle cx="32" cy="32" r="30" stroke="#1e2130" stroke-width="2"/>
+          <path d="M24 28a8 8 0 1 0 16 0 8 8 0 0 0-16 0z" stroke="#4F8EF7" stroke-width="2"/>
+          <path d="M16 48c0-8.837 7.163-16 16-16s16 7.163 16 16" stroke="#4F8EF7" stroke-width="2"/>
+        </svg>
+        <p>No hay usuarios registrados aún.</p>
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th>Última sesión</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of usuarios(); track u.id_usuario) {
+              <tr [class.inactive-row]="u.estado === 'inactivo'">
+                <td class="user-cell">
+                  <div class="user-avatar-sm">{{ u.nombre[0] }}</div>
+                  <div class="user-meta">
+                    <span class="user-name">{{ u.nombre }}</span>
+                    <span class="user-email">{{ u.email }}</span>
+                  </div>
+                </td>
+
+                <!-- Rol: edición inline con select -->
+                <td>
+                  @if (editandoId() === u.id_usuario) {
+                    <div class="inline-edit">
+                      <select class="select-sm" [value]="rolEditado()" (change)="rolEditado.set($any($event.target).value)">
+                        <option value="operador_caja">Operador</option>
+                        <option value="admin_libreria">Administrador</option>
+                      </select>
+                      <button class="icon-btn confirm" (click)="guardarRol(u)" title="Confirmar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      </button>
+                      <button class="icon-btn cancel" (click)="cancelarEdicion()" title="Cancelar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  } @else {
+                    <span class="role-badge" [class.admin]="u.rol === 'admin_libreria'" [class.op]="u.rol !== 'admin_libreria'">
+                      {{ rolLabel(u.rol) }}
+                    </span>
+                  }
+                </td>
+
+                <!-- Estado -->
+                <td>
+                  <span class="status-badge" [class.active]="u.estado === 'activo'" [class.inactive]="u.estado !== 'activo'">
+                    <span class="dot"></span>
+                    {{ u.estado === 'activo' ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+
+                <!-- Última sesión -->
+                <td class="muted-cell">{{ u.ultima_sesion || '—' }}</td>
+
+                <!-- Acciones -->
+                <td class="actions-cell">
+                  <button class="icon-btn edit" (click)="iniciarEdicion(u)" title="Cambiar rol"
+                    [disabled]="editandoId() !== null">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <button
+                    class="icon-btn"
+                    [class.deactivate]="u.estado === 'activo'"
+                    [class.activate]="u.estado !== 'activo'"
+                    (click)="toggleEstado(u)"
+                    [title]="u.estado === 'activo' ? 'Desactivar usuario' : 'Reactivar usuario'">
+                    @if (u.estado === 'activo') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/>
+                        <line x1="16" y1="8" x2="8" y2="16"/>
+                      </svg>
+                    } @else {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                    }
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+</div>

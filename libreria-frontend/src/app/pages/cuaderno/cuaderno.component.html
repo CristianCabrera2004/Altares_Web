@@ -1,0 +1,377 @@
+<!-- src/app/pages/cuaderno/cuaderno.component.html -->
+
+<!-- ── Estado de ÉXITO: comprobante tras guardar ── -->
+@if (guardadoExitoso() && resumen(); as r) {
+  <div class="voucher-overlay">
+    <div class="voucher-card">
+      <div class="voucher-check">
+        <svg viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="22" stroke="#22c55e" stroke-width="2.5"/>
+          <polyline points="14 24 21 31 34 17" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2>¡Cuaderno Guardado!</h2>
+      <p>Las ventas fueron registradas en una transacción atómica exitosa</p>
+      <div class="voucher-details">
+        <div class="voucher-row">
+          <span>N° de Venta</span>
+          <strong>#{{ r.id_venta }}</strong>
+        </div>
+        <div class="voucher-row">
+          <span>Ítems Registrados</span>
+          <strong>{{ r.items }}</strong>
+        </div>
+        <div class="voucher-row total-row">
+          <span>Total Facturado</span>
+          <strong class="total-amount">{{ currency(r.total) }}</strong>
+        </div>
+      </div>
+      <button id="btn-nuevo-cuaderno" class="btn-primary" (click)="nuevoCuaderno()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nuevo Cuaderno
+      </button>
+    </div>
+  </div>
+}
+
+<!-- ── MODAL: Verificación de Arqueo de Caja (CA 5) ── -->
+@if (modalVisible()) {
+  <div class="modal-overlay" (click)="cerrarModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </div>
+        <div>
+          <h2>Verificar Arqueo de Caja</h2>
+          <p>Compare el total del sistema con el efectivo físico antes de confirmar (CA 5)</p>
+        </div>
+      </div>
+
+      <!-- Total del sistema -->
+      <div class="arqueo-system">
+        <span class="arqueo-label">Total del sistema (con IVA)</span>
+        <span class="arqueo-total">{{ currency(totales().total) }}</span>
+      </div>
+
+      <!-- Ingreso del efectivo físico -->
+      <div class="arqueo-field">
+        <label for="input-efectivo">Efectivo físico en caja ($)</label>
+        <input
+          id="input-efectivo"
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="0.00"
+          (input)="setEfectivo($event)"
+        />
+      </div>
+
+      <!-- Diferencia calculada -->
+      @if (efectivoCaja() > 0) {
+        <div class="diferencia-badge"
+          [class.exacto]="diferencia() === 0"
+          [class.excedente]="diferencia() > 0"
+          [class.faltante]="diferencia() < 0">
+          @if (diferencia() === 0) {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            El arqueo cuadra exactamente
+          } @else if (diferencia() > 0) {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Excedente en caja: +{{ currency(diferencia()) }}
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Faltante en caja: {{ currency(diferencia()) }}
+          }
+        </div>
+      }
+
+      @if (errorMsg()) {
+        <div class="modal-error">{{ errorMsg() }}</div>
+      }
+
+      <div class="modal-actions">
+        <button class="btn-ghost" (click)="cerrarModal()">Cancelar</button>
+        <button
+          id="btn-confirmar-guardar"
+          class="btn-confirm"
+          [disabled]="guardando()"
+          (click)="guardarCuaderno()">
+          @if (guardando()) {
+            <span class="spinner-sm"></span> Guardando...
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Confirmar y Guardar
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── PÁGINA PRINCIPAL ── -->
+<div class="page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Cuaderno del Día</h1>
+      <p class="page-subtitle">{{ fechaHoy }}</p>
+    </div>
+    <div class="header-actions">
+      @if (items().length > 0) {
+        <button class="btn-ghost-sm" (click)="limpiarCuaderno()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/>
+          </svg>
+          Limpiar
+        </button>
+      }
+      <button
+        id="btn-verificar-guardar"
+        class="btn-primary"
+        [disabled]="items().length === 0"
+        (click)="abrirModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        Verificar Arqueo
+        @if (items().length > 0) {
+          <span class="item-count">{{ items().length }}</span>
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Layout de dos paneles -->
+  <div class="cuaderno-layout">
+
+    <!-- ── Panel IZQUIERDO: Búsqueda de Productos (CA 1) ── -->
+    <div class="search-panel">
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Buscar Producto
+      </div>
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          id="input-buscar-producto"
+          type="search"
+          placeholder="Nombre o código de producto..."
+          [value]="termino()"
+          (input)="termino.set($any($event.target).value)"
+          (keydown.enter)="onEnterScanner()"
+          autocomplete="off"
+        />
+      </div>
+
+      @if (cargandoCatalogo()) {
+        <div class="search-loading">
+          <div class="spinner-md"></div>
+          <span>Cargando catálogo...</span>
+        </div>
+      } @else if (errorCatalogo()) {
+        <div class="search-error">
+          {{ errorCatalogo() }}
+          <button (click)="cargarCatalogo()">Reintentar</button>
+        </div>
+      } @else {
+        <div class="results-list">
+          @for (p of resultados(); track p.id_producto) {
+            <button
+              class="product-card"
+              [class.in-cuaderno]="idsEnCuaderno().has(p.id_producto)"
+              (click)="agregarItem(p)"
+              [title]="p.stock_actual === 0 ? 'Sin stock disponible' : 'Agregar al cuaderno'">
+
+              <div class="product-info">
+                <span class="product-name">{{ p.nombre }}</span>
+                <span class="product-meta">
+                  <span class="cat-badge">{{ p.nombre_categoria }}</span>
+                  <span class="iva-badge" [class.iva-0]="p.tasa_iva === 0" [class.iva-15]="p.tasa_iva > 0">
+                    IVA {{ p.tasa_iva }}%
+                  </span>
+                </span>
+              </div>
+
+              <div class="product-right">
+                <span class="product-price">{{ currency(p.precio_venta) }}</span>
+                <span class="stock-badge" [class.low]="p.stock_actual <= p.stock_alerta_min">
+                  Stock: {{ p.stock_actual }}
+                </span>
+                <div class="add-icon">
+                  @if (idsEnCuaderno().has(p.id_producto)) {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                  }
+                </div>
+              </div>
+            </button>
+          } @empty {
+            <div class="no-results">
+              <p>No se encontraron productos para "{{ termino() }}"</p>
+            </div>
+          }
+        </div>
+        @if (!termino()) {
+          <p class="hint-text">Escribe para buscar. Se muestran los primeros 8 productos.</p>
+        }
+      }
+    </div>
+
+    <!-- ── Panel DERECHO: Cuaderno Actual (CA 2 + CA 3) ── -->
+    <div class="cuaderno-panel">
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        Cuaderno Actual
+        @if (items().length > 0) {
+          <span class="count-pill">{{ items().length }}</span>
+        }
+      </div>
+
+      @if (items().length === 0) {
+        <div class="empty-cuaderno">
+          <svg viewBox="0 0 64 64" fill="none" width="52">
+            <rect x="10" y="4" width="44" height="56" rx="4" stroke="#1e2130" stroke-width="2"/>
+            <line x1="20" y1="20" x2="44" y2="20" stroke="#2d3148" stroke-width="2"/>
+            <line x1="20" y1="30" x2="36" y2="30" stroke="#2d3148" stroke-width="2"/>
+            <line x1="20" y1="40" x2="40" y2="40" stroke="#2d3148" stroke-width="2"/>
+          </svg>
+          <p>El cuaderno está vacío.<br>Busca y haz clic en un producto para agregarlo.</p>
+        </div>
+      } @else {
+        <!-- Tabla de ítems (CA 2) -->
+        <div class="items-table-wrapper">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>IVA</th>
+                <th class="center-col">Cantidad</th>
+                <th class="right-col">P. Unit.</th>
+                <th class="right-col">Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.producto.id_producto) {
+                <tr>
+                  <td class="item-nombre">
+                    <span>{{ item.producto.nombre }}</span>
+                    <span class="item-cat">{{ item.producto.nombre_categoria }}</span>
+                  </td>
+                  <td>
+                    <span class="iva-badge-sm"
+                      [class.iva-0]="item.producto.tasa_iva === 0"
+                      [class.iva-15]="item.producto.tasa_iva > 0">
+                      {{ item.producto.tasa_iva }}%
+                    </span>
+                  </td>
+
+                  <!-- CA 2: Cantidad editable con validación de stock -->
+                  <td class="center-col">
+                    <div class="qty-control">
+                      <button class="qty-btn" (click)="setCantidad(item.producto.id_producto, item.cantidad - 1)">−</button>
+                      <input
+                        type="number"
+                        class="qty-input"
+                        [value]="item.cantidad"
+                        min="1"
+                        [max]="item.producto.stock_actual"
+                        (change)="setCantidad(item.producto.id_producto, +$any($event.target).value)"
+                      />
+                      <button class="qty-btn" (click)="setCantidad(item.producto.id_producto, item.cantidad + 1)"
+                        [disabled]="item.cantidad >= item.producto.stock_actual">+</button>
+                    </div>
+                    @if (item.cantidad >= item.producto.stock_actual) {
+                      <span class="stock-warn">Máx. stock</span>
+                    }
+                  </td>
+
+                  <td class="right-col price-col">{{ currency(item.producto.precio_venta) }}</td>
+                  <td class="right-col price-col total-col">{{ currency(totalLinea(item)) }}</td>
+
+                  <td>
+                    <button class="remove-btn" (click)="eliminarItem(item.producto.id_producto)" title="Quitar">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- CA 3: Resumen de totales con IVA diferenciado -->
+        <div class="totales-section">
+          <div class="totales-grid">
+            <div class="totales-row">
+              <span class="totales-label">
+                <span class="dot-0"></span> Base gravada 0% (papelería)
+              </span>
+              <span class="totales-value">{{ currency(totales().base0) }}</span>
+            </div>
+            <div class="totales-row">
+              <span class="totales-label">
+                <span class="dot-15"></span> Base gravada 15%
+              </span>
+              <span class="totales-value">{{ currency(totales().base15) }}</span>
+            </div>
+            <div class="totales-row iva-row">
+              <span class="totales-label">IVA 15%</span>
+              <span class="totales-value">{{ currency(totales().iva15) }}</span>
+            </div>
+            <div class="totales-row total-final">
+              <span>TOTAL A COBRAR</span>
+              <span class="total-amount">{{ currency(totales().total) }}</span>
+            </div>
+          </div>
+
+          <button
+            id="btn-abrir-arqueo"
+            class="btn-confirm-lg"
+            (click)="abrirModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Verificar Arqueo y Guardar
+          </button>
+        </div>
+      }
+    </div>
+
+  </div><!-- /cuaderno-layout -->
+</div><!-- /page -->
