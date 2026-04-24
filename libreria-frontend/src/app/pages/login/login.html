@@ -1,0 +1,19 @@
+<div style="max-width: 350px; margin: 60px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+  <h2 style="text-align: center;">{{ isLoginMode ? 'Login' : 'Registro' }}</h2>
+  
+  <p *ngIf="mensaje" style="color: blue; text-align: center;">{{ mensaje }}</p>
+
+  <form (ngSubmit)="onSubmit()" style="display: flex; flex-direction: column; gap: 10px;">
+    <input *ngIf="!isLoginMode" type="text" [(ngModel)]="nombre" name="nombre" placeholder="Nombre completo" required>
+    <input type="email" [(ngModel)]="email" name="email" placeholder="Correo" required>
+    <input type="password" [(ngModel)]="password" name="password" placeholder="Contraseña" required>
+    
+    <button type="submit" style="background: #28a745; color: white; padding: 10px; border: none; cursor: pointer;">
+      {{ isLoginMode ? 'Entrar' : 'Registrarme' }}
+    </button>
+  </form>
+
+  <button (click)="toggleMode()" style="margin-top: 15px; background: none; border: none; color: #007bff; cursor: pointer; width: 100%;">
+    {{ isLoginMode ? '¿No tienes cuenta? Crea una' : '¿Ya tienes cuenta? Logueate' }}
+  </button>
+</div>
