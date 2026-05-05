@@ -10,8 +10,8 @@
           <polyline points="14 24 21 31 34 17" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <h2>¡Cuaderno Guardado!</h2>
-      <p>Las ventas fueron registradas en una transacción atómica exitosa</p>
+      <h2>¡Factura Guardada!</h2>
+      <p>La venta fue registrada en una transacción atómica exitosa</p>
       <div class="voucher-details">
         <div class="voucher-row">
           <span>N° de Venta</span>
@@ -30,7 +30,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
-        Nuevo Cuaderno
+        Nueva Factura
       </button>
     </div>
   </div>
@@ -48,9 +48,57 @@
           </svg>
         </div>
         <div>
-          <h2>Verificar Arqueo de Caja</h2>
-          <p>Compare el total del sistema con el efectivo físico antes de confirmar (CA 5)</p>
+          <h2>Confirmar Factura y Arqueo</h2>
+          <p>Ingrese los datos de facturación y el efectivo físico en caja</p>
         </div>
+      </div>
+
+      <!-- ── Datos de Facturación ── -->
+      <div class="billing-section" style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #1e2130;">
+        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #d0d5e8; font-size: 0.9rem;">
+            <input type="radio" name="tipoCliente" value="final" [checked]="tipoCliente() === 'final'" (change)="tipoCliente.set('final')" style="accent-color: #4F8EF7;">
+            Consumidor Final
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #d0d5e8; font-size: 0.9rem;">
+            <input type="radio" name="tipoCliente" value="datos" [checked]="tipoCliente() === 'datos'" (change)="tipoCliente.set('datos')" style="accent-color: #4F8EF7;">
+            Con Datos
+          </label>
+        </div>
+
+        @if (tipoCliente() === 'datos') {
+          <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #a0a8bb; font-size: 0.85rem;">
+              <input type="radio" name="tipoFactura" value="fisica" [checked]="tipoFactura() === 'fisica'" (change)="tipoFactura.set('fisica')" style="accent-color: #22c55e;">
+              Factura Física
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #a0a8bb; font-size: 0.85rem;">
+              <input type="radio" name="tipoFactura" value="digital" [checked]="tipoFactura() === 'digital'" (change)="tipoFactura.set('digital')" style="accent-color: #22c55e;">
+              Factura Digital
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="arqueo-field" style="margin-bottom: 0;">
+              <label>RUC / CI</label>
+              <input type="text" placeholder="Identificación..." [value]="clienteIdentificacion()" (input)="clienteIdentificacion.set($any($event.target).value)" />
+            </div>
+            <div class="arqueo-field" style="margin-bottom: 0;">
+              <label>Nombre / Razón Social</label>
+              <input type="text" placeholder="Nombre completo..." [value]="clienteNombre()" (input)="clienteNombre.set($any($event.target).value)" />
+            </div>
+            @if (tipoFactura() === 'digital') {
+              <div class="arqueo-field" style="margin-bottom: 0;">
+                <label>Correo Electrónico</label>
+                <input type="email" placeholder="correo@ejemplo.com" [value]="clienteCorreo()" (input)="clienteCorreo.set($any($event.target).value)" />
+              </div>
+              <div class="arqueo-field" style="margin-bottom: 0;">
+                <label>Teléfono (opcional)</label>
+                <input type="text" placeholder="099..." [value]="clienteTelefono()" (input)="clienteTelefono.set($any($event.target).value)" />
+              </div>
+            }
+          </div>
+        }
       </div>
 
       <!-- Total del sistema -->
@@ -130,7 +178,7 @@
   <!-- Header -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Cuaderno del Día</h1>
+      <h1 class="page-title">Facturación</h1>
       <p class="page-subtitle">{{ fechaHoy }}</p>
     </div>
     <div class="header-actions">
@@ -171,19 +219,45 @@
         </svg>
         Buscar Producto
       </div>
-      <div class="search-wrapper">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input
-          id="input-buscar-producto"
-          type="search"
-          placeholder="Nombre o código de producto..."
-          [value]="termino()"
-          (input)="termino.set($any($event.target).value)"
-          (keydown.enter)="onEnterScanner()"
-          autocomplete="off"
-        />
+      <div class="search-toolbar">
+        <div class="search-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            id="input-buscar-producto"
+            type="search"
+            placeholder="Nombre o código..."
+            class="search-input"
+            [value]="termino()"
+            (input)="termino.set($any($event.target).value)"
+            (keydown.enter)="onEnterScanner()"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="filter-group">
+
+          <div class="sort-group">
+            <span class="sort-label">ORDENAR:</span>
+            <button class="sort-btn" [class.active]="sortField() === 'nombre'" (click)="setSort('nombre')">
+              A–Z
+              @if (sortField() === 'nombre') { <span class="sort-arrow">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span> }
+            </button>
+            <button class="sort-btn" [class.active]="sortField() === 'precio_venta'" (click)="setSort('precio_venta')">
+              Precio
+              @if (sortField() === 'precio_venta') { <span class="sort-arrow">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span> }
+            </button>
+            <button class="sort-btn" [class.active]="sortField() === 'stock_actual'" (click)="setSort('stock_actual')">
+              Stock
+              @if (sortField() === 'stock_actual') { <span class="sort-arrow">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span> }
+            </button>
+          </div>
+        </div>
+        
+        <div class="results-count">
+          {{ resultados().length }} resultados
+        </div>
       </div>
 
       @if (cargandoCatalogo()) {
@@ -239,13 +313,13 @@
             </div>
           }
         </div>
-        @if (!termino()) {
-          <p class="hint-text">Escribe para buscar. Se muestran los primeros 8 productos.</p>
+        @if (!termino() && filtroStock() === 'todos') {
+          <p class="hint-text">Escribe o usa el filtro para buscar. Se muestran los primeros 20 productos.</p>
         }
       }
     </div>
 
-    <!-- ── Panel DERECHO: Cuaderno Actual (CA 2 + CA 3) ── -->
+    <!-- ── Panel DERECHO: Factura Actual (CA 2 + CA 3) ── -->
     <div class="cuaderno-panel">
       <div class="panel-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -253,7 +327,7 @@
           <polyline points="14 2 14 8 20 8"/>
           <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
         </svg>
-        Cuaderno Actual
+        Factura Actual
         @if (items().length > 0) {
           <span class="count-pill">{{ items().length }}</span>
         }
@@ -267,7 +341,7 @@
             <line x1="20" y1="30" x2="36" y2="30" stroke="#2d3148" stroke-width="2"/>
             <line x1="20" y1="40" x2="40" y2="40" stroke="#2d3148" stroke-width="2"/>
           </svg>
-          <p>El cuaderno está vacío.<br>Busca y haz clic en un producto para agregarlo.</p>
+          <p>La factura está vacía.<br>Busca y haz clic en un producto para agregarlo.</p>
         </div>
       } @else {
         <!-- Tabla de ítems (CA 2) -->

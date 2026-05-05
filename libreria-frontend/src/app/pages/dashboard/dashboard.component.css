@@ -63,3 +63,222 @@
   text-align: center;
 }
 .empty-state p { font-size: 0.875rem; color: #4b5563; margin: 0; }
+
+/* ── Predictions Section (HU-03) ── */
+.predictions-section {
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.section-header { display: flex; flex-direction: column; gap: 4px; }
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f0f2f8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.section-title svg { width: 18px; color: #fb923c; }
+.section-desc { font-size: 0.8rem; color: #6b7280; margin: 0; }
+
+/* Estados */
+.loading-state, .error-state {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.spinner {
+  width: 24px; height: 24px;
+  border: 2px solid #2d3148;
+  border-top-color: #4F8EF7;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-state p { color: #ef4444; }
+
+/* Tabla */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.data-table th, .data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e2130;
+}
+.data-table th {
+  text-align: left;
+  font-weight: 500;
+  color: #6b7280;
+  background: rgba(255,255,255,0.02);
+}
+.data-table td { color: #c8cdd8; }
+.product-name { font-weight: 500; color: #f0f2f8; }
+
+.text-right { text-align: right !important; }
+.text-center { text-align: center !important; }
+.text-highlight { color: #fb923c !important; font-weight: 600; }
+.text-muted { color: #6b7280 !important; }
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid #2d3148;
+  color: #a78bfa;
+  border-radius: 8px;
+  width: 32px; height: 32px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.btn-icon:hover {
+  background: rgba(167,139,250,0.1);
+  border-color: #a78bfa;
+}
+
+/* ── Modal & Invoice (HU-02) ── */
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+.ml-4 { margin-left: 16px; }
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #1e2130;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-title { font-size: 1.25rem; font-weight: 600; color: #f0f2f8; margin: 0; }
+.close-btn { background: none; border: none; color: #6b7280; font-size: 1.5rem; cursor: pointer; }
+.close-btn:hover { color: #f0f2f8; }
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #1e2130;
+  display: flex; justify-content: flex-end; gap: 12px;
+}
+
+/* ── Invoice Specifics ── */
+.invoice-header-print {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px dashed #2d3148;
+}
+.invoice-header-print h2 { font-size: 1.5rem; margin: 0 0 8px; color: #f0f2f8; }
+.invoice-header-print p { margin: 0 0 4px; color: #a0a8bb; }
+.invoice-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #c8cdd8;
+}
+
+.invoice-totals {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  width: 250px;
+  color: #a0a8bb;
+}
+.grand-total {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #22c55e;
+  border-top: 1px solid #2d3148;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.xml-mock {
+  margin-top: 32px;
+  padding: 16px;
+  background: #0f1115;
+  border: 1px solid #1e2130;
+  border-radius: 8px;
+}
+.xml-mock h4 { margin: 0 0 8px; color: #6b7280; font-size: 0.8rem; text-transform: uppercase; }
+.xml-mock code { color: #a78bfa; font-size: 0.8rem; word-break: break-all; }
+
+/* ── Botones Generales ── */
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  transition: 0.2s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: #4F8EF7; color: white; }
+.btn-primary:hover:not(:disabled) { background: #3b76db; }
+.btn-secondary { background: transparent; border: 1px solid #2d3148; color: #f0f2f8; }
+.btn-secondary:hover { background: #2d3148; }
+
+/* ── Print Styles (HU-02) ── */
+@media print {
+  body * { visibility: hidden; }
+  .printable-area, .printable-area * { visibility: visible; }
+  .printable-area {
+    position: absolute;
+    left: 0; top: 0; width: 100%;
+    background: white;
+    color: black;
+  }
+  .printable-area h2, .printable-area p, .printable-area span, .printable-area td { color: black !important; }
+  .invoice-header-print { border-bottom-color: #ccc; }
+  .data-table th { background: #f3f4f6; color: black; }
+  .data-table td { border-bottom-color: #e5e7eb; }
+  .grand-total { border-top-color: #000; color: black; }
+  .xml-mock { display: none; } /* No imprimir el XML */
+}

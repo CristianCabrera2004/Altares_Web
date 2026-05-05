@@ -1,13 +1,18 @@
 // src/app/app.routes.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// HT-06 CA 60: Login, Dashboard, Inventario, Reportes.
-// HU-05 CA 21: Ruta /usuarios protegida con adminGuard (solo admin_libreria).
-// HU-05 CA 22: Ruta /reportes protegida con adminGuard (oculta para Operador).
-// HU-05 CA 61: authGuard en el shell padre protege todas las rutas hijas.
+// Distribución de roles:
+//   operador       → Dashboard, Cuaderno, Inventario, Reportes, Predicciones
+//   admin_libreria → Gestión de Usuarios + Auditoría (SOLO esto)
+//
+// Guards:
+//   authGuard     → Valida JWT válido (shell padre)
+//   operadorGuard → Permite solo 'operador'; redirige admin a /usuarios
+//   adminGuard    → Permite solo 'admin_libreria'; redirige operador a /dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 import { Routes } from '@angular/router';
-import { authGuard }  from './core/guards/auth.guard';
-import { adminGuard } from './core/guards/admin.guard';
+import { authGuard }     from './core/guards/auth.guard';
+import { adminGuard }    from './core/guards/admin.guard';
+import { operadorGuard } from './core/guards/operador.guard';
 import { LayoutComponent } from './shared/layout/layout.component';
 
 export const routes: Routes = [
@@ -29,45 +34,53 @@ export const routes: Routes = [
     component: LayoutComponent,
     canActivate: [authGuard],
     children: [
-      // Disponible para ambos roles (Admin y Operador)
+
+      // ── RUTAS DEL OPERADOR ────────────────────────────────────────────────
+      // operadorGuard bloquea al admin y lo redirige a /usuarios
       {
         path: 'dashboard',
+        canActivate: [operadorGuard],
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent),
         title: 'Dashboard · Los Altares'
       },
-      // HU-01: Cuaderno de ventas diarias (Operador + Admin)
       {
         path: 'cuaderno',
+        canActivate: [operadorGuard],
         loadComponent: () =>
           import('./pages/cuaderno/cuaderno.component').then(m => m.CuadernoComponent),
         title: 'Cuaderno del Día · Los Altares'
       },
-      // CA 22: Inventario visible para Operador y Administrador
       {
         path: 'inventario',
+        canActivate: [operadorGuard],
         loadComponent: () =>
           import('./pages/inventario/inventario.component').then(m => m.InventarioComponent),
         title: 'Inventario · Los Altares'
       },
-
-      // CA 22: Reportes solo para Administrador (adminGuard bloquea a Operadores)
       {
         path: 'reportes',
-        canActivate: [adminGuard],
+        canActivate: [operadorGuard],
         loadComponent: () =>
           import('./pages/reportes/reportes.component').then(m => m.ReportesComponent),
         title: 'Reportes · Los Altares'
       },
 
-      // CA 21: Módulo de Usuarios — exclusivo para Administrador
-      // adminGuard redirige a /dashboard si el rol es 'operador_caja'
+      // ── RUTAS DEL ADMINISTRADOR ───────────────────────────────────────────
+      // adminGuard bloquea al operador y lo redirige a /dashboard
       {
         path: 'usuarios',
         canActivate: [adminGuard],
         loadComponent: () =>
           import('./pages/usuarios/usuarios.component').then(m => m.UsuariosComponent),
         title: 'Gestión de Usuarios · Los Altares'
+      },
+      {
+        path: 'usuarios/auditoria',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/usuarios/auditoria/auditoria.component').then(m => m.AuditoriaComponent),
+        title: 'Auditoría · Los Altares'
       }
     ]
   },

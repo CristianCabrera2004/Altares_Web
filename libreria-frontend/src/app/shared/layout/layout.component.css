@@ -76,6 +76,17 @@
   margin: 8px 0;
 }
 
+.nav-section-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a78bfa;
+  padding: 8px 12px 4px;
+  opacity: 0.8;
+}
+
 /* ── Footer ── */
 .sidebar-footer {
   padding: 12px 8px;

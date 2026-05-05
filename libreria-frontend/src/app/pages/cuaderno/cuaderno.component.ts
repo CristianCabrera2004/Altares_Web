@@ -12,6 +12,8 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
 // Espeja el struct Producto del backend (incluye tasa_iva del JOIN con categorias)
@@ -58,6 +60,11 @@ export class CuadernoComponent implements OnInit {
 
   // ── Búsqueda (CA 1) ─────────────────────────────────────────────────────
   readonly termino = signal('');
+  readonly filtroStock = signal<'todos' | 'con_stock' | 'agotados'>('todos');
+  
+  // ── Ordenamiento ────────────────────────────────────────────────────────
+  readonly sortField = signal<keyof ProductoCatalogo>('nombre');
+  readonly sortDir   = signal<'asc' | 'desc'>('asc');
 
   // ── Ítems del cuaderno (CA 2) ────────────────────────────────────────────
   readonly items = signal<ItemCuaderno[]>([]);
@@ -70,23 +77,55 @@ export class CuadernoComponent implements OnInit {
   readonly guardadoExitoso  = signal(false);
   readonly resumen          = signal<{ id_venta: number; total: number; items: number } | null>(null);
 
+  // ── Datos de Facturación ─────────────────────────────────────────────────
+  readonly tipoCliente      = signal<'final' | 'datos'>('final');
+  readonly tipoFactura      = signal<'fisica' | 'digital'>('fisica');
+  readonly clienteIdentificacion = signal('');
+  readonly clienteNombre    = signal('');
+  readonly clienteDireccion = signal('');
+  readonly clienteTelefono  = signal('');
+  readonly clienteCorreo    = signal('');
+
   // ── Fecha para el encabezado ─────────────────────────────────────────────
   readonly fechaHoy = new Date().toLocaleDateString('es-EC', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
   // ── Computed: resultados de búsqueda (CA 1) ──────────────────────────────
-  // Filtra por nombre (contains) o por id_producto (exacto, búsqueda por código).
+  // Filtra por nombre (contains) o por id_producto (exacto).
   readonly resultados = computed<ProductoCatalogo[]>(() => {
     const t = this.termino().trim().toLowerCase();
-    const cat = this.catalogo();
-    if (!t) return cat.slice(0, 8);
-    return cat
-      .filter(p =>
+    let lista = this.catalogo();
+
+    if (t) {
+      lista = lista.filter(p =>
         p.nombre.toLowerCase().includes(t) ||
         p.id_producto.toString() === t
-      )
-      .slice(0, 20);
+      );
+    }
+
+    const stock = this.filtroStock();
+    if (stock === 'con_stock') {
+      lista = lista.filter(p => p.stock_actual > 0);
+    } else if (stock === 'agotados') {
+      lista = lista.filter(p => p.stock_actual === 0);
+    }
+
+    // Ordenar
+    const campo = this.sortField();
+    const dir = this.sortDir();
+    lista = [...lista].sort((a, b) => {
+      let va: string | number = a[campo];
+      let vb: string | number = b[campo];
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ?  1 : -1;
+      return 0;
+    });
+
+    // Sin filtros: primeros 20; con filtro: hasta 50
+    return lista.slice(0, (t || stock !== 'todos') ? 50 : 20);
   });
 
   // IDs que ya están en el cuaderno (para marcar visualmente en los resultados)
@@ -136,6 +175,16 @@ export class CuadernoComponent implements OnInit {
         this.cargandoCatalogo.set(false);
       }
     });
+  }
+
+  // ── Ordenamiento ─────────────────────────────────────────────────────────
+  setSort(campo: keyof ProductoCatalogo): void {
+    if (this.sortField() === campo) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(campo);
+      this.sortDir.set('asc'); // Por defecto al cambiar de campo
+    }
   }
 
   // ── Gestión de ítems (CA 2) ──────────────────────────────────────────────
@@ -258,6 +307,8 @@ export class CuadernoComponent implements OnInit {
 
     const payload = {
       id_usuario: idUsuario,
+      cliente_identificacion: this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
+      cliente_nombre: this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
       items: this.items().map(item => ({
         id_producto:     item.producto.id_producto,
         cantidad:        item.cantidad,
@@ -278,6 +329,11 @@ export class CuadernoComponent implements OnInit {
           this.guardadoExitoso.set(true);
           this.modalVisible.set(false);
           this.guardando.set(false);
+
+          if (this.tipoFactura() === 'fisica') {
+            this.generarYDescargarFacturaFisica(res.id_venta, payload.cliente_nombre, payload.cliente_identificacion, this.items());
+          }
+
           this.items.set([]);             // Limpiar cuaderno tras guardar
         },
         error: err => {
@@ -287,9 +343,80 @@ export class CuadernoComponent implements OnInit {
       });
   }
 
+  generarYDescargarFacturaFisica(idVenta: number, clienteNombre: string, clienteIdentificacion: string, itemsFactura: ItemCuaderno[]): void {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a5'
+    });
+
+    const numFactura = idVenta.toString().padStart(6, '0');
+    const fecha = new Date().toLocaleString('es-EC');
+
+    // Header
+    doc.setFontSize(16);
+    doc.text('LIBRERÍA "LOS ALTARES"', 74, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.text(`Factura Nro: ${numFactura}`, 10, 25);
+    doc.text(`Fecha: ${fecha}`, 10, 30);
+    doc.text(`Cliente: ${clienteNombre}`, 10, 35);
+    doc.text(`RUC/CI: ${clienteIdentificacion}`, 10, 40);
+
+    let subtotal = 0;
+    let totalIva = 0;
+
+    const tableData = itemsFactura.map(item => {
+      const totalLinea = this.totalLinea(item);
+      const lineaBase = item.producto.precio_venta * item.cantidad;
+      const ivaLinea = totalLinea - lineaBase;
+      
+      subtotal += lineaBase;
+      totalIva += ivaLinea;
+
+      return [
+        item.cantidad.toString(),
+        item.producto.nombre,
+        this.currency(item.producto.precio_venta),
+        this.currency(totalLinea)
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 45,
+      head: [['Cant', 'Descripción', 'V. Unit', 'Total']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [79, 142, 247] },
+      margin: { left: 10, right: 10 }
+    });
+
+    // Summary
+    const finalY = (doc as any).lastAutoTable.finalY || 45;
+    
+    doc.setFontSize(9);
+    doc.text(`Subtotal: ${this.currency(subtotal)}`, 85, finalY + 10);
+    doc.text(`IVA: ${this.currency(totalIva)}`, 85, finalY + 15);
+    doc.setFontSize(11);
+    doc.text(`TOTAL A PAGAR: ${this.currency(subtotal + totalIva)}`, 85, finalY + 22);
+
+    doc.setFontSize(10);
+    doc.text('¡Gracias por su compra!', 74, finalY + 35, { align: 'center' });
+
+    doc.save(`Factura_${numFactura}.pdf`);
+  }
+
   nuevoCuaderno(): void {
     this.guardadoExitoso.set(false);
     this.resumen.set(null);
     this.termino.set('');
+    this.tipoCliente.set('final');
+    this.tipoFactura.set('fisica');
+    this.clienteIdentificacion.set('');
+    this.clienteNombre.set('');
+    this.clienteDireccion.set('');
+    this.clienteTelefono.set('');
+    this.clienteCorreo.set('');
   }
 }

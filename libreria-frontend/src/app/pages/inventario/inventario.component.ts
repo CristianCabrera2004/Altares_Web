@@ -64,6 +64,11 @@ export class InventarioComponent implements OnInit {
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
 
+  // ─── Filtros de ordenamiento ──────────────────────────────────────────────
+  readonly sortField = signal<'nombre' | 'precio_venta' | 'stock_actual'>('nombre');
+  readonly sortDir   = signal<'asc' | 'desc'>('asc');
+  readonly filtroCat = signal<number | null>(null);  // null = todas las categorías
+
   // ─── Modal Ingresar Producto ──────────────────────────────────────────────
   readonly mostrarModalIngreso    = signal(false);
   readonly guardandoIngreso       = signal(false);
@@ -105,14 +110,51 @@ export class InventarioComponent implements OnInit {
     stock_alerta_min:[5,  [Validators.required, Validators.min(0)]]
   });
 
-  // ─── Productos filtrados ──────────────────────────────────────────────────
+  // ─── Modal Editar Producto ────────────────────────────────────────────────
+  readonly mostrarModalEditar = signal(false);
+  readonly productoEditar     = signal<Producto | null>(null);
+  readonly guardandoEdicion   = signal(false);
+
+  readonly formEditar = this.fb.group({
+    codigo_barras:   [''],
+    nombre:          ['', [Validators.required, Validators.minLength(2)]],
+    id_categoria:    [null as number | null, Validators.required],
+    precio_venta:    [null as number | null, [Validators.required, Validators.min(0)]],
+    stock_actual:    [0,  [Validators.required, Validators.min(0)]],
+    stock_alerta_min:[5,  [Validators.required, Validators.min(0)]],
+    estado:          ['activo', Validators.required]
+  });
+
+  // ─── Productos filtrados y ordenados ─────────────────────────────────────
   readonly productosFiltrados = computed(() => {
-    const q = this.busqueda().toLowerCase().trim();
-    if (!q) return this.productos();
-    return this.productos().filter(p =>
+    const q      = this.busqueda().toLowerCase().trim();
+    const campo  = this.sortField();
+    const dir    = this.sortDir();
+    const catId  = this.filtroCat();
+
+    let lista = this.productos();
+
+    // Filtrar por búsqueda de texto
+    if (q) lista = lista.filter(p =>
       p.nombre.toLowerCase().includes(q) ||
       p.nombre_categoria.toLowerCase().includes(q)
     );
+
+    // Filtrar por categoría
+    if (catId !== null) lista = lista.filter(p => p.id_categoria === catId);
+
+    // Ordenar
+    lista = [...lista].sort((a, b) => {
+      let va: string | number = a[campo];
+      let vb: string | number = b[campo];
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ?  1 : -1;
+      return 0;
+    });
+
+    return lista;
   });
 
   ngOnInit(): void {
@@ -354,6 +396,67 @@ export class InventarioComponent implements OnInit {
     });
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // MODAL: EDITAR PRODUCTO
+  // ═══════════════════════════════════════════════════════════
+  abrirModalEditar(p: Producto): void {
+    this.productoEditar.set(p);
+    this.formEditar.patchValue({
+      codigo_barras:   p.codigo_barras ?? '',
+      nombre:          p.nombre,
+      id_categoria:    p.id_categoria,
+      precio_venta:    p.precio_venta / 100,
+      stock_actual:    p.stock_actual,
+      stock_alerta_min: p.stock_alerta_min,
+      estado:          p.estado
+    });
+    this.errorMsg.set('');
+    this.mostrarModalEditar.set(true);
+  }
+
+  cerrarModalEditar(): void {
+    this.mostrarModalEditar.set(false);
+    this.productoEditar.set(null);
+    this.formEditar.reset({ estado: 'activo' });
+    this.errorMsg.set('');
+  }
+
+  guardarEdicion(): void {
+    if (this.formEditar.invalid || this.guardandoEdicion()) {
+      this.formEditar.markAllAsTouched();
+      return;
+    }
+    const p = this.productoEditar();
+    if (!p) return;
+
+    this.guardandoEdicion.set(true);
+    this.errorMsg.set('');
+    const raw = this.formEditar.value;
+    const payload = {
+      codigo_barras:    (raw.codigo_barras ?? '').trim(),
+      nombre:           raw.nombre,
+      id_categoria:     Number(raw.id_categoria),
+      precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),
+      stock_actual:     raw.stock_actual ?? 0,
+      stock_alerta_min: raw.stock_alerta_min ?? 5,
+      estado:           raw.estado ?? 'activo'
+    };
+
+    this.http.put<{ mensaje: string; producto: Producto }>(`${this.apiProductos}?id=${p.id_producto}`, payload).subscribe({
+      next: (res) => {
+        this.successMsg.set(`✓ ${res.mensaje}`);
+        this.guardandoEdicion.set(false);
+        this.cerrarModalEditar();
+        this.cargarProductos();
+        setTimeout(() => this.successMsg.set(''), 5000);
+      },
+      error: (err) => {
+        this.errorMsg.set(err?.error?.error ?? 'Error al actualizar el producto.');
+        this.guardandoEdicion.set(false);
+      }
+    });
+  }
+
   // ─── Baja lógica (desactivar del catálogo) ───────────────────────────────
   darDeBaja(p: Producto): void {
     if (!confirm(`¿Desactivar "${p.nombre}" del catálogo?\nEl producto quedará inactivo pero sus registros se conservan.`)) return;
@@ -378,4 +481,23 @@ export class InventarioComponent implements OnInit {
   }
 
   setBusqueda(value: string): void { this.busqueda.set(value); }
+
+  setSort(campo: 'nombre' | 'precio_venta' | 'stock_actual'): void {
+    if (this.sortField() === campo) {
+      // Mismo campo → invertir dirección
+      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(campo);
+      this.sortDir.set('asc');
+    }
+  }
+
+  setFiltroCat(valor: string): void {
+    this.filtroCat.set(valor === '' ? null : Number(valor));
+  }
+
+  sortIcon(campo: 'nombre' | 'precio_venta' | 'stock_actual'): string {
+    if (this.sortField() !== campo) return '↕';
+    return this.sortDir() === 'asc' ? '↑' : '↓';
+  }
 }

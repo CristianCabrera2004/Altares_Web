@@ -165,7 +165,7 @@ CREATE TABLE operaciones.detalle_ventas (
 
 CREATE TABLE operaciones.devoluciones (
     id_devolucion SERIAL PRIMARY KEY,
-    id_venta INT NOT NULL REFERENCES operaciones.ventas(id_venta),
+    id_venta INT REFERENCES operaciones.ventas(id_venta),
     id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
     id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
     cantidad_devuelta INT NOT NULL,

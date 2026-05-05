@@ -42,8 +42,11 @@
   background: #16181f; border: 1px solid #1e2130;
   border-radius: 14px; overflow: hidden;
 }
-.table-toolbar { padding: 16px; border-bottom: 1px solid #1e2130; }
-.search-wrapper { position: relative; max-width: 360px; }
+.table-toolbar {
+  padding: 14px 16px; border-bottom: 1px solid #1e2130;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.search-wrapper { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; color: #4b5563; }
 .search-input {
   width: 100%; padding: 9px 12px 9px 36px;
@@ -358,3 +361,40 @@
   font-size: 0.8rem; color: #6b7280;
 }
 .stock-preview strong { color: #4ade80; font-size: 0.95rem; }
+
+/* ── Filtros y Ordenamiento ── */
+.filter-select {
+  padding: 8px 12px;
+  background: #1e2130; border: 1px solid #2d3148; border-radius: 8px;
+  color: #c8cdd8; font-size: 0.82rem; cursor: pointer; outline: none;
+  transition: border-color 0.15s;
+}
+.filter-select:focus { border-color: #4F8EF7; }
+
+.sort-group {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.sort-label {
+  font-size: 0.75rem; color: #4b5563; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.sort-btn {
+  padding: 6px 12px;
+  background: #1e2130; border: 1px solid #2d3148; border-radius: 8px;
+  color: #8b92a5; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.sort-btn:hover { border-color: #4F8EF7; color: #c8cdd8; }
+.sort-btn.active {
+  background: rgba(79,142,247,0.15);
+  border-color: #4F8EF7; color: #4F8EF7;
+}
+
+.th-sortable {
+  cursor: pointer; user-select: none;
+  transition: color 0.15s;
+}
+.th-sortable:hover { color: #4F8EF7; }
+.sort-arrow {
+  font-size: 0.75rem; margin-left: 4px; opacity: 0.7;
+}

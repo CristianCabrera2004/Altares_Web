@@ -1,0 +1,78 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Logs de Auditoría</h1>
+      <p class="page-subtitle">Registro de actividad del sistema (solo lectura)</p>
+    </div>
+  </div>
+
+  <div class="filters-card">
+    <div class="filter-group">
+      <label>Buscar por Usuario</label>
+      <input type="text" class="input-field" placeholder="Ej. Juan Perez" [ngModel]="searchUsuario()" (ngModelChange)="searchUsuario.set($event)">
+    </div>
+    <div class="filter-group">
+      <label>Buscar por Fecha</label>
+      <input type="date" class="input-field" [ngModel]="searchFecha()" (ngModelChange)="searchFecha.set($event)">
+    </div>
+    <div class="filter-group">
+      <label>Tipo de Acción</label>
+      <select class="input-field" [ngModel]="searchAccion()" (ngModelChange)="searchAccion.set($event)">
+        @for (acc of acciones; track acc) {
+          <option [value]="acc">{{ acc }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (errorMsg()) {
+    <div class="error-state">
+      <p>{{ errorMsg() }}</p>
+    </div>
+  } @else if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando bitácora de seguridad...</p>
+    </div>
+  } @else if (logsFiltrados().length === 0) {
+    <div class="empty-state">
+      <svg viewBox="0 0 64 64" fill="none" width="56">
+        <circle cx="32" cy="32" r="30" stroke="#2d3148" stroke-width="2"/>
+        <path d="M20 32h24M32 20v24" stroke="#4F8EF7" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <p>No hay registros que coincidan con estos filtros.</p>
+    </div>
+  } @else {
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fecha y Hora</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+            <th>Detalle Afectado</th>
+            <th>IP Origen</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (log of logsFiltrados(); track log.id_log) {
+            <tr>
+              <td class="text-muted">{{ log.fecha }}</td>
+              <td class="font-medium">{{ log.nombre_usuario }}</td>
+              <td><span class="badge" [ngClass]="getBadgeClass(log.accion)">{{ log.accion }}</span></td>
+              <td>
+                <div class="log-details">
+                  <span class="table-name">{{ log.tabla_afectada }} <span *ngIf="log.id_registro_afectado">(ID: {{ log.id_registro_afectado }})</span></span>
+                  <span class="value-change" *ngIf="log.valor_anterior || log.valor_nuevo">
+                    {{ log.valor_anterior || 'N/A' }} ➔ {{ log.valor_nuevo || 'N/A' }}
+                  </span>
+                </div>
+              </td>
+              <td class="text-muted" style="font-family: monospace;">{{ log.ip_origen }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

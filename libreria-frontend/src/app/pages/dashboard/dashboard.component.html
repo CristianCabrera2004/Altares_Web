@@ -7,11 +7,23 @@
         Bienvenido, <strong>{{ nombre() }}</strong> — {{ horaActual() }}
       </p>
     </div>
-    @if (isAdmin()) {
-      <span class="role-badge admin">Administrador</span>
-    } @else {
-      <span class="role-badge operator">Operador</span>
-    }
+    <div class="header-actions">
+      @if (isAdmin()) {
+        <span class="role-badge admin">Administrador</span>
+      } @else {
+        <span class="role-badge operator">Operador</span>
+      }
+      <button class="btn btn-primary ml-4" (click)="generarFacturaCierre()" [disabled]="procesandoCierre()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" style="margin-right: 6px;">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        {{ procesandoCierre() ? 'Procesando...' : 'Cierre de Caja (Factura Global)' }}
+      </button>
+    </div>
   </div>
 
   <!-- KPIs -->
@@ -39,7 +51,7 @@
         <span class="kpi-value">—</span>
       </div>
     </div>
-    <div class="kpi-card">
+    <div class="kpi-card" [class.kpi-alert]="(stockBajoCount() ?? 0) > 0">
       <div class="kpi-icon orange">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -48,7 +60,13 @@
       </div>
       <div class="kpi-info">
         <span class="kpi-label">Stock Bajo</span>
-        <span class="kpi-value">—</span>
+        @if (stockBajoCount() === null) {
+          <span class="kpi-value">—</span>
+        } @else if (stockBajoCount() === 0) {
+          <span class="kpi-value" style="color: #22c55e;">✓ Sin alertas</span>
+        } @else {
+          <span class="kpi-value" style="color: #ef4444;">{{ stockBajoCount() }} producto{{ (stockBajoCount() ?? 0) > 1 ? 's' : '' }}</span>
+        }
       </div>
     </div>
     @if (isAdmin()) {
@@ -67,11 +85,247 @@
     }
   </div>
 
-  <div class="empty-state">
-    <svg viewBox="0 0 64 64" fill="none" width="56">
-      <circle cx="32" cy="32" r="30" stroke="#2d3148" stroke-width="2"/>
-      <path d="M20 32h24M32 20v24" stroke="#4F8EF7" stroke-width="2.5" stroke-linecap="round"/>
-    </svg>
-    <p>Los datos del dashboard se cargarán al conectar la base de datos.</p>
+  <!-- Nueva sección de Gráfica con filtros de periodo -->
+  <div class="chart-section" style="margin-top: 24px; background: #16181f; border: 1px solid #1e2130; border-radius: 14px; padding: 20px;">
+    <!-- Header de la sección -->
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+      <div>
+        <h2 class="section-title" style="margin-bottom: 4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" style="margin-right: 8px; vertical-align: text-bottom;">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Histórico de Ventas
+        </h2>
+        <p class="section-desc" style="color: #6b7280; font-size: 0.8rem; margin: 0;">
+          @switch (periodoGrafica()) {
+            @case ('7')   { Últimos 7 días (semana actual) }
+            @case ('15')  { Últimos 15 días }
+            @case ('30')  { Últimos 30 días (mes) }
+            @case ('365') { Últimos 365 días (año) }
+            @case ('0')   { Historial completo }
+          }
+        </p>
+      </div>
+
+      <!-- Botones de periodo -->
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        @for (p of periodos; track p.valor) {
+          <button
+            [id]="'btn-periodo-' + p.valor"
+            (click)="setPeriodo(p.valor)"
+            style="padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s;"
+            [style.background]="periodoGrafica() === p.valor ? 'rgba(79,142,247,0.15)' : '#1e2130'"
+            [style.border-color]="periodoGrafica() === p.valor ? '#4F8EF7' : '#2d3148'"
+            [style.color]="periodoGrafica() === p.valor ? '#4F8EF7' : '#8b92a5'">
+            {{ p.etiqueta }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="canvas-container" style="position: relative; height: 300px; width: 100%;">
+      @if (graficaCargando()) {
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(22,24,31,0.8);border-radius:8px;z-index:2;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border:3px solid #2d3148;border-top-color:#4F8EF7;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <span style="color:#6b7280;font-size:0.8rem;">Cargando datos...</span>
+          </div>
+        </div>
+      }
+      @if (graficaError()) {
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;">
+          <div style="text-align:center;padding:20px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" width="36" style="margin-bottom:8px;">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p style="color:#f87171;font-size:0.85rem;margin:0;">{{ graficaError() }}</p>
+            <button (click)="cargarGrafica()" style="margin-top:12px;padding:6px 14px;background:#1e2130;border:1px solid #2d3148;border-radius:8px;color:#8b92a5;cursor:pointer;font-size:0.8rem;">
+              Reintentar
+            </button>
+          </div>
+        </div>
+      }
+      <canvas #salesChart></canvas>
+    </div>
+  </div>
+
+  <!-- HU-03: Visualización de proyección de stock sugerido -->
+  <div class="predictions-section" style="margin-top: 24px;">
+    <div class="section-header" style="flex-direction: row; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h2 class="section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Sugerencia de Compras (Top 5 Riesgo de Agotamiento)
+        </h2>
+        <p class="section-desc">Basado en el análisis de ventas de los últimos 2 años (Motor Analítico ARIMA).</p>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <!-- Botones de periodo de proyección -->
+        <div style="display: flex; gap: 6px; background: #1e2130; padding: 4px; border-radius: 10px; border: 1px solid #2d3148;">
+          <button
+            (click)="cambiarHorizonteProyeccion(7)"
+            style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;"
+            [style.background]="horizonteProyeccion() === 7 ? '#4F8EF7' : 'transparent'"
+            [style.color]="horizonteProyeccion() === 7 ? '#ffffff' : '#8b92a5'">
+            1 Semana
+          </button>
+          <button
+            (click)="cambiarHorizonteProyeccion(15)"
+            style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;"
+            [style.background]="horizonteProyeccion() === 15 ? '#4F8EF7' : 'transparent'"
+            [style.color]="horizonteProyeccion() === 15 ? '#ffffff' : '#8b92a5'">
+            15 Días
+          </button>
+        </div>
+        <button class="btn btn-secondary" (click)="exportarSugerenciasExcel()" [disabled]="predicciones().length === 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" style="margin-right: 6px;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Exportar
+        </button>
+      </div>
+    </div>
+
+    @if (loadingPredicciones()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Analizando histórico de ventas...</p>
+      </div>
+    } @else if (errorPredicciones()) {
+      <div class="error-state">
+        <p>{{ errorPredicciones() }}</p>
+      </div>
+    } @else if (advertenciaPredicciones()) {
+      <!-- CA#14: Historial insuficiente — mensaje explicativo en lugar de tabla vacía -->
+      <div class="warning-state" style="background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 24px; display: flex; gap: 16px; align-items: flex-start;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="28" style="flex-shrink:0; margin-top:2px;">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <div>
+          <p style="color:#f59e0b; font-weight:600; margin:0 0 6px;">Historial insuficiente</p>
+          <p style="color:#a0a8bb; font-size:0.875rem; margin:0; line-height:1.6;">{{ advertenciaPredicciones() }}</p>
+          <p style="color:#6b7280; font-size:0.8rem; margin:8px 0 0;">Días con datos detectados: <strong style="color:#f0f2f8">{{ diasConDatos() }}</strong> / mínimo requerido: <strong style="color:#f0f2f8">14</strong></p>
+        </div>
+      </div>
+    } @else if (predicciones().length === 0) {
+      <div class="empty-state">
+        <p>No hay datos suficientes para generar proyecciones.</p>
+      </div>
+    } @else {
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="text-right">Proyección (Próximos {{ horizonteProyeccion() }} días)</th>
+              <th class="text-right">Margen de Error</th>
+              <th class="text-center">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of predicciones(); track item.id_producto) {
+              <tr>
+                <td class="product-name">{{ item.nombre }}</td>
+                <td class="text-right text-highlight">{{ item.cantidad_proyectada }} unds</td>
+                <td class="text-right text-muted">± {{ item.margen_error * 100 }}%</td>
+                <td class="text-center">
+                  <button class="btn-icon" title="Añadir al carrito de proveedor">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16">
+                      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                      <line x1="3" y1="6" x2="21" y2="6"></line>
+                      <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
   </div>
 </div>
+
+<!-- Modal Factura Cierre (HU-02) -->
+@if (modalInvoiceVisible()) {
+  <div class="modal-overlay">
+    <div class="modal-content invoice-modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Factura Global de Cierre</h2>
+        <button class="close-btn" (click)="cerrarModalInvoice()">×</button>
+      </div>
+      
+      <div class="modal-body printable-area">
+        @if (errorInvoice()) {
+          <div class="error-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>{{ errorInvoice() }}</p>
+          </div>
+        } @else if (invoiceData()) {
+          <div class="invoice-header-print">
+            <h2>Librería "Los Altares"</h2>
+            <p>RUC: 1234567890001</p>
+            <p>Factura de Cierre de Jornada</p>
+            <div class="invoice-meta">
+              <span><strong>Fecha:</strong> {{ invoiceData()?.fecha_emision }}</span>
+              <span><strong>Cliente:</strong> {{ invoiceData()?.nombre_cliente }} (RUC: {{ invoiceData()?.ruc_cliente }})</span>
+            </div>
+          </div>
+
+          <table class="data-table invoice-table">
+            <thead>
+              <tr>
+                <th>Cant</th>
+                <th>Descripción</th>
+                <th class="text-right">V. Unit</th>
+                <th class="text-right">IVA</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of invoiceData()?.detalles; track item.producto) {
+                <tr>
+                  <td>{{ item.cantidad }}</td>
+                  <td>{{ item.producto }}</td>
+                  <td class="text-right">{{ formatCurrency(item.precio_unitario) }}</td>
+                  <td class="text-right">{{ item.iva_aplicado }}%</td>
+                  <td class="text-right">{{ formatCurrency(item.subtotal) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          <div class="invoice-totals">
+            <div class="total-row"><span>Subtotal (Base):</span> <span>{{ formatCurrency(invoiceData()?.subtotal_base || 0) }}</span></div>
+            <div class="total-row"><span>IVA 0%:</span> <span>{{ formatCurrency(invoiceData()?.total_iva_0 || 0) }}</span></div>
+            <div class="total-row"><span>IVA 15%:</span> <span>{{ formatCurrency(invoiceData()?.total_iva_15 || 0) }}</span></div>
+            <div class="total-row grand-total"><span>Total a Declarar:</span> <span>{{ formatCurrency(invoiceData()?.total_global || 0) }}</span></div>
+          </div>
+
+          <div class="xml-mock">
+            <h4>XML SRI Generado (Representativo):</h4>
+            <code>{{ invoiceData()?.xml_sri_mock }}</code>
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="cerrarModalInvoice()">Cerrar</button>
+        @if (invoiceData()) {
+          <button class="btn btn-primary" (click)="imprimirFactura()">Imprimir / Guardar PDF</button>
+        }
+      </div>
+    </div>
+  </div>
+}

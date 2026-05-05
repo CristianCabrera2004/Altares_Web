@@ -18,8 +18,12 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+
+	"libreria-altares/middleware"
+	"libreria-altares/utils"
 )
 
 // Producto mapea la tabla inventario.productos.
@@ -355,6 +359,15 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		p.Estado = "activo"
 	}
 
+	// Recuperar el precio actual para auditoría (HU-08 CA 37)
+	var precioAnterior int
+	err = db.QueryRow(`SELECT precio_venta FROM inventario.productos WHERE id_producto = $1`, id).Scan(&precioAnterior)
+	if err != nil && err != sql.ErrNoRows {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al recuperar el producto."})
+		return
+	}
+
 	// ── TRANSACCIÓN SQL: BEGIN / COMMIT / ROLLBACK (CA 45) ───────────────────
 	tx, err := db.Begin() // BEGIN
 	if err != nil {
@@ -385,10 +398,53 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Manejo del código de barras
+	if p.CodigoBarras != "" {
+		// Verificar que el código no pertenezca a OTRO producto
+		var idExistente int
+		errCb := tx.QueryRow(`SELECT id_producto FROM inventario.codigos_barras WHERE codigo = $1`, p.CodigoBarras).Scan(&idExistente)
+		if errCb == nil && idExistente != id {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El código de barras proporcionado ya pertenece a otro producto."})
+			return
+		}
+
+		// Borramos los anteriores (si los hay) y lo insertamos/actualizamos
+		_, err = tx.Exec(`DELETE FROM inventario.codigos_barras WHERE id_producto = $1`, id)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar los códigos de barras."})
+			return
+		}
+		_, err = tx.Exec(`INSERT INTO inventario.codigos_barras (id_producto, codigo) VALUES ($1, $2)`, id, p.CodigoBarras)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al guardar el nuevo código de barras."})
+			return
+		}
+	} else {
+		// Si se envía vacío, significa que se quitó el código de barras
+		_, err = tx.Exec(`DELETE FROM inventario.codigos_barras WHERE id_producto = $1`, id)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al eliminar el código de barras."})
+			return
+		}
+	}
+
 	if err := tx.Commit(); err != nil { // COMMIT
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al confirmar la transacción."})
 		return
+	}
+
+	// Registrar en auditoría solo si el precio cambió (HU-08 CA 37)
+	if precioAnterior != p.PrecioVenta {
+		claims, ok := middleware.GetClaims(r)
+		if ok {
+			utils.LogAction(db, claims.IdUsuario, "MODIFICACION_PRECIO", "inventario.productos", &id, 
+				fmt.Sprintf("%d", precioAnterior), fmt.Sprintf("%d", p.PrecioVenta), r.RemoteAddr)
+		}
 	}
 
 	p.IdProducto = id

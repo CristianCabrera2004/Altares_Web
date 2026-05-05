@@ -62,49 +62,43 @@ func main() {
 
 	// ─── HT-02: Catálogo de Productos (CA 43, 44, 45, 46) ───────────────────
 	// IMPORTANTE: /api/productos/buscar se registra ANTES de /api/productos
-	// porque Go stdlib usa el prefijo más largo para rutas más específicas.
-	//
-	// GET /api/productos/buscar?codigo=XXX → Busca producto por código de barras
-	//   Usado por el frontend para verificar si el producto ya existe antes de guardar.
-	mux.HandleFunc("/api/productos/buscar", middleware.RequireAuth(handlers.BuscarProductoHandler(db)))
+	mux.HandleFunc("/api/productos/buscar", middleware.RequireRole("operador_caja")(handlers.BuscarProductoHandler(db)))
 
-	// GET    → Lista catálogo activo con JOIN de categoría (índice GIN, < 200ms)
-	// POST   → Crea producto (si barcode existe → incrementa stock; si no → INSERT + liga barcode)
-	// PUT    → Actualiza producto en transacción SQL
-	// DELETE → Baja lógica en transacción SQL
-	mux.HandleFunc("/api/productos", middleware.RequireAuth(handlers.ProductHandler(db)))
+	// GET/POST/PUT/DELETE /api/productos
+	mux.HandleFunc("/api/productos", middleware.RequireRole("operador_caja")(handlers.ProductHandler(db)))
 
-	// ─── HT-02: Categorías (CA 43, 44, 45) ──────────────────────────────────
-	mux.HandleFunc("/api/categorias", middleware.RequireAuth(handlers.CategoryHandler(db)))
-
-	// ─── HT-02: Proveedores (CA 43, 44, 45) ─────────────────────────────────
-	mux.HandleFunc("/api/proveedores", middleware.RequireAuth(handlers.ProviderHandler(db)))
+	// ─── HT-02: Categorías y Proveedores ─────────────────────────────────────
+	mux.HandleFunc("/api/categorias", middleware.RequireRole("operador_caja")(handlers.CategoryHandler(db)))
+	mux.HandleFunc("/api/proveedores", middleware.RequireRole("operador_caja")(handlers.ProviderHandler(db)))
 
 	// ─── HT-02: Inventario Transaccional (CA 45) ────────────────────────────
-	// BEGIN → INSERT ingreso/baja + UPDATE stock + INSERT movimiento → COMMIT/ROLLBACK
-	mux.HandleFunc("/api/inventario/ingreso", middleware.RequireAuth(handlers.IngresoHandler(db)))
-	mux.HandleFunc("/api/inventario/baja", middleware.RequireAuth(handlers.BajaHandler(db)))
-	mux.HandleFunc("/api/inventario/movimientos", middleware.RequireAuth(handlers.MovimientosHandler(db)))
+	mux.HandleFunc("/api/inventario/ingreso", middleware.RequireRole("operador_caja")(handlers.IngresoHandler(db)))
+	mux.HandleFunc("/api/inventario/baja", middleware.RequireRole("operador_caja")(handlers.BajaHandler(db)))
+	mux.HandleFunc("/api/inventario/movimientos", middleware.RequireRole("operador_caja")(handlers.MovimientosHandler(db)))
 
-	// ─── HU-04: Devoluciones (Arquitectura de Bajas y Devoluciones) ─────────
-	// POST → Registra devolución: repone stock + INSERT devoluciones + auditoría
-	// GET  → Lista historial de devoluciones (filtro opcional ?id_producto=X)
-	mux.HandleFunc("/api/devoluciones", middleware.RequireAuth(handlers.DevolucionHandler(db)))
+	// ─── HU-04: Devoluciones ──────────────────────────────────────────────────
+	mux.HandleFunc("/api/devoluciones", middleware.RequireRole("operador_caja")(handlers.DevolucionHandler(db)))
 
-	// ─── HT-02: Ventas y Cuaderno Transaccional (CA 45) ─────────────────────
-	// IMPORTANTE: /api/ventas/cuaderno se registra ANTES de /api/ventas
-	// porque Go stdlib usa prefijo más largo para rutas más específicas.
-	//
+	// ─── HT-02: Ventas y Cuaderno Transaccional ───────────────────────────────
+	// HU-02: Factura Global (Cierre)
+	mux.HandleFunc("/api/ventas/factura-cierre", middleware.RequireRole("operador_caja")(handlers.InvoiceHandler(db)))
 	// POST /api/ventas/cuaderno → Carga masiva del cuaderno del día
-	//   Todo el array se procesa en UNA transacción: si falla uno → ROLLBACK total
-	mux.HandleFunc("/api/ventas/cuaderno", middleware.RequireAuth(handlers.CuadernoHandler(db)))
+	mux.HandleFunc("/api/ventas/cuaderno", middleware.RequireRole("operador_caja")(handlers.CuadernoHandler(db)))
+	// POST /api/ventas → Venta individual
+	mux.HandleFunc("/api/ventas", middleware.RequireRole("operador_caja")(handlers.SalesHandler(db)))
 
-	// POST /api/ventas → Venta individual (también transaccional)
-	mux.HandleFunc("/api/ventas", middleware.RequireAuth(handlers.SalesHandler(db)))
+	// ─── HU-08: Auditoría y Logs (Solo Administrador) ────────────────────────
+	mux.HandleFunc("/api/auditoria", middleware.RequireRole("admin_libreria")(handlers.AuditHandler(db)))
 
-	// ─── Gestión de Usuarios (Solo Administrador) ───────────────────────────
-	// RequireRole bloquea con HTTP 403 si el JWT no contiene rol = admin_libreria
+	// ─── HU-07: Reportes (Solo Operador) ─────────────────────────────────────
+	mux.HandleFunc("/api/reportes/ventas", middleware.RequireRole("operador_caja")(handlers.ReportesVentasHandler(db)))
+	mux.HandleFunc("/api/dashboard/grafica", middleware.RequireRole("operador_caja")(handlers.ReporteGraficaHandler(db)))
+
+	// ─── Gestión de Usuarios (Solo Administrador) ────────────────────────────
 	mux.HandleFunc("/api/usuarios", middleware.RequireRole("admin_libreria")(handlers.UserHandler(db)))
+
+	// ─── HT-03: Motor de Predicción Analítica (Solo Operador) ────────────────
+	mux.HandleFunc("/api/predicciones", middleware.RequireRole("operador_caja")(handlers.PredictionHandler(db)))
 
 	// 4. Puerto del servidor
 	port := os.Getenv("PORT")

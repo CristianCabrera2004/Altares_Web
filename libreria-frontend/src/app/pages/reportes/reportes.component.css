@@ -1,13 +1,157 @@
 /* src/app/pages/reportes/reportes.component.css */
 .page { display: flex; flex-direction: column; gap: 24px; }
-.page-header { display: flex; align-items: center; justify-content: space-between; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .page-title { font-size: 1.5rem; font-weight: 700; color: #f0f2f8; margin: 0 0 4px; }
 .page-subtitle { font-size: 0.875rem; color: #6b7280; margin: 0; }
-.coming-soon {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 12px; padding: 60px 24px;
-  background: #16181f; border: 1px solid #1e2130; border-radius: 14px;
+
+.filters-card {
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+}
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-group label { font-size: 0.8rem; color: #a0a8bb; font-weight: 500; }
+.input-field {
+  background: #0f1115;
+  border: 1px solid #2d3148;
+  color: #f0f2f8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  min-width: 150px;
+}
+.filter-actions { display: flex; gap: 12px; margin-left: auto; }
+
+/* ── Tabla ── */
+.table-container {
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
+  padding: 20px;
+  overflow-x: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.data-table th, .data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e2130;
+}
+.data-table th {
+  text-align: left;
+  font-weight: 500;
+  color: #6b7280;
+  background: rgba(255,255,255,0.02);
+}
+.data-table td { color: #c8cdd8; }
+.product-name { font-weight: 500; color: #f0f2f8; }
+
+.badge {
+  background: rgba(79,142,247,0.15);
+  color: #4F8EF7;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+.text-right { text-align: right !important; }
+.text-highlight { color: #22c55e !important; font-weight: 600; }
+
+/* ── Estados ── */
+.loading-state, .error-state, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  background: #16181f;
+  border: 1px solid #1e2130;
+  border-radius: 14px;
   text-align: center;
 }
-.coming-soon h2 { font-size: 1.1rem; font-weight: 600; color: #c8cdd8; margin: 0; }
-.coming-soon p { font-size: 0.875rem; color: #4b5563; margin: 0; max-width: 300px; }
+.empty-state p { font-size: 0.875rem; color: #4b5563; margin: 0; }
+.spinner {
+  width: 24px; height: 24px;
+  border: 2px solid #2d3148;
+  border-top-color: #4F8EF7;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-state p { color: #ef4444; }
+
+/* ── Botones ── */
+.btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  transition: 0.2s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: #4F8EF7; color: white; }
+.btn-primary:hover:not(:disabled) { background: #3b76db; }
+.btn-secondary { background: transparent; border: 1px solid #2d3148; color: #f0f2f8; }
+.btn-secondary:hover { background: #2d3148; }
+
+/* ── Print Styles (HU-07) ── */
+.only-print { display: none; }
+@media print {
+  .no-print { display: none !important; }
+  .only-print { display: block !important; }
+  
+  .printable-area {
+    width: 100%;
+    background: white;
+    color: black;
+  }
+  .printable-area h2, .printable-area h3, .printable-area p, .printable-area span, .printable-area td { color: black !important; }
+  .invoice-header-print {
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed #ccc;
+  }
+  .invoice-header-print h2 { font-size: 1.5rem; margin: 0 0 8px; }
+  .invoice-header-print p { margin: 0 0 4px; }
+  .invoice-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    font-size: 0.9rem;
+  }
+  .data-table th { background: #f3f4f6; color: black; }
+  .data-table td { border-bottom-color: #e5e7eb; }
+  .invoice-totals {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .grand-total {
+    font-weight: 700;
+    font-size: 1.2rem;
+    border-top: 1px solid #000;
+    padding-top: 8px;
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    width: 250px;
+  }
+}

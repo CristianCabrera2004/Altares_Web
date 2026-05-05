@@ -24,9 +24,9 @@ export class LoginComponent implements OnInit {
   ngOnInit(): void {
     // Mostrar aviso si el interceptor redirigió por token expirado (CA 23)
     this.sessionExpired.set(this.route.snapshot.queryParams['expired'] === '1');
-    // Si ya hay sesión activa → ir directo al dashboard
+    // Si ya hay sesión activa → redirigir según rol
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/dashboard']);
+      this.redirectByRole();
     }
   }
 
@@ -39,6 +39,12 @@ export class LoginComponent implements OnInit {
     this.showPassword.update(v => !v);
   }
 
+  /** Redirige al home correspondiente según el rol del JWT */
+  private redirectByRole(): void {
+    const destino = this.authService.isAdmin() ? '/usuarios' : '/dashboard';
+    this.router.navigate([destino]);
+  }
+
   onSubmit(): void {
     if (this.form.invalid || this.loading()) return;
     this.errorMsg.set('');
@@ -46,7 +52,7 @@ export class LoginComponent implements OnInit {
 
     this.authService.login(this.form.value as { email: string; password: string }).subscribe({
       next: () => {
-        this.router.navigate(['/dashboard']);
+        this.redirectByRole();
       },
       error: (err) => {
         const msg = err?.error?.error ?? 'Error al conectar con el servidor.';

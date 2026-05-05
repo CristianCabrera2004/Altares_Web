@@ -37,6 +37,7 @@
   <!-- ── Tabla de Productos ── -->
   <div class="table-card">
     <div class="table-toolbar">
+      <!-- Búsqueda de texto -->
       <div class="search-wrapper">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -48,6 +49,34 @@
           class="search-input"
           (input)="setBusqueda($any($event.target).value)"
         />
+      </div>
+
+      <!-- Filtro por categoría -->
+      <select id="select-filtro-categoria" class="filter-select" (change)="setFiltroCat($any($event.target).value)">
+        <option value="">Todas las categorías</option>
+        @for (cat of categorias(); track cat.id_categoria) {
+          <option [value]="cat.id_categoria">{{ cat.nombre }}</option>
+        }
+      </select>
+
+      <!-- Botones de orden rápido -->
+      <div class="sort-group">
+        <span class="sort-label">Ordenar:</span>
+        <button id="btn-sort-nombre"
+          class="sort-btn" [class.active]="sortField() === 'nombre'"
+          (click)="setSort('nombre')" title="Ordenar por nombre">
+          A–Z {{ sortIcon('nombre') }}
+        </button>
+        <button id="btn-sort-precio"
+          class="sort-btn" [class.active]="sortField() === 'precio_venta'"
+          (click)="setSort('precio_venta')" title="Ordenar por precio">
+          Precio {{ sortIcon('precio_venta') }}
+        </button>
+        <button id="btn-sort-stock"
+          class="sort-btn" [class.active]="sortField() === 'stock_actual'"
+          (click)="setSort('stock_actual')" title="Ordenar por stock">
+          Stock {{ sortIcon('stock_actual') }}
+        </button>
       </div>
     </div>
 
@@ -75,11 +104,17 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Producto</th>
+              <th class="th-sortable" (click)="setSort('nombre')">
+                Producto <span class="sort-arrow">{{ sortIcon('nombre') }}</span>
+              </th>
               <th>Categoría</th>
               <th>IVA</th>
-              <th>Precio Venta</th>
-              <th>Stock</th>
+              <th class="th-sortable" (click)="setSort('precio_venta')">
+                Precio Venta <span class="sort-arrow">{{ sortIcon('precio_venta') }}</span>
+              </th>
+              <th class="th-sortable" (click)="setSort('stock_actual')">
+                Stock <span class="sort-arrow">{{ sortIcon('stock_actual') }}</span>
+              </th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -116,6 +151,12 @@
                   </div>
                 </td>
                 <td class="actions-cell">
+                  <button class="icon-btn edit" (click)="abrirModalEditar(p)" title="Editar producto" style="color: #60a5fa;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </button>
                   <button class="icon-btn devolucion" (click)="abrirModalDevolucion(p)" title="Registrar devolución">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -546,6 +587,113 @@
               <span class="spinner-sm"></span> Registrando...
             } @else {
               Registrar Devolución
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Editar Producto                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+@if (mostrarModalEditar() && productoEditar()) {
+  <div class="modal-overlay" (click)="cerrarModalEditar()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Editar Producto</h2>
+          <p class="modal-subtitle">Modifica los detalles de "{{ productoEditar()!.nombre }}"</p>
+        </div>
+        <button class="modal-close" (click)="cerrarModalEditar()" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (errorMsg()) {
+        <div class="alert-error modal-alert" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          </svg>
+          {{ errorMsg() }}
+        </div>
+      }
+
+      <form [formGroup]="formEditar" (ngSubmit)="guardarEdicion()" novalidate class="modal-form">
+        <!-- Nombre -->
+        <div class="field-group full-width">
+          <label for="edit-nombre">Nombre del producto *</label>
+          <input id="edit-nombre" type="text" formControlName="nombre"
+                 [class.invalid]="formEditar.get('nombre')?.invalid && formEditar.get('nombre')?.touched" />
+        </div>
+
+        <div class="form-row">
+          <!-- Categoría -->
+          <div class="field-group">
+            <label for="edit-categoria">Categoría *</label>
+            <select id="edit-categoria" formControlName="id_categoria" class="select-input"
+                    [class.invalid]="formEditar.get('id_categoria')?.invalid && formEditar.get('id_categoria')?.touched">
+              @for (cat of categorias(); track cat.id_categoria) {
+                <option [value]="cat.id_categoria">{{ cat.nombre }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Precio de venta -->
+          <div class="field-group">
+            <label for="edit-precio">Precio de venta ($) *</label>
+            <div class="input-prefix-wrapper">
+              <span class="input-prefix">$</span>
+              <input id="edit-precio" type="number" step="0.01" min="0" formControlName="precio_venta" class="with-prefix"
+                     [class.invalid]="formEditar.get('precio_venta')?.invalid && formEditar.get('precio_venta')?.touched" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <!-- Stock actual -->
+          <div class="field-group">
+            <label for="edit-stock">Stock actual</label>
+            <input id="edit-stock" type="number" min="0" formControlName="stock_actual"
+                   [class.invalid]="formEditar.get('stock_actual')?.invalid && formEditar.get('stock_actual')?.touched" />
+          </div>
+
+          <!-- Stock alerta mínimo -->
+          <div class="field-group">
+            <label for="edit-alerta">Alerta mínima</label>
+            <input id="edit-alerta" type="number" min="0" formControlName="stock_alerta_min"
+                   [class.invalid]="formEditar.get('stock_alerta_min')?.invalid && formEditar.get('stock_alerta_min')?.touched" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <!-- Código de Barras -->
+          <div class="field-group">
+            <label for="edit-barcode">Código de Barras</label>
+            <input id="edit-barcode" type="text" formControlName="codigo_barras" placeholder="Opcional" />
+          </div>
+
+          <!-- Estado -->
+          <div class="field-group">
+            <label for="edit-estado">Estado *</label>
+            <select id="edit-estado" formControlName="estado" class="select-input">
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="form-actions">
+          <button type="button" class="btn-ghost" (click)="cerrarModalEditar()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="formEditar.invalid || guardandoEdicion()">
+            @if (guardandoEdicion()) {
+              <span class="spinner-sm"></span> Guardando...
+            } @else {
+              Guardar Cambios
             }
           </button>
         </div>
