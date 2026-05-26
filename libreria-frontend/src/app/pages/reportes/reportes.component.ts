@@ -2,6 +2,8 @@ import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReportesService, ReporteItem } from '../../core/services/reportes.service';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   selector: 'app-reportes',
@@ -83,9 +85,64 @@ export class ReportesComponent implements OnInit {
     document.body.removeChild(link);
   }
 
-  // CA 30: Exportar a PDF (Impresión nativa)
+  // CA 30: Exportar a PDF usando jsPDF (A4, encabezado formal, descarga rápida < 3s)
   imprimirPDF(): void {
-    window.print();
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const fechaHoy = new Date().toLocaleString('es-EC');
+
+    // Encabezado de la librería
+    doc.setFontSize(16);
+    doc.text('LIBRERÍA "LOS ALTARES"', 105, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.text('RUC: 1234567890001', 14, 25);
+    doc.text('Dirección: Av. Principal y Secundaria, Sangolquí', 14, 30);
+    doc.text('Teléfono: (02) 233-4455', 14, 35);
+
+    // Título del reporte
+    doc.setFontSize(14);
+    doc.text('REPORTE DE VENTAS', 105, 45, { align: 'center' });
+
+    // Meta-datos del reporte
+    doc.setFontSize(10);
+    doc.text(`Fecha de Emisión: ${fechaHoy}`, 14, 55);
+    doc.text(`Período: Desde ${this.startDate()} Hasta ${this.endDate()}`, 14, 60);
+    doc.text(`Categoría Filtrada: ${this.categoria()}`, 14, 65);
+
+    // Tabla de datos
+    const tableData = this.items().map(item => [
+      item.fecha_venta,
+      item.producto,
+      item.categoria,
+      item.cantidad.toString(),
+      this.formatCurrency(item.total)
+    ]);
+
+    autoTable(doc, {
+      startY: 70,
+      head: [['Fecha', 'Descripción', 'Categoría', 'Cant.', 'Total']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [79, 142, 247], textColor: [255, 255, 255] },
+      columnStyles: {
+        3: { halign: 'right' },
+        4: { halign: 'right' }
+      }
+    });
+
+    // Total Global
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total del Período: ${this.formatCurrency(this.totalGlobal())}`, 196, finalY, { align: 'right' });
+
+    // Guardado (CA 32: Inicia en menos de 3s)
+    doc.save(`reporte_ventas_${this.startDate()}_a_${this.endDate()}.pdf`);
   }
 
   formatCurrency(centavos: number): string {

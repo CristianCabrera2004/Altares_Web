@@ -59,6 +59,20 @@ export const routes: Routes = [
         title: 'Inventario · Los Altares'
       },
       {
+        path: 'devoluciones',
+        canActivate: [operadorGuard],
+        loadComponent: () =>
+          import('./pages/devoluciones/devoluciones.component').then(m => m.DevolucionesComponent),
+        title: 'Devoluciones · Los Altares'
+      },
+      {
+        path: 'bajas',
+        canActivate: [operadorGuard],
+        loadComponent: () =>
+          import('./pages/bajas/bajas.component').then(m => m.BajasComponent),
+        title: 'Bajas por Merma · Los Altares'
+      },
+      {
         path: 'reportes',
         canActivate: [operadorGuard],
         loadComponent: () =>

@@ -4,7 +4,7 @@
     <div>
       <h1 class="page-title">Dashboard</h1>
       <p class="page-subtitle">
-        Bienvenido, <strong>{{ nombre() }}</strong> — {{ horaActual() }}
+        Bienvenido, <strong>{{ nombreUsuario() }}</strong> — {{ horaActual() }}
       </p>
     </div>
     <div class="header-actions">
@@ -86,7 +86,7 @@
   </div>
 
   <!-- Nueva sección de Gráfica con filtros de periodo -->
-  <div class="chart-section" style="margin-top: 24px; background: #16181f; border: 1px solid #1e2130; border-radius: 14px; padding: 20px;">
+  <div class="chart-section" style="margin-top: 24px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px;">
     <!-- Header de la sección -->
     <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
       <div>
@@ -96,7 +96,7 @@
           </svg>
           Histórico de Ventas
         </h2>
-        <p class="section-desc" style="color: #6b7280; font-size: 0.8rem; margin: 0;">
+        <p class="section-desc" style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">
           @switch (periodoGrafica()) {
             @case ('7')   { Últimos 7 días (semana actual) }
             @case ('15')  { Últimos 15 días }
@@ -114,9 +114,9 @@
             [id]="'btn-periodo-' + p.valor"
             (click)="setPeriodo(p.valor)"
             style="padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s;"
-            [style.background]="periodoGrafica() === p.valor ? 'rgba(79,142,247,0.15)' : '#1e2130'"
-            [style.border-color]="periodoGrafica() === p.valor ? '#4F8EF7' : '#2d3148'"
-            [style.color]="periodoGrafica() === p.valor ? '#4F8EF7' : '#8b92a5'">
+            [style.background]="periodoGrafica() === p.valor ? 'rgba(79,142,247,0.15)' : 'var(--border-subtle)'"
+            [style.border-color]="periodoGrafica() === p.valor ? '#4F8EF7' : 'var(--border-strong)'"
+            [style.color]="periodoGrafica() === p.valor ? '#4F8EF7' : 'var(--text-muted)'">
             {{ p.etiqueta }}
           </button>
         }
@@ -127,8 +127,8 @@
       @if (graficaCargando()) {
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(22,24,31,0.8);border-radius:8px;z-index:2;">
           <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
-            <div style="width:28px;height:28px;border:3px solid #2d3148;border-top-color:#4F8EF7;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-            <span style="color:#6b7280;font-size:0.8rem;">Cargando datos...</span>
+            <div style="width:28px;height:28px;border:3px solid var(--border-strong);border-top-color:#4F8EF7;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <span style="color:var(--text-secondary);font-size:0.8rem;">Cargando datos...</span>
           </div>
         </div>
       }
@@ -139,7 +139,7 @@
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <p style="color:#f87171;font-size:0.85rem;margin:0;">{{ graficaError() }}</p>
-            <button (click)="cargarGrafica()" style="margin-top:12px;padding:6px 14px;background:#1e2130;border:1px solid #2d3148;border-radius:8px;color:#8b92a5;cursor:pointer;font-size:0.8rem;">
+            <button (click)="cargarGrafica()" style="margin-top:12px;padding:6px 14px;background:var(--border-subtle);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-muted);cursor:pointer;font-size:0.8rem;">
               Reintentar
             </button>
           </div>
@@ -163,19 +163,19 @@
       </div>
       <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <!-- Botones de periodo de proyección -->
-        <div style="display: flex; gap: 6px; background: #1e2130; padding: 4px; border-radius: 10px; border: 1px solid #2d3148;">
+        <div style="display: flex; gap: 6px; background: var(--border-subtle); padding: 4px; border-radius: 10px; border: 1px solid var(--border-strong);">
           <button
             (click)="cambiarHorizonteProyeccion(7)"
             style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;"
             [style.background]="horizonteProyeccion() === 7 ? '#4F8EF7' : 'transparent'"
-            [style.color]="horizonteProyeccion() === 7 ? '#ffffff' : '#8b92a5'">
+            [style.color]="horizonteProyeccion() === 7 ? '#ffffff' : 'var(--text-muted)'">
             1 Semana
           </button>
           <button
             (click)="cambiarHorizonteProyeccion(15)"
             style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;"
             [style.background]="horizonteProyeccion() === 15 ? '#4F8EF7' : 'transparent'"
-            [style.color]="horizonteProyeccion() === 15 ? '#ffffff' : '#8b92a5'">
+            [style.color]="horizonteProyeccion() === 15 ? '#ffffff' : 'var(--text-muted)'">
             15 Días
           </button>
         </div>
@@ -187,7 +187,15 @@
             <line x1="16" y1="17" x2="8" y2="17"></line>
             <polyline points="10 9 9 9 8 9"></polyline>
           </svg>
-          Exportar
+          Excel (CSV)
+        </button>
+        <button class="btn btn-primary" (click)="exportarSugerenciasPDF()" [disabled]="predicciones().length === 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" style="margin-right: 6px;">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          PDF
         </button>
       </div>
     </div>
@@ -211,7 +219,7 @@
         <div>
           <p style="color:#f59e0b; font-weight:600; margin:0 0 6px;">Historial insuficiente</p>
           <p style="color:#a0a8bb; font-size:0.875rem; margin:0; line-height:1.6;">{{ advertenciaPredicciones() }}</p>
-          <p style="color:#6b7280; font-size:0.8rem; margin:8px 0 0;">Días con datos detectados: <strong style="color:#f0f2f8">{{ diasConDatos() }}</strong> / mínimo requerido: <strong style="color:#f0f2f8">14</strong></p>
+          <p style="color:var(--text-secondary); font-size:0.8rem; margin:8px 0 0;">Días con datos detectados: <strong style="color:var(--text-heading)">{{ diasConDatos() }}</strong> / mínimo requerido: <strong style="color:var(--text-heading)">14</strong></p>
         </div>
       </div>
     } @else if (predicciones().length === 0) {

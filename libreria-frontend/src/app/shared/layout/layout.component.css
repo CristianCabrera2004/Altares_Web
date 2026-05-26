@@ -4,7 +4,7 @@
 .app-shell {
   display: flex;
   height: 100vh;
-  background: #0f1117;
+  background: var(--bg-base);
   overflow: hidden;
   transition: all 0.3s ease;
 }
@@ -12,8 +12,8 @@
 /* ── Sidebar ── */
 .sidebar {
   width: 240px;
-  background: #16181f;
-  border-right: 1px solid #1e2130;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
@@ -27,13 +27,13 @@
   align-items: center;
   gap: 12px;
   padding: 20px 16px;
-  border-bottom: 1px solid #1e2130;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .logo-mark svg { flex-shrink: 0; }
 .logo-text {
   font-size: 1rem;
   font-weight: 700;
-  color: #f0f2f8;
+  color: var(--text-heading);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -54,7 +54,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   text-decoration: none;
-  color: #8b92a5;
+  color: var(--text-muted);
   font-size: 0.875rem;
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
@@ -62,7 +62,7 @@
   overflow: hidden;
 }
 .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-.nav-item:hover { background: #1e2130; color: #c8cdd8; }
+.nav-item:hover { background: var(--border-subtle); color: var(--text-hover); }
 .nav-item.active {
   background: rgba(79, 142, 247, 0.15);
   color: #4F8EF7;
@@ -72,7 +72,7 @@
 
 .nav-divider {
   height: 1px;
-  background: #1e2130;
+  background: var(--border-subtle);
   margin: 8px 0;
 }
 
@@ -90,7 +90,7 @@
 /* ── Footer ── */
 .sidebar-footer {
   padding: 12px 8px;
-  border-top: 1px solid #1e2130;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -119,18 +119,18 @@
 .user-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #d0d5e8;
+  color: var(--text-title);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.user-role { font-size: 0.7rem; color: #6b7280; }
+.user-role { font-size: 0.7rem; color: var(--text-secondary); }
 
 .logout-btn {
   background: none;
   border: none;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 6px;
   border-radius: 8px;
   display: flex;
@@ -151,8 +151,8 @@
 
 .topbar {
   height: 56px;
-  background: #16181f;
-  border-bottom: 1px solid #1e2130;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -163,21 +163,40 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 6px;
   border-radius: 8px;
   display: flex;
   transition: color 0.15s, background 0.15s;
 }
 .toggle-btn svg { width: 20px; height: 20px; }
-.toggle-btn:hover { color: #c8cdd8; background: #1e2130; }
+.toggle-btn:hover { color: var(--text-hover); background: var(--border-subtle); }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.theme-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  transition: color 0.15s, background 0.15s;
+}
+.theme-toggle-btn svg { width: 20px; height: 20px; }
+.theme-toggle-btn:hover { color: var(--text-hover); background: var(--border-subtle); }
 
 .session-badge {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .page-wrapper {

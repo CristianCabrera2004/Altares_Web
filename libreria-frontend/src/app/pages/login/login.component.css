@@ -52,16 +52,16 @@
 .card-header h1 {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #f0f2f8;
+  color: var(--text-heading);
   margin: 0 0 6px;
 }
-.card-header p { font-size: 0.85rem; color: #6b7280; margin: 0; }
+.card-header p { font-size: 0.85rem; color: var(--text-secondary); margin: 0; }
 
 /* ── Form ── */
 .login-form { display: flex; flex-direction: column; gap: 18px; }
 
 .field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-group label { font-size: 0.8rem; font-weight: 600; color: #9ca3af; letter-spacing: 0.03em; }
+.field-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.03em; }
 
 .input-wrapper {
   position: relative;
@@ -79,10 +79,10 @@
 .input-wrapper input {
   width: 100%;
   padding: 11px 40px 11px 38px;
-  background: #1e2130;
-  border: 1px solid #2d3148;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
-  color: #e5e7eb;
+  color: var(--text-main);
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s;

@@ -19,8 +19,28 @@ export class LayoutComponent {
   readonly isAdmin = signal(this.authService.isAdmin());
   readonly sidebarOpen = signal(true);
 
+  // Inicializa el tema desde localStorage para persistir entre recargas
+  readonly isLightMode = signal(
+    typeof localStorage !== 'undefined' && localStorage.getItem('theme') === 'light'
+  );
+
+  constructor() {
+    // Aplica la clase antes del primer render para evitar flash de tema incorrecto
+    if (typeof document !== 'undefined' && this.isLightMode()) {
+      document.body.classList.add('light-mode');
+    }
+  }
+
   toggleSidebar(): void {
     this.sidebarOpen.update(v => !v);
+  }
+
+  toggleTheme(): void {
+    this.isLightMode.update(v => !v);
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('light-mode', this.isLightMode());
+      localStorage.setItem('theme', this.isLightMode() ? 'light' : 'dark');
+    }
   }
 
   logout(): void {

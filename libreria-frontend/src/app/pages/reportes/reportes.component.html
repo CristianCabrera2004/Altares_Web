@@ -1,4 +1,4 @@
-<div class="page no-print">
+<div class="page">
   <div class="page-header">
     <div>
       <h1 class="page-title">Reportes y Analítica</h1>
@@ -47,7 +47,7 @@
           <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
           <rect x="6" y="14" width="12" height="8"></rect>
         </svg>
-        PDF / Imprimir
+        Descargar PDF
       </button>
     </div>
   </div>
@@ -64,7 +64,7 @@
   } @else if (items().length === 0) {
     <div class="empty-state">
       <svg viewBox="0 0 64 64" fill="none" width="56">
-        <circle cx="32" cy="32" r="30" stroke="#2d3148" stroke-width="2"/>
+        <circle cx="32" cy="32" r="30" stroke="var(--border-strong)" stroke-width="2"/>
         <path d="M20 32h24M32 20v24" stroke="#4F8EF7" stroke-width="2.5" stroke-linecap="round"/>
       </svg>
       <p>No se encontraron ventas para estos filtros.</p>
@@ -105,48 +105,4 @@
   }
 </div>
 
-<!-- ================= IMPRESIÓN (PDF) ================= -->
-<div class="printable-area only-print">
-  <div class="invoice-header-print">
-    <h2>Librería "Los Altares"</h2>
-    <p>RUC: 1234567890001</p>
-    <p>Dirección: Av. Principal y Secundaria, Sangolquí</p>
-    <p>Teléfono: (02) 233-4455</p>
-    <h3 style="margin-top: 20px; text-transform: uppercase;">Reporte de Ventas</h3>
-    <div class="invoice-meta">
-      <span><strong>Desde:</strong> {{ startDate() }}</span>
-      <span><strong>Hasta:</strong> {{ endDate() }}</span>
-      <span><strong>Categoría:</strong> {{ categoria() }}</span>
-    </div>
-  </div>
 
-  <table class="data-table invoice-table">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Descripción</th>
-        <th>Cat.</th>
-        <th class="text-right">Cant.</th>
-        <th class="text-right">Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (item of items(); track $index) {
-        <tr>
-          <td>{{ item.fecha_venta }}</td>
-          <td>{{ item.producto }}</td>
-          <td>{{ item.categoria }}</td>
-          <td class="text-right">{{ item.cantidad }}</td>
-          <td class="text-right">{{ formatCurrency(item.total) }}</td>
-        </tr>
-      }
-    </tbody>
-  </table>
-
-  <div class="invoice-totals">
-    <div class="total-row grand-total">
-      <span>Total del Período:</span> 
-      <span>{{ formatCurrency(totalGlobal()) }}</span>
-    </div>
-  </div>
-</div>

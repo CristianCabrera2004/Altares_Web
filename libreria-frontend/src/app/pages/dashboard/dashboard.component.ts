@@ -1,11 +1,13 @@
 // src/app/pages/dashboard/dashboard.component.ts
-import { Component, inject, signal, OnInit, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, signal, OnInit, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { PredictionService, Prediccion, PredictionResponse } from '../../core/services/prediction.service';
 import { InvoiceService, InvoiceSummary } from '../../core/services/invoice.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { Chart, registerables } from 'chart.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 Chart.register(...registerables);
 
@@ -16,7 +18,7 @@ Chart.register(...registerables);
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
-export class DashboardComponent implements OnInit, AfterViewInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly predictionService = inject(PredictionService);
   private readonly invoiceService = inject(InvoiceService);
@@ -25,8 +27,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   readonly nombreUsuario = signal('');
   readonly rolUsuario = signal('');
   readonly fechaActual = signal('');
-  
-  readonly nombre = signal('');
+
   readonly isAdmin = signal(false);
   readonly horaActual = signal('');
 
@@ -50,6 +51,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   @ViewChild('salesChart') salesChartRef!: ElementRef;
   private chartInstance: Chart | null = null;
+  private themeObserver: MutationObserver | null = null;
+  private clockInterval: ReturnType<typeof setInterval> | null = null;
 
   // Período activo del histórico de ventas
   readonly periodoGrafica  = signal<'7' | '15' | '30' | '365' | '0'>('15');
@@ -67,13 +70,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const nombre = this.authService.getNombre();
     if (nombre) {
       this.nombreUsuario.set(nombre);
-      this.nombre.set(nombre);
       this.rolUsuario.set(this.authService.getRol() ?? '');
     }
 
     this.isAdmin.set(this.authService.isAdmin());
     this.actualizarHora();
-    setInterval(() => this.actualizarHora(), 60000);
+    // Guardamos la referencia para limpiarla en ngOnDestroy y evitar memory leak
+    this.clockInterval = setInterval(() => this.actualizarHora(), 60000);
 
     const opciones: Intl.DateTimeFormatOptions = { 
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
@@ -84,6 +87,38 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.cargarStockBajo(); // HU-06 CA#26
   }
 
+  private getCssVar(name: string): string {
+    if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') return '';
+    return getComputedStyle(document.body).getPropertyValue(name).trim();
+  }
+
+  private actualizarColoresGrafica(): void {
+    if (!this.chartInstance) return;
+    const bgSurface = this.getCssVar('--bg-surface') || '#16181f';
+    const borderSubtle = this.getCssVar('--border-subtle') || '#1e2130';
+    const borderStrong = this.getCssVar('--border-strong') || '#2d3148';
+    const textHeading = this.getCssVar('--text-heading') || '#f0f2f8';
+    const textSecondary = this.getCssVar('--text-secondary') || '#6b7280';
+
+    (this.chartInstance.data.datasets[0] as any).pointBorderColor = bgSurface;
+    
+    if (this.chartInstance.options.plugins?.tooltip) {
+      (this.chartInstance.options.plugins.tooltip as any).backgroundColor = borderSubtle;
+      (this.chartInstance.options.plugins.tooltip as any).titleColor = textSecondary;
+      (this.chartInstance.options.plugins.tooltip as any).bodyColor = textHeading;
+      (this.chartInstance.options.plugins.tooltip as any).borderColor = borderStrong;
+    }
+
+    if (this.chartInstance.options.scales?.['x']?.ticks) {
+      this.chartInstance.options.scales['x'].ticks.color = textHeading;
+    }
+    if (this.chartInstance.options.scales?.['y']?.ticks) {
+      this.chartInstance.options.scales['y'].ticks.color = textHeading;
+    }
+    
+    this.chartInstance.update();
+  }
+
   private actualizarHora(): void {
     const ahora = new Date();
     this.horaActual.set(ahora.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }));
@@ -91,6 +126,27 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   ngAfterViewInit(): void {
     this.cargarGrafica();
+
+    if (typeof document !== 'undefined') {
+      this.themeObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'class' && this.chartInstance) {
+            this.actualizarColoresGrafica();
+          }
+        });
+      });
+      // attributeFilter limita el observer solo a cambios de clase (más eficiente)
+      this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.themeObserver) {
+      this.themeObserver.disconnect();
+    }
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+    }
   }
 
   /** HU-06 CA#26 — Carga conteo real de productos bajo stock mínimo */
@@ -128,6 +184,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           return;
         }
 
+        const bgSurface = this.getCssVar('--bg-surface') || '#16181f';
+        const borderSubtle = this.getCssVar('--border-subtle') || '#1e2130';
+        const borderStrong = this.getCssVar('--border-strong') || '#2d3148';
+        const textHeading = this.getCssVar('--text-heading') || '#f0f2f8';
+        const textSecondary = this.getCssVar('--text-secondary') || '#6b7280';
+
         // Primera vez: crear el chart
         this.chartInstance = new Chart(ctx, {
           type: 'line',
@@ -140,7 +202,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
               backgroundColor: 'rgba(79, 142, 247, 0.1)',
               borderWidth: 3,
               pointBackgroundColor: '#22c55e',
-              pointBorderColor: '#16181f',
+              pointBorderColor: bgSurface,
               pointBorderWidth: 2,
               pointRadius: 4,
               pointHoverRadius: 6,
@@ -154,10 +216,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: '#1e2130',
-                titleColor: '#a0a8bb',
-                bodyColor: '#f0f2f8',
-                borderColor: '#2d3148',
+                backgroundColor: borderSubtle,
+                titleColor: textSecondary,
+                bodyColor: textHeading,
+                borderColor: borderStrong,
                 borderWidth: 1,
                 padding: 12,
                 displayColors: false,
@@ -175,12 +237,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
             },
             scales: {
               x: {
-                grid: { color: 'rgba(45, 49, 72, 0.4)' },
-                ticks: { color: '#6b7280', font: { family: 'inherit', size: 11 } }
+                grid: { display: false },
+                ticks: { color: textHeading, font: { family: 'inherit', size: 11 } }
               },
               y: {
-                grid: { color: 'rgba(45, 49, 72, 0.4)' },
-                ticks: { color: '#6b7280', font: { family: 'inherit', size: 11 },
+                grid: { display: false },
+                ticks: { color: textHeading, font: { family: 'inherit', size: 11 },
                   callback: function(value) { return '$' + value; }
                 },
                 beginAtZero: true
@@ -281,6 +343,61 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  exportarSugerenciasPDF(): void {
+    const arr = this.predicciones();
+    if (arr.length === 0) return;
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const fechaHoy = new Date().toLocaleString('es-EC');
+    const horizonte = this.horizonteProyeccion();
+
+    // Encabezado
+    doc.setFontSize(16);
+    doc.text('LIBRERÍA "LOS ALTARES"', 105, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.text('RUC: 1234567890001', 14, 25);
+    doc.text('Dirección: Av. Principal y Secundaria, Sangolquí', 14, 30);
+
+    // Título
+    doc.setFontSize(14);
+    doc.text('SUGERENCIA DE COMPRAS', 105, 40, { align: 'center' });
+
+    // Meta-datos
+    doc.setFontSize(10);
+    doc.text(`Fecha de Emisión: ${fechaHoy}`, 14, 50);
+    doc.text(`Horizonte de Proyección: Próximos ${horizonte} días`, 14, 55);
+    doc.text(`Motor Analítico: Modelo ARIMA (Autoregresivo de 2 años)`, 14, 60);
+
+    // Tabla
+    const tableData = arr.map(i => [
+      i.id_producto.toString(),
+      i.nombre,
+      i.cantidad_proyectada.toString(),
+      `±${(i.margen_error * 100).toFixed(0)}%`,
+      'Solicitar a proveedor'
+    ]);
+
+    autoTable(doc, {
+      startY: 65,
+      head: [['ID', 'Producto', 'Cant. Sugerida', 'Margen Error', 'Acción Recomendada']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [79, 142, 247], textColor: [255, 255, 255] },
+      columnStyles: {
+        2: { halign: 'center' },
+        3: { halign: 'center' }
+      }
+    });
+
+    doc.save(`sugerencia_compras_${new Date().toISOString().split('T')[0]}.pdf`);
   }
 
   cerrarModalInvoice(): void {
