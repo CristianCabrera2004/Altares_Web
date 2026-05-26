@@ -135,12 +135,25 @@ CREATE TABLE inventario.pronosticos_demanda (
 -- 4. ESQUEMA: OPERACIONES
 -- ==========================================
 
+-- Catálogo de clientes (HU-Clientes): cedula_ruc es UNIQUE para evitar duplicados.
+-- Un único registro '9999999999999' representa las ventas anónimas (Consumidor Final).
+CREATE TABLE operaciones.clientes (
+    id_cliente  SERIAL PRIMARY KEY,
+    cedula_ruc  VARCHAR(15) NOT NULL,
+    nombre      VARCHAR(150) NOT NULL,
+    direccion   TEXT,
+    telefono    VARCHAR(20),
+    CONSTRAINT uq_clientes_cedula_ruc UNIQUE (cedula_ruc)
+);
+
 CREATE TABLE operaciones.cierres_diarios (
-    id_cierre SERIAL PRIMARY KEY,
-    id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
-    fecha_cierre DATE NOT NULL,
-    total_recaudado INT NOT NULL DEFAULT 0,
-    estado VARCHAR(20) NOT NULL DEFAULT 'cuadrado'
+    id_cierre         SERIAL PRIMARY KEY,
+    id_usuario        INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    fecha_cierre      DATE NOT NULL,
+    total_recaudado   INT NOT NULL DEFAULT 0,
+    estado            VARCHAR(20) NOT NULL DEFAULT 'cuadrado',
+    -- Timestamp exacto del cierre: permite registrar múltiples cierres por día
+    fecha_hora_cierre TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE operaciones.ventas (
@@ -180,13 +193,15 @@ CREATE TABLE operaciones.tipo_factura (
 );
 
 CREATE TABLE operaciones.facturas (
-    id_factura SERIAL PRIMARY KEY,
-    id_venta INT NOT NULL REFERENCES operaciones.ventas(id_venta),
-    id_tipo_factura INT NOT NULL REFERENCES operaciones.tipo_factura(id_tipo_factura),
-    cliente_identificacion VARCHAR(20) NOT NULL DEFAULT '9999999999999',
-    cliente_nombre VARCHAR(150) NOT NULL DEFAULT 'Consumidor Final',
-    archivo_pdf VARCHAR(255),
-    fecha_emision TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id_factura              SERIAL PRIMARY KEY,
+    id_venta                INT NOT NULL REFERENCES operaciones.ventas(id_venta),
+    id_tipo_factura         INT NOT NULL REFERENCES operaciones.tipo_factura(id_tipo_factura),
+    -- FK al catálogo de clientes (NULL = Consumidor Final sin datos registrados)
+    id_cliente              INT REFERENCES operaciones.clientes(id_cliente) ON DELETE SET NULL,
+    cliente_identificacion  VARCHAR(20) NOT NULL DEFAULT '9999999999999',
+    cliente_nombre          VARCHAR(150) NOT NULL DEFAULT 'Consumidor Final',
+    archivo_pdf             VARCHAR(255),
+    fecha_emision           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE inventario.movimientos_stock (
@@ -228,6 +243,10 @@ REVOKE DELETE ON ALL TABLES IN SCHEMA inventario FROM operador_caja;
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA operaciones TO operador_caja;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA operaciones TO operador_caja;
 REVOKE DELETE ON ALL TABLES IN SCHEMA operaciones FROM operador_caja;
+
+-- Permisos explícitos sobre la nueva tabla de clientes
+GRANT SELECT, INSERT, UPDATE ON operaciones.clientes TO operador_caja;
+GRANT USAGE, SELECT ON SEQUENCE operaciones.clientes_id_cliente_seq TO operador_caja;
 
 GRANT SELECT ON seguridad.usuarios TO operador_caja;
 GRANT SELECT, INSERT, UPDATE ON seguridad.sesiones TO operador_caja;
@@ -278,6 +297,13 @@ CREATE INDEX idx_movimientos_fecha ON inventario.movimientos_stock(fecha_movimie
 
 -- Índice de productos activos (consultas frecuentes del catálogo)
 CREATE INDEX idx_productos_estado ON inventario.productos(estado);
+
+-- Búsqueda predictiva y exacta en catálogo de clientes
+CREATE INDEX idx_clientes_nombre ON operaciones.clientes USING gin (nombre gin_trgm_ops);
+CREATE INDEX idx_clientes_cedula ON operaciones.clientes(cedula_ruc);
+
+-- Índice FK en facturas → clientes para JOINs rápidos
+CREATE INDEX idx_facturas_id_cliente ON operaciones.facturas(id_cliente);
 
 -- ==========================================
 -- 8. VISTA MATERIALIZADA DE VENTAS DIARIAS

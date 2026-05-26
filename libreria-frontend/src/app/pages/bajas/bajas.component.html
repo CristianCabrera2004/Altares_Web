@@ -1,0 +1,235 @@
+<!-- src/app/pages/bajas/bajas.component.html -->
+<div class="page">
+
+  <!-- ── Header ── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Bajas por Merma</h1>
+      <p class="page-subtitle">Registro de mermas y pérdidas de inventario · {{ bajasFiltradas().length }} registros</p>
+    </div>
+  </div>
+
+  <!-- ── Mensajes ── -->
+  @if (successMsg()) {
+    <div class="alert-success" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      {{ successMsg() }}
+    </div>
+  }
+  @if (errorMsg() && form.pristine) {
+    <div class="alert-error" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {{ errorMsg() }}
+    </div>
+  }
+
+  <!-- ── Layout de dos columnas ── -->
+  <div class="two-col-layout">
+
+    <!-- ── Formulario de Registro ── -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="form-card-icon baja-icon">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <h2 class="form-card-title">Registrar Baja por Merma</h2>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="registrar()" novalidate class="registro-form">
+
+        <!-- Error del formulario -->
+        @if (errorMsg() && form.dirty) {
+          <div class="alert-error form-alert" role="alert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+            </svg>
+            {{ errorMsg() }}
+          </div>
+        }
+
+        <!-- Producto (autocomplete por nombre o código de barras) -->
+        <div class="field-group">
+          <label for="baja-busqueda-prod">Producto *</label>
+          <div class="autocomplete-wrapper">
+            <svg class="autocomplete-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              id="baja-busqueda-prod"
+              type="text"
+              class="autocomplete-input"
+              [class.invalid]="form.get('id_producto')?.invalid && form.get('id_producto')?.touched"
+              [class.selected]="productoSeleccionado() !== null"
+              placeholder="Buscar por nombre o código de barras..."
+              [value]="busquedaProducto()"
+              (input)="onBusquedaInput($any($event.target).value)"
+              (focus)="mostrarSugerencias.set(true)"
+              (blur)="ocultarSugerencias()"
+              autocomplete="off"
+            />
+            @if (productoSeleccionado()) {
+              <span class="autocomplete-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </span>
+            }
+            <!-- Lista de sugerencias -->
+            @if (mostrarSugerencias() && sugerencias().length > 0) {
+              <ul class="sugerencias-list">
+                @for (p of sugerencias(); track p.id_producto) {
+                  <li class="sugerencia-item" (mousedown)="seleccionarProducto(p)">
+                    <div class="sug-icon">{{ p.nombre[0].toUpperCase() }}</div>
+                    <div class="sug-info">
+                      <span class="sug-nombre">{{ p.nombre }}</span>
+                      <span class="sug-meta">
+                        @if (p.codigo_barras) { <span class="sug-codigo">{{ p.codigo_barras }}</span> }
+                        <span class="sug-stock" [class.sug-stock-zero]="p.stock_actual === 0">Stock: {{ p.stock_actual }}</span>
+                      </span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          @if (form.get('id_producto')?.invalid && form.get('id_producto')?.touched) {
+            <span class="field-error">Selecciona un producto de la lista.</span>
+          }
+          @if (stockDisponible() !== null) {
+            <span class="stock-hint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              Stock disponible: <strong>{{ stockDisponible() }}</strong> unidades
+            </span>
+          }
+        </div>
+
+        <!-- Motivo -->
+        <div class="field-group">
+          <label for="baja-motivo">Motivo de la Baja *</label>
+          <select id="baja-motivo" formControlName="motivo" class="select-input"
+                  [class.invalid]="form.get('motivo')?.invalid && form.get('motivo')?.touched">
+            <option value="" disabled selected>Selecciona un motivo</option>
+            @for (m of motivos; track m) {
+              <option [value]="m">{{ m }}</option>
+            }
+          </select>
+          @if (form.get('motivo')?.invalid && form.get('motivo')?.touched) {
+            <span class="field-error">Selecciona el motivo de la baja.</span>
+          }
+        </div>
+
+        <!-- Cantidad -->
+        <div class="field-group">
+          <label for="baja-cantidad">Cantidad a dar de Baja *</label>
+          <input id="baja-cantidad" type="number" min="1"
+                 [max]="stockDisponible() ?? 9999"
+                 formControlName="cantidad_baja"
+                 class="select-input"
+                 [class.invalid]="form.get('cantidad_baja')?.invalid && form.get('cantidad_baja')?.touched" />
+          @if (form.get('cantidad_baja')?.invalid && form.get('cantidad_baja')?.touched) {
+            <span class="field-error">Ingresa una cantidad válida (≥ 1).</span>
+          }
+          @if (stockDisponible() !== null && (form.get('cantidad_baja')?.value ?? 0) > 0) {
+            <span class="stock-result">
+              Stock resultante: <strong>{{ stockDisponible()! - (form.get('cantidad_baja')?.value ?? 0) }}</strong> u.
+            </span>
+          }
+        </div>
+
+        <button id="btn-registrar-baja" type="submit" class="btn-baja"
+                [disabled]="form.invalid || guardando()">
+          @if (guardando()) {
+            <span class="spinner-sm"></span> Registrando...
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            Registrar Baja
+          }
+        </button>
+
+      </form>
+    </div>
+
+    <!-- ── Historial ── -->
+    <div class="table-card">
+      <div class="table-toolbar">
+        <div class="search-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            id="input-buscar-baja"
+            type="text"
+            placeholder="Buscar por producto..."
+            class="search-input"
+            (input)="setBusqueda($any($event.target).value)"
+          />
+        </div>
+      </div>
+
+      @if (cargando()) {
+        <div class="loading-state">
+          <div class="spinner-lg"></div>
+          <span>Cargando historial...</span>
+        </div>
+      } @else if (bajasFiltradas().length === 0) {
+        <div class="empty-state">
+          <svg viewBox="0 0 64 64" fill="none" width="52">
+            <circle cx="32" cy="32" r="28" stroke="var(--border-subtle)" stroke-width="2"/>
+            <line x1="42" y1="22" x2="22" y2="42" stroke="#f87171" stroke-width="2"/>
+            <line x1="22" y1="22" x2="42" y2="42" stroke="#f87171" stroke-width="2"/>
+          </svg>
+          <p>No hay bajas registradas aún.</p>
+        </div>
+      } @else {
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th>Cantidad Baja</th>
+                <th>Stock Resultante</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of bajasFiltradas(); track b.id_movimiento) {
+                <tr>
+                  <td><span class="id-badge">{{ b.id_movimiento }}</span></td>
+                  <td class="product-cell">
+                    <div class="product-icon baja-color">{{ b.nombre_producto[0].toUpperCase() }}</div>
+                    <span class="product-name">{{ b.nombre_producto }}</span>
+                  </td>
+                  <td>
+                    <span class="qty-badge baja-qty">−{{ cantidadAbs(b.cantidad) }}</span>
+                  </td>
+                  <td>
+                    <span class="stock-result-badge" [class.stock-zero]="b.stock_resultante === 0">
+                      {{ b.stock_resultante }} u.
+                    </span>
+                  </td>
+                  <td class="fecha-cell">{{ formatFecha(b.fecha_movimiento) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+  </div>
+</div>

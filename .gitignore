@@ -4,6 +4,7 @@
 .env
 Backend/.env
 node_modules/
+respaldo_tesis_BD
 
 # Binarios de Go
 /libreria-backend

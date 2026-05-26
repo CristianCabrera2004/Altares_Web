@@ -11,7 +11,7 @@ import (
 	"libreria-altares/utils"
 )
 
-// InvoiceSummary representa el cierre global de ventas de un día.
+// InvoiceSummary representa el resumen de un cierre de caja.
 type InvoiceSummary struct {
 	FechaEmision  string          `json:"fecha_emision"`
 	RucCliente    string          `json:"ruc_cliente"`
@@ -22,6 +22,7 @@ type InvoiceSummary struct {
 	TotalGlobal   int             `json:"total_global"`
 	Detalles      []InvoiceDetail `json:"detalles"`
 	XmlGenerado   string          `json:"xml_sri_mock"`
+	IdCierre      int             `json:"id_cierre,omitempty"`
 }
 
 type InvoiceDetail struct {
@@ -32,9 +33,11 @@ type InvoiceDetail struct {
 	Subtotal       int    `json:"subtotal"`
 }
 
-// InvoiceHandler procesa el cierre de caja y devuelve la data de la factura global.
-// HU-02: Si ya se generó un cierre hoy (POST), retorna HTTP 409 con los datos
-// ya calculados para evitar duplicar el registro de auditoría.
+// InvoiceHandler procesa un cierre de caja y devuelve el resumen de la jornada.
+// HU-02 (actualizado): Se permiten múltiples cierres parciales por día.
+// Cada POST genera un registro independiente en operaciones.cierres_diarios
+// con su timestamp exacto (fecha_hora_cierre), permitiendo cuadres parciales
+// o finales dentro del mismo día calendario.
 func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -46,25 +49,6 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		hoy := time.Now().Format("2006-01-02")
-
-		// HU-02: Protección contra doble cierre del mismo día.
-		// Solo aplica al POST (generación), no al GET (consulta).
-		if r.Method == http.MethodPost {
-			var cierresHoy int
-			db.QueryRow(`
-				SELECT COUNT(*) FROM seguridad.logs_auditoria
-				WHERE accion = 'CIERRE_CAJA' AND DATE(fecha) = $1`, hoy,
-			).Scan(&cierresHoy)
-
-			if cierresHoy > 0 {
-				w.WriteHeader(http.StatusConflict) // HTTP 409
-				json.NewEncoder(w).Encode(map[string]string{
-					"error": "Ya se generó la factura de cierre para el día de hoy (" + hoy + "). " +
-						"Solo se permite un cierre por jornada. Utilice la opción de consulta para verla.",
-				})
-				return
-			}
-		}
 
 		// Consultar todas las ventas de la jornada
 		query := `
@@ -123,10 +107,27 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 		// CA 9: Simulador de XML SRI
 		summary.XmlGenerado = fmt.Sprintf("<factura><infoTributaria><ruc>1234567890001</ruc><razonSocial>Librería Los Altares</razonSocial></infoTributaria><infoFactura><fechaEmision>%s</fechaEmision><identificacionComprador>9999999999999</identificacionComprador><totalConImpuestos>%d</totalConImpuestos></infoFactura></factura>", hoy, summary.TotalGlobal)
 
-		// Registrar evento en auditoría (HU-08)
+		// Registrar evento en auditoría (HU-08) e insertar cierre en cierres_diarios
 		claims, ok := middleware.GetClaims(r)
-		if ok {
-			utils.LogAction(db, claims.IdUsuario, "CIERRE_CAJA", "operaciones.ventas", nil, "", fmt.Sprintf("Total: %d", summary.TotalGlobal), r.RemoteAddr)
+		if r.Method == http.MethodPost {
+			if ok {
+				// Insertar registro de cierre con timestamp exacto (permite múltiples por día)
+				var idCierre int
+				insertErr := db.QueryRow(`
+					INSERT INTO operaciones.cierres_diarios
+					  (id_usuario, fecha_cierre, total_recaudado, estado, fecha_hora_cierre)
+					VALUES ($1, $2, $3, 'cuadrado', NOW())
+					RETURNING id_cierre`,
+					claims.IdUsuario,
+					hoy,
+					summary.TotalGlobal,
+				).Scan(&idCierre)
+				if insertErr == nil {
+					summary.IdCierre = idCierre
+				}
+				utils.LogAction(db, claims.IdUsuario, "CIERRE_CAJA", "operaciones.cierres_diarios",
+					&idCierre, "", fmt.Sprintf("Total: %d centavos | Cierre #%d", summary.TotalGlobal, idCierre), r.RemoteAddr)
+			}
 		}
 
 		w.WriteHeader(http.StatusOK)
