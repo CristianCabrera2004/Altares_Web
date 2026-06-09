@@ -317,33 +317,122 @@ export class CuadernoComponent implements OnInit {
       }))
     };
 
-    this.http
-      .post<RespuestaCuaderno>(`${environment.apiUrl}/ventas/cuaderno`, payload)
-      .subscribe({
-        next: res => {
-          this.resumen.set({
-            id_venta: res.id_venta,
-            total:    this.totales().total, // total local con IVA calculado
-            items:    res.items_cargados
+    // 1. Registrar la venta en el backend
+    this.http.post<RespuestaCuaderno>(`${environment.apiUrl}/ventas/cuaderno`, payload).subscribe({
+      next: (ventaRes) => {
+        const idVenta = ventaRes.id_venta;
+
+        // 2. Gestionar el cliente y la creación de la factura
+        if (this.tipoCliente() === 'final') {
+          // Factura a Consumidor Final (tipo 1)
+          this.crearFacturaBackend(idVenta, 1, null, null, ventaRes);
+        } else {
+          // Factura con datos. Buscar si existe el cliente o crearlo
+          const ruc = this.clienteIdentificacion().trim();
+          this.http.get<any[]>(`${environment.apiUrl}/clientes/buscar?q=${encodeURIComponent(ruc)}`).subscribe({
+            next: (clientes) => {
+              const exactClient = clientes.find(c => c.cedula_ruc === ruc);
+              if (exactClient) {
+                // Cliente existe, usar su ID
+                this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+              } else {
+                // Cliente no existe, crearlo
+                this.http.post<any>(`${environment.apiUrl}/clientes`, {
+                  cedula_ruc: ruc,
+                  nombre: this.clienteNombre(),
+                  direccion: this.clienteDireccion() || 'Dirección de la Tienda',
+                  telefono: this.clienteTelefono() || 'N/A',
+                  email: this.clienteCorreo() || ''
+                }).subscribe({
+                  next: (newClientRes) => {
+                    this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
+                  },
+                  error: (err) => {
+                    this.errorMsg.set('Venta guardada, pero falló al crear el cliente para la factura: ' + (err?.error?.error ?? ''));
+                    this.guardando.set(false);
+                  }
+                });
+              }
+            },
+            error: () => {
+              // Si falla la búsqueda, intentar crear el cliente directamente
+              this.http.post<any>(`${environment.apiUrl}/clientes`, {
+                cedula_ruc: ruc,
+                nombre: this.clienteNombre(),
+                direccion: this.clienteDireccion() || 'Dirección de la Tienda',
+                telefono: this.clienteTelefono() || 'N/A',
+                email: this.clienteCorreo() || ''
+              }).subscribe({
+                next: (newClientRes) => {
+                  this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
+                },
+                error: (err) => {
+                  this.errorMsg.set('Venta guardada, pero falló al registrar el cliente: ' + (err?.error?.error ?? ''));
+                  this.guardando.set(false);
+                }
+              });
+            }
           });
-          this.guardadoExitoso.set(true);
-          this.modalVisible.set(false);
-          this.guardando.set(false);
-
-          if (this.tipoFactura() === 'fisica') {
-            this.generarYDescargarFacturaFisica(res.id_venta, payload.cliente_nombre, payload.cliente_identificacion, this.items());
-          }
-
-          this.items.set([]);             // Limpiar cuaderno tras guardar
-        },
-        error: err => {
-          this.errorMsg.set(err?.error?.error ?? 'Error al guardar el cuaderno. Ningún stock fue modificado.');
-          this.guardando.set(false);
         }
-      });
+      },
+      error: err => {
+        this.errorMsg.set(err?.error?.error ?? 'Error al guardar el cuaderno. Ningún stock fue modificado.');
+        this.guardando.set(false);
+      }
+    });
   }
 
-  generarYDescargarFacturaFisica(idVenta: number, clienteNombre: string, clienteIdentificacion: string, itemsFactura: ItemCuaderno[]): void {
+  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno): void {
+    const tipoFacturaId = this.tipoFactura() === 'digital' ? 3 : 2; // 3: Electrónica, 2: Física con Datos
+    let pdfBase64: string | null = null;
+    
+    // Generar PDF
+    const doc = this.generarPdfFactura(idVenta, this.clienteNombre(), this.clienteIdentificacion(), this.items());
+    
+    if (this.tipoFactura() === 'digital') {
+      const pdfDataUri = doc.output('datauristring');
+      pdfBase64 = pdfDataUri.split(',')[1];
+    }
+
+    this.crearFacturaBackend(idVenta, tipoFacturaId, idCliente, pdfBase64, ventaRes, doc);
+  }
+
+  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF): void {
+    const payload = {
+      id_venta: idVenta,
+      id_tipo_factura: idTipoFactura,
+      id_cliente: idCliente,
+      pdf_base64: pdfBase64 || undefined
+    };
+
+    this.http.post<any>(`${environment.apiUrl}/facturas`, payload).subscribe({
+      next: () => {
+        this.resumen.set({
+          id_venta: idVenta,
+          total:    this.totales().total,
+          items:    ventaRes.items_cargados
+        });
+        this.guardadoExitoso.set(true);
+        this.modalVisible.set(false);
+        this.guardando.set(false);
+
+        // Descargar PDF
+        const docToSave = doc || this.generarPdfFactura(idVenta, this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final', this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999', this.items());
+        const docName = idTipoFactura === 3 
+          ? `Factura_Electronica_${idVenta.toString().padStart(6, '0')}.pdf`
+          : `Factura_${idVenta.toString().padStart(6, '0')}.pdf`;
+        docToSave.save(docName);
+
+        this.items.set([]);
+      },
+      error: (err) => {
+        this.errorMsg.set('Venta registrada, pero falló al crear el comprobante de factura: ' + (err?.error?.error ?? ''));
+        this.guardando.set(false);
+      }
+    });
+  }
+
+  generarPdfFactura(idVenta: number, clienteNombre: string, clienteIdentificacion: string, itemsFactura: ItemCuaderno[]): jsPDF {
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -404,7 +493,7 @@ export class CuadernoComponent implements OnInit {
     doc.setFontSize(10);
     doc.text('¡Gracias por su compra!', 74, finalY + 35, { align: 'center' });
 
-    doc.save(`Factura_${numFactura}.pdf`);
+    return doc;
   }
 
   nuevoCuaderno(): void {

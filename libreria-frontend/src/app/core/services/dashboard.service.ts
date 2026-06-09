@@ -19,8 +19,12 @@ interface ProductoStock {
 export class DashboardService {
   private readonly http = inject(HttpClient);
 
-  getGraficaVentas(periodo: '7' | '15' | '30' | '365' | '0' = '15'): Observable<GraficaData[]> {
-    return this.http.get<GraficaData[]>(`${environment.apiUrl}/dashboard/grafica?periodo=${periodo}`);
+  getGraficaVentas(periodo: '7' | '15' | '30' | '365' | '0' = '15', tiendaId?: number): Observable<GraficaData[]> {
+    let url = `${environment.apiUrl}/dashboard/grafica?periodo=${periodo}`;
+    if (tiendaId) {
+      url += `&tienda=${tiendaId}`;
+    }
+    return this.http.get<GraficaData[]>(url);
   }
 
   /** HU-06 CA#26 — Cuenta productos con stock <= stock_alerta_min */

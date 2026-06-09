@@ -1,6 +1,7 @@
-// src/app/pages/dashboard/dashboard.component.ts
-import { Component, inject, signal, OnInit, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { PredictionService, Prediccion, PredictionResponse } from '../../core/services/prediction.service';
 import { InvoiceService, InvoiceSummary } from '../../core/services/invoice.service';
@@ -23,6 +24,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly predictionService = inject(PredictionService);
   private readonly invoiceService = inject(InvoiceService);
   private readonly dashboardService = inject(DashboardService);
+  private readonly http = inject(HttpClient);
+
+  readonly tiendas = signal<any[]>([]);
+  readonly tiendaSeleccionada = signal<number>(1);
+  readonly productosCount = signal<number>(0);
+  readonly usuariosCount = signal<number>(0);
+  readonly ventasHoy = signal<number>(0);
 
   readonly nombreUsuario = signal('');
   readonly rolUsuario = signal('');
@@ -56,6 +64,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Período activo del histórico de ventas
   readonly periodoGrafica  = signal<'7' | '15' | '30' | '365' | '0'>('15');
+  readonly graficaRawData  = signal<any[]>([]);
   readonly graficaCargando = signal(false);
   readonly graficaError    = signal('');
   readonly periodos = [
@@ -65,6 +74,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     { valor: '365', etiqueta: 'Año' },
     { valor: '0',   etiqueta: 'General' }
   ] as const;
+
+  // Modal de Detalle de Ventas por día/período
+  readonly modalDetalleDiaVisible = signal(false);
+  readonly itemsDetalleDia = signal<any[]>([]);
+  readonly cargandoDetalleDia = signal(false);
+  readonly errorDetalleDia = signal('');
+  readonly fechaDetalleDiaFormateada = signal('');
+
+  readonly totalRecaudadoDia = computed(() => {
+    return this.itemsDetalleDia().reduce((acc, curr) => acc + curr.total, 0);
+  });
 
   ngOnInit(): void {
     const nombre = this.authService.getNombre();
@@ -85,6 +105,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.cargarPredicciones();
     this.cargarStockBajo(); // HU-06 CA#26
+    
+    // Cargar datos dinámicos de KPIs
+    this.http.get<any[]>(`${environment.apiUrl}/productos`).subscribe({
+      next: p => this.productosCount.set(p.length),
+      error: () => this.productosCount.set(0)
+    });
+
+    if (this.isAdmin()) {
+      this.http.get<any[]>(`${environment.apiUrl}/usuarios`).subscribe({
+        next: u => this.usuariosCount.set(u.length),
+        error: () => this.usuariosCount.set(0)
+      });
+      this.http.get<any[]>(`${environment.apiUrl}/tiendas`).subscribe({
+        next: t => {
+          this.tiendas.set(t);
+          if (t.length > 0) {
+            this.tiendaSeleccionada.set(t[0].id_tienda);
+            // Recargar gráfica para la tienda por defecto del admin
+            this.cargarGrafica();
+          }
+        },
+        error: () => this.tiendas.set([])
+      });
+    }
   }
 
   private getCssVar(name: string): string {
@@ -162,14 +206,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.graficaCargando.set(true);
     this.graficaError.set('');
 
-    this.dashboardService.getGraficaVentas(p).subscribe({
+    const tiendaId = this.isAdmin() ? this.tiendaSeleccionada() : undefined;
+
+    this.dashboardService.getGraficaVentas(p, tiendaId).subscribe({
       next: (rawData) => {
         this.graficaCargando.set(false);
         const data = rawData ?? [];
+        this.graficaRawData.set(data);
+
+        // Calcular ventas de hoy
+        const hoyStr = new Date().toISOString().split('T')[0];
+        const hoyVentas = data.find(d => d.fecha === hoyStr);
+        this.ventasHoy.set(hoyVentas ? hoyVentas.total : 0);
 
         const labels = data.map(d => {
-          const parts = d.fecha.split('-');
-          return `${parts[2]}/${parts[1]}`;
+          if (d.fecha.length === 10) { // YYYY-MM-DD
+            const parts = d.fecha.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+          } else if (d.fecha.length === 7) { // YYYY-MM
+            const parts = d.fecha.split('-');
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const mesIdx = parseInt(parts[1], 10) - 1;
+            const mesNombre = meses[mesIdx] || parts[1];
+            return `${mesNombre} ${parts[0]}`; // e.g. "Febrero 2026"
+          } else { // YYYY
+            return d.fecha; // e.g. "2026"
+          }
         });
         const values = data.map(d => d.total / 100);
 
@@ -213,6 +275,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            onClick: (event, elements) => {
+              if (elements && elements.length > 0) {
+                const index = elements[0].index;
+                const rawDate = this.graficaRawData()[index]?.fecha;
+                if (rawDate) {
+                  this.abrirDetalleDia(rawDate);
+                }
+              }
+            },
             plugins: {
               legend: { display: false },
               tooltip: {
@@ -415,8 +486,68 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cargarGrafica(valor);
   }
 
+  getLastDayOfMonth(yearStr: string, monthStr: string): string {
+    const y = parseInt(yearStr, 10);
+    const m = parseInt(monthStr, 10);
+    const lastDay = new Date(y, m, 0).getDate();
+    return `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  abrirDetalleDia(fecha: string): void {
+    let startDate = fecha;
+    let endDate = fecha;
+    let titulo = '';
+
+    if (fecha.length === 10) { // YYYY-MM-DD
+      const parts = fecha.split('-');
+      titulo = `Ventas del día ${parts[2]}/${parts[1]}/${parts[0]}`;
+    } else if (fecha.length === 7) { // YYYY-MM
+      const parts = fecha.split('-');
+      const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const mesIdx = parseInt(parts[1], 10) - 1;
+      const mesNombre = meses[mesIdx] || parts[1];
+      titulo = `Ventas de ${mesNombre} ${parts[0]}`;
+      startDate = `${fecha}-01`;
+      endDate = this.getLastDayOfMonth(parts[0], parts[1]);
+    } else { // YYYY
+      titulo = `Ventas del año ${fecha}`;
+      startDate = `${fecha}-01-01`;
+      endDate = `${fecha}-12-31`;
+    }
+
+    this.fechaDetalleDiaFormateada.set(titulo);
+    this.modalDetalleDiaVisible.set(true);
+    this.cargandoDetalleDia.set(true);
+    this.errorDetalleDia.set('');
+    this.itemsDetalleDia.set([]);
+
+    const tiendaId = this.isAdmin() ? this.tiendaSeleccionada() : 1;
+    this.http.get<any[]>(`${environment.apiUrl}/reportes/ventas?start_date=${startDate}&end_date=${endDate}&tienda=${tiendaId}`).subscribe({
+      next: (data) => {
+        this.itemsDetalleDia.set(data ?? []);
+        this.cargandoDetalleDia.set(false);
+      },
+      error: (err) => {
+        console.error('Error al cargar ventas del período', err);
+        this.errorDetalleDia.set('No se pudieron cargar los detalles de ventas para el período seleccionado.');
+        this.cargandoDetalleDia.set(false);
+      }
+    });
+  }
+
+  cerrarModalDetalleDia(): void {
+    this.modalDetalleDiaVisible.set(false);
+    this.itemsDetalleDia.set([]);
+    this.errorDetalleDia.set('');
+  }
+
   formatCurrency(centavos: number): string {
     return `$${(Math.abs(centavos) / 100).toFixed(2)}`;
+  }
+
+  onTiendaChange(tiendaId: number): void {
+    this.tiendaSeleccionada.set(tiendaId);
+    this.cargarGrafica();
   }
 }
 

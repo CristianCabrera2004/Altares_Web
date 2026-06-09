@@ -130,8 +130,8 @@ def cargar_datos(df):
                 # No existe, lo insertamos. Asumimos categoría 1 (Papelería/General)
                 cursor.execute("""
                     INSERT INTO inventario.productos 
-                    (nombre, id_categoria, stock_actual, stock_alerta_min, precio_venta, estado)
-                    VALUES (%s, 1, 0, 5, %s, 'activo') RETURNING id_producto
+                    (nombre, id_categoria, precio_venta, estado)
+                    VALUES (%s, 1, %s, 'activo') RETURNING id_producto
                 """, (nombre, precio))
                 nuevo_id = cursor.fetchone()[0]
                 
@@ -140,6 +140,14 @@ def cargar_datos(df):
                     INSERT INTO inventario.codigos_barras (id_producto, codigo) 
                     VALUES (%s, %s)
                 """, (nuevo_id, cod_item))
+                
+                # Inicializar stock en ambas tiendas
+                for id_tienda in [1, 2]:
+                    cursor.execute("""
+                        INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
+                        VALUES (%s, %s, 0, 5)
+                        ON CONFLICT (id_tienda, id_producto) DO NOTHING
+                    """, (id_tienda, nuevo_id))
                 
                 mapa_productos[cod_item] = nuevo_id
             conn.commit()
@@ -160,11 +168,14 @@ def cargar_datos(df):
             # Sumar el subtotal de todos los productos en esa venta (en centavos)
             subtotal_venta = int(grupo['total_venta_cents'].sum())
             
+            # ID de la tienda para datos históricos (1 = Sucursal Principal)
+            ID_TIENDA_MIGRACION = 1
+            
             # 1. Insertar Venta Principal
             cursor.execute("""
-                INSERT INTO operaciones.ventas (id_usuario, fecha_venta, subtotal, total_iva, total, estado)
-                VALUES (%s, %s, %s, 0, %s, 'completada') RETURNING id_venta
-            """, (ID_USUARIO_ADMIN, fecha, subtotal_venta, subtotal_venta))
+                INSERT INTO operaciones.ventas (id_usuario, id_tienda, fecha_venta, subtotal, total_iva, total, estado)
+                VALUES (%s, %s, %s, %s, 0, %s, 'completada') RETURNING id_venta
+            """, (ID_USUARIO_ADMIN, ID_TIENDA_MIGRACION, fecha, subtotal_venta, subtotal_venta))
             id_venta_nueva = cursor.fetchone()[0]
             
             # 2. Insertar Detalles y Movimientos para Predicción
@@ -189,9 +200,9 @@ def cargar_datos(df):
                 # (Crucial para que el Motor de Predicción tenga datos reales, CA 57)
                 cursor.execute("""
                     INSERT INTO inventario.movimientos_stock 
-                    (id_producto, id_usuario, tipo_movimiento, cantidad, stock_resultante, referencia_id, fecha_movimiento)
-                    VALUES (%s, %s, 'VENTA', %s, 0, %s, %s)
-                """, (id_producto, ID_USUARIO_ADMIN, -cantidad, id_venta_nueva, fecha))
+                    (id_producto, id_usuario, id_tienda, tipo_movimiento, cantidad, stock_resultante, referencia_id, fecha_movimiento)
+                    VALUES (%s, %s, %s, 'VENTA', %s, 0, %s, %s)
+                """, (id_producto, ID_USUARIO_ADMIN, ID_TIENDA_MIGRACION, -cantidad, id_venta_nueva, fecha))
 
             # Transacción completa de la venta: Todo o nada
             conn.commit()
@@ -207,12 +218,12 @@ def cargar_datos(df):
     conn.close()
     
     print("-" * 50)
-    print("🏁 RESUMEN DE MIGRACIÓN")
-    print(f"   ✅ Ventas insertadas exitosamente: {ventas_exitosas}")
+    print("RESUMEN DE MIGRACION")
+    print(f"   Ventas insertadas exitosamente: {ventas_exitosas}")
     if ventas_fallidas > 0:
-        print(f"   ⚠️ Ventas con error: {ventas_fallidas} (Detalles en errores_migracion.log)")
+        print(f"   Ventas con error: {ventas_fallidas} (Detalles en errores_migracion.log)")
     else:
-         print(f"   ⚠️ Ventas con error: 0")
+         print(f"   Ventas con error: 0")
     print("-" * 50)
 
 if __name__ == "__main__":
@@ -222,4 +233,4 @@ if __name__ == "__main__":
     df_raw = extraer_sysag()
     df_clean = transformar_datos(df_raw)
     cargar_datos(df_clean)
-    print("🚀 MIGRACIÓN FINALIZADA CORRECTAMENTE.")
+    print("MIGRACION FINALIZADA CORRECTAMENTE.")

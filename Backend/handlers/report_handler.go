@@ -18,6 +18,9 @@ type ReporteItem struct {
 	Total          int    `json:"total"`
 }
 
+// getTiendaIDForReports has been replaced by GetTiendaIDFromCtxOrDb
+
+
 // ReportesVentasHandler devuelve las ventas en un rango de fechas.
 func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,16 +35,16 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		q := r.URL.Query()
 		startDate := q.Get("start_date")
 		endDate := q.Get("end_date")
-		categoria := q.Get("categoria") // opcional, puede ser nombre o ID
+		categoria := q.Get("categoria")
 
 		if startDate == "" || endDate == "" {
-			// Por defecto los últimos 30 días
 			endDate = time.Now().Format("2006-01-02")
 			startDate = time.Now().AddDate(0, -1, 0).Format("2006-01-02")
 		}
 
-		// Prevenir inyección usando parámetros nombrados o posicionales dinámicos.
-		args := []interface{}{startDate, endDate}
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		args := []interface{}{startDate, endDate, idTienda}
 		query := `
 			SELECT 
 				TO_CHAR(v.fecha_venta, 'YYYY-MM-DD'),
@@ -56,6 +59,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 			WHERE DATE(v.fecha_venta) >= $1 AND DATE(v.fecha_venta) <= $2
+			AND v.id_tienda = $3
 			AND v.estado = 'completada'
 		`
 
@@ -64,7 +68,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 			query += fmt.Sprintf(" AND c.nombre = $%d", len(args))
 		}
 
-		query += " ORDER BY v.fecha_venta DESC LIMIT 1000" // Protección de memoria
+		query += " ORDER BY v.fecha_venta DESC LIMIT 1000"
 
 		rows, err := db.Query(query, args...)
 		if err != nil {
@@ -94,8 +98,6 @@ type GraficaData struct {
 }
 
 // ReporteGraficaHandler devuelve las ventas totales agrupadas por día.
-// Acepta ?periodo= con los valores: 7, 15, 30, 365, 0 (general/todos).
-// Por defecto usa 15 días si no se especifica.
 func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -106,35 +108,48 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Leer parámetro de periodo (días hacia atrás; 0 = sin límite)
 		periodo := r.URL.Query().Get("periodo")
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
+		var selectClause string
+		var groupClause string
 		var whereClause string
+
 		switch periodo {
 		case "7":
 			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '6 days'"
-		case "30":
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '29 days'"
-		case "365":
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '364 days'"
-		case "0":
-			whereClause = "" // Sin límite de fecha → histórico completo
-		default: // "15" o cualquier otro valor
+			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha"
+			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD')"
+		case "30": // Mes: agrupa por mes de los últimos 12 meses
+			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '11 months'"
+			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM') as fecha"
+			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM')"
+		case "365": // Año: agrupa por año de los últimos 5 años
+			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '4 years'"
+			selectClause = "TO_CHAR(fecha_venta, 'YYYY') as fecha"
+			groupClause = "TO_CHAR(fecha_venta, 'YYYY')"
+		case "0": // General: agrupa por año sin límite de fecha
+			whereClause = ""
+			selectClause = "TO_CHAR(fecha_venta, 'YYYY') as fecha"
+			groupClause = "TO_CHAR(fecha_venta, 'YYYY')"
+		default: // "15" (15 días)
 			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '14 days'"
+			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha"
+			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD')"
 		}
 
 		query := fmt.Sprintf(`
 			SELECT 
-				TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha,
+				%s,
 				SUM(total) as total
 			FROM operaciones.ventas
-			WHERE estado = 'completada'
+			WHERE estado = 'completada' AND id_tienda = $1
 			  %s
-			GROUP BY TO_CHAR(fecha_venta, 'YYYY-MM-DD')
-			ORDER BY TO_CHAR(fecha_venta, 'YYYY-MM-DD') ASC
-		`, whereClause)
+			GROUP BY %s
+			ORDER BY %s ASC
+		`, selectClause, whereClause, groupClause, groupClause)
 
-		rows, err := db.Query(query)
+		rows, err := db.Query(query, idTienda)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar datos de la gráfica."})

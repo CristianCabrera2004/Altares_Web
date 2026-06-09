@@ -1,0 +1,73 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+\geometry{a4paper, margin=2.5cm}
+
+\title{\textbf{Requisitos de Seguridad y Modelado de Amenazas} \\ \Large{Sistema: Librería Los Altares}}
+\author{Equipo de Desarrollo}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducción}
+El presente documento detalla el modelado de amenazas realizado para la aplicación web "Librería Los Altares" (Frontend en Angular, Backend en Go y Base de Datos PostgreSQL) y los requisitos de seguridad derivados de este análisis. Se dividen en controles actualmente implementados en el código y aquellos propuestos para futuras iteraciones con el fin de robustecer la postura de ciberseguridad del sistema.
+
+\section{Modelado de Amenazas (Identificación)}
+Basado en metodologías como STRIDE y OWASP Top 10, se han identificado las siguientes amenazas principales para el sistema:
+
+\begin{itemize}
+    \item \textbf{Suplantación de Identidad (Spoofing):} Acceso no autorizado mediante robo de credenciales o secuestro de sesión (JWT).
+    \item \textbf{Manipulación de Datos (Tampering):} Modificación de precios de productos, alteraciones en el inventario o en el cuaderno de ventas por usuarios sin privilegios.
+    \item \textbf{Repudio (Repudiation):} Acciones críticas (como eliminar un producto o registrar una venta) realizadas sin un registro adecuado (trazabilidad).
+    \item \textbf{Divulgación de Información (Information Disclosure):} Exposición de datos de usuarios, métricas de ventas o contraseñas en texto claro.
+    \item \textbf{Denegación de Servicio (DoS):} Saturación de los endpoints del backend, especialmente en el inicio de sesión o generación de reportes masivos.
+    \item \textbf{Elevación de Privilegios (Elevation of Privilege):} Un operador de caja accediendo a funciones exclusivas del administrador (ej. gestión de usuarios).
+\end{itemize}
+
+\section{Requisitos de Seguridad Implementados}
+A partir de la revisión del código fuente (específicamente \texttt{main.go} y handlers), el proyecto ya cuenta con las siguientes contramedidas:
+
+\begin{table}[h!]
+\centering
+\begin{tabularx}{\textwidth}{|>{\hsize=.3\hsize}X|>{\hsize=.7\hsize}X|}
+\hline
+\rowcolor{gray!20} \textbf{Categoría} & \textbf{Requisito / Implementación} \\ \hline
+\textbf{Autenticación} & Uso de \textbf{BCrypt} para el hashing seguro de contraseñas. Ninguna contraseña se almacena en texto claro. \\ \hline
+\textbf{Gestión de Sesiones} & Emisión de \textbf{JSON Web Tokens (JWT)} con algoritmo HS256 y expiración definida (8 horas). Inclusión de endpoint para invalidación explícita (Logout). \\ \hline
+\textbf{Autorización} & Control de Acceso Basado en Roles (RBAC) mediante middlewares (\texttt{RequireRole}). Diferenciación estricta entre \texttt{operador\_caja} y \texttt{admin\_libreria}. \\ \hline
+\textbf{Trazabilidad (Auditoría)} & Implementación de endpoint de auditoría (\texttt{/api/auditoria}) reservado para el administrador para rastrear eventos críticos. \\ \hline
+\textbf{Seguridad en el Cliente} & Protección inherente contra Cross-Site Scripting (XSS) provista por el motor de plantillas de Angular y su validación estricta de contexto. \\ \hline
+\end{tabularx}
+\caption{Requisitos de seguridad mitigados actualmente.}
+\end{table}
+
+\section{Requisitos de Seguridad a Implementar (Mejoras Futuras)}
+Para mitigar amenazas residuales, se proponen los siguientes requisitos para futuras fases de desarrollo:
+
+\begin{table}[h!]
+\centering
+\begin{tabularx}{\textwidth}{|>{\hsize=.3\hsize}X|>{\hsize=.7\hsize}X|}
+\hline
+\rowcolor{gray!20} \textbf{Categoría} & \textbf{Requisito / Propuesta} \\ \hline
+\textbf{Configuración CORS} & \textbf{Restringir los orígenes permitidos}. Actualmente el middleware de CORS acepta \texttt{*} (Access-Control-Allow-Origin: *). Debe limitarse estrictamente al dominio del frontend en producción. \\ \hline
+\textbf{Comunicaciones Seguras} & Forzar el uso de \textbf{HTTPS/TLS} en producción para cifrar los datos en tránsito, protegiendo los JWT y credenciales contra ataques de hombre en el medio (MitM). \\ \hline
+\textbf{Protección contra DoS / Fuerza Bruta} & Implementar \textbf{Rate Limiting} en el endpoint \texttt{/api/auth/login} para bloquear intentos repetitivos de adivinación de contraseñas. \\ \hline
+\textbf{Complejidad de Contraseñas} & Enforzar políticas de contraseñas seguras (longitud mínima de 8 caracteres, uso de mayúsculas, números y símbolos) durante la creación de usuarios o cambio de contraseña. \\ \hline
+\textbf{Seguridad de Cabeceras (Headers)} & Añadir cabeceras de seguridad HTTP en el middleware de Go (ej. \texttt{Strict-Transport-Security}, \texttt{X-Content-Type-Options}, \texttt{X-Frame-Options}). \\ \hline
+\textbf{Validación de Entrada} & Asegurar la sanitización estricta de todas las entradas del usuario en el backend (Go) para prevenir inyecciones SQL, incluso si se usa ORM o base de datos relacional. \\ \hline
+\end{tabularx}
+\caption{Requisitos propuestos para mitigación de amenazas residuales.}
+\end{table}
+
+\section{Conclusión}
+El sistema base presenta una arquitectura sólida con los controles fundamentales (RBAC, JWT, BCrypt). Implementar las mejoras propuestas (especialmente el ajuste de CORS, Rate Limiting y HTTPS) cerrará vectores de ataque comunes en aplicaciones web modernas, garantizando la integridad de los datos de ventas e inventario de la Librería Los Altares.
+
+\end{document}

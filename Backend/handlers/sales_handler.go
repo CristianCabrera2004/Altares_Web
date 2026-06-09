@@ -9,7 +9,8 @@
 // productos vendidos durante el día y se inserta TODO en una sola transacción.
 // Si falla un solo producto → ROLLBACK completo. Nada queda sin consistencia.
 //
-// procesarVenta() es la función atómica interna compartida por ambos handlers.
+// Soporte multitienda: se registra id_tienda en ventas, se actualiza el stock 
+// en inventario.stock_tiendas, y los movimientos quedan atados a la tienda.
 // ─────────────────────────────────────────────────────────────────────────────
 package handlers
 
@@ -85,7 +86,9 @@ func SalesHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		idVenta, total, err := procesarVenta(db, input.IdUsuario, input.Items,
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		idVenta, total, err := procesarVenta(db, input.IdUsuario, idTienda, input.Items,
 			"9999999999999", "Consumidor Final")
 		if err != nil {
 			httpCode := http.StatusInternalServerError
@@ -108,11 +111,6 @@ func SalesHandler(db *sql.DB) http.HandlerFunc {
 
 // ─── POST /api/ventas/cuaderno ───────────────────────────────────────────────
 // CuadernoHandler implementa la CARGA MASIVA del cuaderno de ventas del día.
-//
-// Este es el endpoint transaccional crítico del CA 45: se recibe un array
-// completo de ítems y se procesa TODO en una única transacción SQL atómica.
-// Si falla CUALQUIER producto → ROLLBACK de TODO el cuaderno.
-// Éxito total → COMMIT. No hay estados intermedios.
 func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -130,7 +128,6 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validaciones de entrada → 400 (CA 45)
 		if input.IdUsuario <= 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": "'id_usuario' es obligatorio."})
@@ -142,7 +139,6 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validar todos los ítems antes de abrir la transacción
 		for i, item := range input.Items {
 			if item.IdProducto <= 0 || item.Cantidad <= 0 || item.PrecioUnitario < 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -156,7 +152,6 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Asignar valores por defecto para cliente
 		if input.ClienteId == "" {
 			input.ClienteId = "9999999999999"
 		}
@@ -164,12 +159,9 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 			input.ClienteNombre = "Consumidor Final"
 		}
 
-		// ════════════════════════════════════════════════════════════════════
-		// TRANSACCIÓN MASIVA DEL CUADERNO (CA 45)
-		// Todo el array de ítems se registra en UNA SOLA transacción SQL.
-		// Garantía: o todas las ventas se registran, o ninguna.
-		// ════════════════════════════════════════════════════════════════════
-		idVenta, total, err := procesarVenta(db, input.IdUsuario, input.Items,
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		idVenta, total, err := procesarVenta(db, input.IdUsuario, idTienda, input.Items,
 			input.ClienteId, input.ClienteNombre)
 		if err != nil {
 			httpCode := http.StatusInternalServerError
@@ -195,17 +187,12 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 // procesarVenta ejecuta los 4 pasos de una venta dentro de una SOLA transacción:
 //  1. INSERT en operaciones.ventas            (cabecera)
 //  2. Para cada item:
-//     a. SELECT FOR UPDATE del stock          (bloqueo de fila, evita concurrencia)
+//     a. SELECT FOR UPDATE del stock          (bloqueo de fila en stock_tiendas)
 //     b. Validar stock suficiente             (error 400 → ROLLBACK)
 //     c. INSERT en operaciones.detalle_ventas
-//     d. UPDATE inventario.productos.stock_actual
+//     d. UPDATE inventario.stock_tiendas.stock_actual
 //     e. INSERT en inventario.movimientos_stock
-//
-// Retorna (id_venta, total_centavos, error).
-// Los errores "stock_insuficiente" y "producto_no_encontrado" deben mapear a HTTP 400.
-func procesarVenta(db *sql.DB, idUsuario int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
-	// Calcular el total CON IVA antes de abrir la transacción (HU-01 CA 3)
-	// IVA se calcula con redondeo bancario para precisión en centavos.
+func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
 	var subtotalBase int // suma de precios sin IVA
 	var totalIva     int // suma de IVA calculado
 	for _, item := range items {
@@ -216,22 +203,19 @@ func procesarVenta(db *sql.DB, idUsuario int, items []DetalleVentaInput, cliente
 	}
 	totalConIva := subtotalBase + totalIva
 
-	// ══════════════════════════════════════════════════════════════
-	// BEGIN — Inicio de la transacción atómica
-	// ══════════════════════════════════════════════════════════════
 	tx, err := db.Begin()
 	if err != nil {
 		return 0, 0, fmt.Errorf("error_transaccion")
 	}
-	defer tx.Rollback() // ROLLBACK garantizado si no se llega a Commit()
+	defer tx.Rollback()
 
-	// Paso 1 — Insertar la cabecera de la venta con totales correctos (IVA diferenciado)
+	// Paso 1 — Insertar la cabecera de la venta
 	var idVenta int
 	err = tx.QueryRow(`
-		INSERT INTO operaciones.ventas (id_usuario, subtotal, total_iva, total, estado)
-		VALUES ($1, $2, $3, $4, 'completada')
+		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado)
+		VALUES ($1, $2, $3, $4, $5, 'completada')
 		RETURNING id_venta`,
-		idUsuario, subtotalBase, totalIva, totalConIva,
+		idUsuario, idTienda, subtotalBase, totalIva, totalConIva,
 	).Scan(&idVenta)
 	if err != nil {
 		return 0, 0, fmt.Errorf("error_creando_venta")
@@ -239,13 +223,14 @@ func procesarVenta(db *sql.DB, idUsuario int, items []DetalleVentaInput, cliente
 
 	// Paso 2 — Procesar cada ítem del cuaderno/venta
 	for _, item := range items {
-		// Paso 2a — Bloquear la fila del producto (SELECT FOR UPDATE)
+		// Paso 2a — Bloquear la fila de stock_tiendas para evitar concurrencia
 		var stockActual int
 		err = tx.QueryRow(
-			`SELECT stock_actual FROM inventario.productos WHERE id_producto = $1 FOR UPDATE`,
-			item.IdProducto,
+			`SELECT stock_actual FROM inventario.stock_tiendas WHERE id_producto = $1 AND id_tienda = $2 FOR UPDATE`,
+			item.IdProducto, idTienda,
 		).Scan(&stockActual)
 		if err == sql.ErrNoRows {
+			// Si no existe fila en stock_tiendas, el producto no está asignado a la tienda o no tiene stock
 			return 0, 0, fmt.Errorf("producto_no_encontrado")
 		}
 		if err != nil {
@@ -257,13 +242,12 @@ func procesarVenta(db *sql.DB, idUsuario int, items []DetalleVentaInput, cliente
 			return 0, 0, fmt.Errorf("stock_insuficiente")
 		}
 
-		// IVA y total de la línea (HU-01 CA 3: IVA diferenciado por categoría)
 		lineBase    := item.PrecioUnitario * item.Cantidad
 		lineIva     := int(math.Round(float64(lineBase) * float64(item.IvaAplicado) / 100.0))
 		lineTotalConIva := lineBase + lineIva
 		nuevoStock  := stockActual - item.Cantidad
 
-		// Paso 2c — Insertar línea de detalle con IVA real
+		// Paso 2c — Insertar línea de detalle
 		_, err = tx.Exec(`
 			INSERT INTO operaciones.detalle_ventas
 			  (id_venta, id_producto, cantidad, precio_unitario, iva_aplicado, subtotal)
@@ -274,28 +258,27 @@ func procesarVenta(db *sql.DB, idUsuario int, items []DetalleVentaInput, cliente
 			return 0, 0, fmt.Errorf("error_insertando_detalle")
 		}
 
-		// Paso 2d — Actualizar stock del producto
+		// Paso 2d — Actualizar stock en stock_tiendas
 		_, err = tx.Exec(
-			`UPDATE inventario.productos SET stock_actual = $1 WHERE id_producto = $2`,
-			nuevoStock, item.IdProducto,
+			`UPDATE inventario.stock_tiendas SET stock_actual = $1 WHERE id_producto = $2 AND id_tienda = $3`,
+			nuevoStock, item.IdProducto, idTienda,
 		)
 		if err != nil {
 			return 0, 0, fmt.Errorf("error_actualizando_stock")
 		}
 
-		// Paso 2e — Registrar movimiento (cantidad negativa = salida)
+		// Paso 2e — Registrar movimiento
 		_, err = tx.Exec(`
 			INSERT INTO inventario.movimientos_stock
-			  (id_producto, id_usuario, tipo_movimiento, cantidad, stock_resultante, referencia_id)
-			VALUES ($1, $2, 'VENTA', $3, $4, $5)`,
-			item.IdProducto, idUsuario, -item.Cantidad, nuevoStock, idVenta,
+			  (id_producto, id_usuario, id_tienda, tipo_movimiento, cantidad, stock_resultante, referencia_id)
+			VALUES ($1, $2, $3, 'VENTA', $4, $5, $6)`,
+			item.IdProducto, idUsuario, idTienda, -item.Cantidad, nuevoStock, idVenta,
 		)
 		if err != nil {
 			return 0, 0, fmt.Errorf("error_registrando_movimiento")
 		}
 	}
 
-	// COMMIT — todos los pasos fueron exitosos (CA 4)
 	if err := tx.Commit(); err != nil {
 		return 0, 0, fmt.Errorf("error_confirmando_transaccion")
 	}
@@ -303,16 +286,15 @@ func procesarVenta(db *sql.DB, idUsuario int, items []DetalleVentaInput, cliente
 	return idVenta, totalConIva, nil
 }
 
-// tradError convierte códigos internos de error a mensajes legibles en español.
 func tradError(code string) string {
 	msgs := map[string]string{
-		"stock_insuficiente":            "Stock insuficiente para uno o más productos. Verifique el cuaderno.",
-		"producto_no_encontrado":        "Uno o más productos del cuaderno no existen en el catálogo.",
+		"stock_insuficiente":            "Stock insuficiente en la tienda para uno o más productos.",
+		"producto_no_encontrado":        "Uno o más productos no existen en el catálogo o no tienen stock inicial en esta tienda.",
 		"error_transaccion":             "Error interno al iniciar la transacción SQL.",
 		"error_creando_venta":           "Error interno al crear el registro de venta.",
-		"error_consultando_producto":    "Error interno al consultar un producto.",
+		"error_consultando_producto":    "Error interno al consultar stock de un producto.",
 		"error_insertando_detalle":      "Error interno al insertar el detalle de la venta.",
-		"error_actualizando_stock":      "Error interno al actualizar el stock.",
+		"error_actualizando_stock":      "Error interno al actualizar el stock en la tienda.",
 		"error_registrando_movimiento":  "Error interno al registrar el movimiento de stock.",
 		"error_confirmando_transaccion": "Error interno al confirmar la transacción. Se realizó ROLLBACK.",
 	}
