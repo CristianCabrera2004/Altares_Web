@@ -7,7 +7,7 @@
 //   GET  /api/inventario/movimientos  → Consulta el historial de movimientos
 //
 // Cada operación de escritura es ATÓMICA: actualiza ingreso/baja + stock
-// del producto + movimientos_stock en la MISMA transacción.
+// en la tienda + movimientos_stock en la MISMA transacción.
 // Si falla cualquier paso → ROLLBACK total. (CA 45)
 // ─────────────────────────────────────────────────────────────────────────────
 package handlers
@@ -37,13 +37,11 @@ type BajaInput struct {
 	Motivo       string `json:"motivo"`
 }
 
+// getTiendaID has been replaced by GetTiendaIDFromCtxOrDb
+
+
 // ─── POST /api/inventario/ingreso ────────────────────────────────────────────
 // IngresoHandler registra una entrada de mercadería de forma transaccional.
-// Pasos dentro de la transacción:
-//  1. SELECT FOR UPDATE del stock actual (bloqueo optimista de fila)
-//  2. INSERT en ingreso_inventario
-//  3. UPDATE stock_actual del producto
-//  4. INSERT en movimientos_stock
 func IngresoHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -61,7 +59,6 @@ func IngresoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validaciones → HTTP 400 (CA 45)
 		if ing.IdProducto <= 0 || ing.IdUsuario <= 0 || ing.CantidadIngresada <= 0 || ing.CostoUnitario < 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{
@@ -70,38 +67,33 @@ func IngresoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// ══════════════════════════════════════════════════
-		// TRANSACCIÓN SQL — BEGIN (CA 45)
-		// Atomicidad: todos los pasos ocurren juntos o ninguno.
-		// ══════════════════════════════════════════════════
-		tx, err := db.Begin() // BEGIN
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "No se pudo iniciar la transacción."})
 			return
 		}
-		defer tx.Rollback() // ROLLBACK automático si Commit() no se llama
+		defer tx.Rollback()
 
-		// Paso 1 — Obtener y bloquear el stock actual (FOR UPDATE evita condiciones de carrera)
-		var stockActual int
-		err = tx.QueryRow(
-			`SELECT stock_actual FROM inventario.productos WHERE id_producto = $1 FOR UPDATE`,
-			ing.IdProducto,
-		).Scan(&stockActual)
-		if err == sql.ErrNoRows {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Producto no encontrado con el id_producto proporcionado."})
-			return
-		}
+		// Upsert del stock en la tienda
+		var nuevoStock int
+		err = tx.QueryRow(`
+			INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
+			VALUES ($1, $2, $3, 5)
+			ON CONFLICT (id_tienda, id_producto)
+			DO UPDATE SET stock_actual = inventario.stock_tiendas.stock_actual + $3
+			RETURNING stock_actual`,
+			idTienda, ing.IdProducto, ing.CantidadIngresada,
+		).Scan(&nuevoStock)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar el stock del producto."})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar el stock de la tienda."})
 			return
 		}
 
-		nuevoStock := stockActual + ing.CantidadIngresada
-
-		// Paso 2 — Insertar el registro de ingreso
+		// Insertar registro de ingreso
 		var idIngreso int
 		var proveedorNullable *int
 		if ing.IdProveedor > 0 {
@@ -109,10 +101,10 @@ func IngresoHandler(db *sql.DB) http.HandlerFunc {
 		}
 		err = tx.QueryRow(`
 			INSERT INTO inventario.ingreso_inventario
-			  (id_producto, id_proveedor, id_usuario, cantidad_ingresada, costo_unitario, observacion)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			  (id_producto, id_proveedor, id_usuario, id_tienda, cantidad_ingresada, costo_unitario, observacion)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			RETURNING id_ingreso`,
-			ing.IdProducto, proveedorNullable, ing.IdUsuario,
+			ing.IdProducto, proveedorNullable, ing.IdUsuario, idTienda,
 			ing.CantidadIngresada, ing.CostoUnitario, ing.Observacion,
 		).Scan(&idIngreso)
 		if err != nil {
@@ -121,23 +113,12 @@ func IngresoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Paso 3 — Actualizar el stock del producto
-		_, err = tx.Exec(
-			`UPDATE inventario.productos SET stock_actual = $1 WHERE id_producto = $2`,
-			nuevoStock, ing.IdProducto,
-		)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar el stock del producto."})
-			return
-		}
-
-		// Paso 4 — Registrar en movimientos_stock (trazabilidad completa)
+		// Registrar movimiento
 		_, err = tx.Exec(`
 			INSERT INTO inventario.movimientos_stock
-			  (id_producto, id_usuario, tipo_movimiento, cantidad, stock_resultante, referencia_id)
-			VALUES ($1, $2, 'INGRESO', $3, $4, $5)`,
-			ing.IdProducto, ing.IdUsuario, ing.CantidadIngresada, nuevoStock, idIngreso,
+			  (id_producto, id_usuario, id_tienda, tipo_movimiento, cantidad, stock_resultante, referencia_id)
+			VALUES ($1, $2, $3, 'INGRESO', $4, $5, $6)`,
+			ing.IdProducto, ing.IdUsuario, idTienda, ing.CantidadIngresada, nuevoStock, idIngreso,
 		)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -145,7 +126,6 @@ func IngresoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// COMMIT — todos los pasos fueron exitosos
 		if err := tx.Commit(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al confirmar la transacción."})
@@ -163,7 +143,6 @@ func IngresoHandler(db *sql.DB) http.HandlerFunc {
 
 // ─── POST /api/inventario/baja ───────────────────────────────────────────────
 // BajaHandler registra una baja/merma de stock de forma transaccional.
-// Verifica que haya stock suficiente antes de permitir la baja. (CA 45: 400)
 func BajaHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -181,7 +160,6 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validar motivo (CA 15 — HU-04: solo valores permitidos)
 		motivosPermitidos := map[string]bool{"Caducidad": true, "Daño": true, "Pérdida": true}
 		if baja.IdProducto <= 0 || baja.IdUsuario <= 0 || baja.CantidadBaja <= 0 || baja.Motivo == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -198,26 +176,24 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// ══════════════════════════════════════════════════
-		// TRANSACCIÓN SQL — BEGIN (CA 45)
-		// ══════════════════════════════════════════════════
-		tx, err := db.Begin() // BEGIN
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		tx, err := db.Begin()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "No se pudo iniciar la transacción."})
 			return
 		}
-		defer tx.Rollback() // ROLLBACK automático
+		defer tx.Rollback()
 
-		// Paso 1 — Bloquear y leer stock actual
 		var stockActual int
 		err = tx.QueryRow(
-			`SELECT stock_actual FROM inventario.productos WHERE id_producto = $1 FOR UPDATE`,
-			baja.IdProducto,
+			`SELECT stock_actual FROM inventario.stock_tiendas WHERE id_producto = $1 AND id_tienda = $2 FOR UPDATE`,
+			baja.IdProducto, idTienda,
 		).Scan(&stockActual)
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Producto no encontrado."})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Producto no encontrado o sin stock en esta tienda."})
 			return
 		}
 		if err != nil {
@@ -226,7 +202,6 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validación de negocio: stock suficiente (CA 19 — HU-04)
 		if baja.CantidadBaja > stockActual {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{
@@ -238,12 +213,11 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 
 		nuevoStock := stockActual - baja.CantidadBaja
 
-		// Paso 2 — Insertar registro de baja
 		var idBaja int
 		err = tx.QueryRow(`
-			INSERT INTO inventario.bajas_inventario (id_producto, id_usuario, cantidad_baja, motivo)
-			VALUES ($1, $2, $3, $4) RETURNING id_baja`,
-			baja.IdProducto, baja.IdUsuario, baja.CantidadBaja, baja.Motivo,
+			INSERT INTO inventario.bajas_inventario (id_producto, id_usuario, id_tienda, cantidad_baja, motivo)
+			VALUES ($1, $2, $3, $4, $5) RETURNING id_baja`,
+			baja.IdProducto, baja.IdUsuario, idTienda, baja.CantidadBaja, baja.Motivo,
 		).Scan(&idBaja)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -251,10 +225,9 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Paso 3 — Actualizar stock
 		_, err = tx.Exec(
-			`UPDATE inventario.productos SET stock_actual = $1 WHERE id_producto = $2`,
-			nuevoStock, baja.IdProducto,
+			`UPDATE inventario.stock_tiendas SET stock_actual = $1 WHERE id_producto = $2 AND id_tienda = $3`,
+			nuevoStock, baja.IdProducto, idTienda,
 		)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -262,12 +235,11 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Paso 4 — Registrar movimiento tipo BAJA_MERMA (CA 16 — excluido de predicción)
 		_, err = tx.Exec(`
 			INSERT INTO inventario.movimientos_stock
-			  (id_producto, id_usuario, tipo_movimiento, cantidad, stock_resultante, referencia_id)
-			VALUES ($1, $2, 'BAJA_MERMA', $3, $4, $5)`,
-			baja.IdProducto, baja.IdUsuario, -baja.CantidadBaja, nuevoStock, idBaja,
+			  (id_producto, id_usuario, id_tienda, tipo_movimiento, cantidad, stock_resultante, referencia_id)
+			VALUES ($1, $2, $3, 'BAJA_MERMA', $4, $5, $6)`,
+			baja.IdProducto, baja.IdUsuario, idTienda, -baja.CantidadBaja, nuevoStock, idBaja,
 		)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -275,27 +247,6 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Paso 5 — Log de auditoría (CA 18 — HU-04: usuario, fecha, IP)
-		// Extrae IP del request; prioriza X-Forwarded-For si hay proxy/balanceador
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
-		valorAnterior := strconv.Itoa(stockActual)
-		valorNuevo := strconv.Itoa(nuevoStock)
-		_, err = tx.Exec(`
-			INSERT INTO seguridad.logs_auditoria
-			  (id_usuario, accion, tabla_afectada, id_registro_afectado, valor_anterior, valor_nuevo, ip_origen)
-			VALUES ($1, 'BAJA_MERMA', 'inventario.productos', $2, $3, $4, $5)`,
-			baja.IdUsuario, baja.IdProducto, valorAnterior, valorNuevo, ip,
-		)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error al registrar el log de auditoría."})
-			return
-		}
-
-		// COMMIT
 		if err := tx.Commit(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al confirmar la transacción."})
@@ -304,7 +255,7 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"mensaje":     "Baja de merma registrada exitosamente. Stock y auditoría actualizados.",
+			"mensaje":     "Baja de merma registrada exitosamente.",
 			"id_baja":     idBaja,
 			"stock_nuevo": nuevoStock,
 			"motivo":      baja.Motivo,
@@ -314,7 +265,6 @@ func BajaHandler(db *sql.DB) http.HandlerFunc {
 
 // ─── GET /api/inventario/movimientos ────────────────────────────────────────
 // MovimientosHandler consulta el historial de movimientos de stock.
-// Acepta filtro opcional ?id_producto=X. Usa el índice idx_movimientos_fecha (CA 46).
 func MovimientosHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -337,6 +287,7 @@ func MovimientosHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		idProductoStr := r.URL.Query().Get("id_producto")
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 		var rows *sql.Rows
 		var err error
@@ -345,12 +296,13 @@ func MovimientosHandler(db *sql.DB) http.HandlerFunc {
 			       m.tipo_movimiento, m.cantidad, m.stock_resultante,
 			       m.referencia_id, TO_CHAR(m.fecha_movimiento, 'YYYY-MM-DD HH24:MI:SS')
 			FROM inventario.movimientos_stock m
-			JOIN inventario.productos p ON m.id_producto = p.id_producto`
+			JOIN inventario.productos p ON m.id_producto = p.id_producto
+			WHERE m.id_tienda = $1`
 
 		if idProductoStr != "" {
-			rows, err = db.Query(baseQuery+` WHERE m.id_producto = $1 ORDER BY m.fecha_movimiento DESC LIMIT 200`, idProductoStr)
+			rows, err = db.Query(baseQuery+` AND m.id_producto = $2 ORDER BY m.fecha_movimiento DESC LIMIT 200`, idTienda, idProductoStr)
 		} else {
-			rows, err = db.Query(baseQuery + ` ORDER BY m.fecha_movimiento DESC LIMIT 200`)
+			rows, err = db.Query(baseQuery+` ORDER BY m.fecha_movimiento DESC LIMIT 200`, idTienda)
 		}
 
 		if err != nil {

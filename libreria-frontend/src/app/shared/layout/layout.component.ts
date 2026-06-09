@@ -17,6 +17,7 @@ export class LayoutComponent {
   readonly nombre = signal(this.authService.getNombre() ?? 'Usuario');
   readonly rol = signal(this.authService.getRol() ?? '');
   readonly isAdmin = signal(this.authService.isAdmin());
+  readonly nombreTienda = signal(this.authService.getNombreTienda() ?? 'Todas las tiendas');
   readonly sidebarOpen = signal(true);
 
   // Inicializa el tema desde localStorage para persistir entre recargas

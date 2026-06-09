@@ -1,11 +1,22 @@
 <!-- src/app/pages/dashboard/dashboard.component.html -->
 <div class="page">
   <div class="page-header">
-    <div>
-      <h1 class="page-title">Dashboard</h1>
-      <p class="page-subtitle">
-        Bienvenido, <strong>{{ nombreUsuario() }}</strong> — {{ horaActual() }}
-      </p>
+    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <div>
+        <h1 class="page-title" style="display: inline-block;">Dashboard</h1>
+        <p class="page-subtitle">
+          Bienvenido, <strong>{{ nombreUsuario() }}</strong> — {{ horaActual() }}
+        </p>
+      </div>
+      @if (isAdmin() && tiendas().length > 0) {
+        <div class="store-selector" style="display: inline-block; margin-top: -8px;">
+          <select [value]="tiendaSeleccionada()" (change)="onTiendaChange(+$any($event.target).value)" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg-card); color: var(--text-title); font-size: 0.9rem; font-weight: 600; cursor: pointer; outline: none;">
+            @for (t of tiendas(); track t.id_tienda) {
+              <option [value]="t.id_tienda">{{ t.nombre }}</option>
+            }
+          </select>
+        </div>
+      }
     </div>
     <div class="header-actions">
       @if (isAdmin()) {
@@ -37,7 +48,7 @@
       </div>
       <div class="kpi-info">
         <span class="kpi-label">Productos</span>
-        <span class="kpi-value">—</span>
+        <span class="kpi-value">{{ productosCount() }}</span>
       </div>
     </div>
     <div class="kpi-card">
@@ -48,7 +59,7 @@
       </div>
       <div class="kpi-info">
         <span class="kpi-label">Ventas Hoy</span>
-        <span class="kpi-value">—</span>
+        <span class="kpi-value">{{ formatCurrency(ventasHoy()) }}</span>
       </div>
     </div>
     <div class="kpi-card" [class.kpi-alert]="(stockBajoCount() ?? 0) > 0">
@@ -79,7 +90,7 @@
         </div>
         <div class="kpi-info">
           <span class="kpi-label">Usuarios</span>
-          <span class="kpi-value">—</span>
+          <span class="kpi-value">{{ usuariosCount() }}</span>
         </div>
       </div>
     }
@@ -337,3 +348,87 @@
     </div>
   </div>
 }
+
+<!-- Modal Detalle Ventas de un Día o Período -->
+@if (modalDetalleDiaVisible()) {
+  <div class="modal-overlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.25s ease-out;">
+    <div class="modal-content" style="background: var(--bg-surface, #16181f); border: 1px solid var(--border-strong, #2d3148); border-radius: 16px; max-width: 750px; width: 90%; max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+      
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border-subtle, #1e2130);">
+        <h2 class="modal-title" style="font-size: 1.25rem; font-weight: 700; color: var(--text-heading, #f0f2f8); margin: 0; display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#4F8EF7" stroke-width="2" width="22" style="vertical-align: middle;">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          {{ fechaDetalleDiaFormateada() }}
+        </h2>
+        <button class="close-btn" (click)="cerrarModalDetalleDia()" style="background: transparent; border: none; color: var(--text-secondary, #6b7280); font-size: 1.75rem; cursor: pointer; line-height: 1; transition: color 0.15s;" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color=''">×</button>
+      </div>
+      
+      <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1;">
+        @if (cargandoDetalleDia()) {
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; gap: 12px;">
+            <div style="width: 36px; height: 36px; border: 3px solid var(--border-strong); border-top-color: #4F8EF7; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <span style="color: var(--text-secondary); font-size: 0.9rem;">Cargando transacciones de venta...</span>
+          </div>
+        } @else if (errorDetalleDia()) {
+          <div class="alert-error" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; padding: 12px 16px; border-radius: 8px; font-size: 0.875rem;">
+            {{ errorDetalleDia() }}
+          </div>
+        } @else if (itemsDetalleDia().length === 0) {
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" style="margin-bottom: 12px; opacity: 0.5;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p style="margin: 0; font-size: 0.95rem;">No se encontraron registros de ventas para el período seleccionado.</p>
+          </div>
+        } @else {
+          <div class="table-wrapper" style="border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; background: rgba(255,255,255,0.015);">
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-subtle); background: rgba(255,255,255,0.01);">
+                  <th style="padding: 12px 16px; text-align: left; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Producto</th>
+                  <th style="padding: 12px 16px; text-align: left; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Categoría</th>
+                  <th style="padding: 12px 16px; text-align: right; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Cantidad</th>
+                  <th style="padding: 12px 16px; text-align: right; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">P. Unitario</th>
+                  <th style="padding: 12px 16px; text-align: right; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of itemsDetalleDia(); track item.id_producto + item.producto) {
+                  <tr style="border-bottom: 1px solid var(--border-subtle); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background=''">
+                    <td style="padding: 12px 16px; font-size: 0.875rem; color: var(--text-title); font-weight: 600;">{{ item.producto }}</td>
+                    <td style="padding: 12px 16px; font-size: 0.875rem;">
+                      <span class="role-badge op" style="background: rgba(79, 142, 247, 0.12); color: #4F8EF7; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">
+                        {{ item.categoria }}
+                      </span>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right; font-size: 0.875rem; color: var(--text-title);">{{ item.cantidad }} u.</td>
+                    <td style="padding: 12px 16px; text-align: right; font-size: 0.875rem; color: var(--text-muted);">{{ formatCurrency(item.precio_unitario) }}</td>
+                    <td style="padding: 12px 16px; text-align: right; font-size: 0.875rem; color: #22c55e; font-weight: 700;">{{ formatCurrency(item.total) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          
+          <div style="display: flex; justify-content: flex-end; margin-top: 20px; padding: 12px; background: rgba(34,197,94,0.05); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px;">
+            <div style="font-size: 1.1rem; font-weight: 700; color: #4ade80;">
+              Total Recaudado en Período: {{ formatCurrency(totalRecaudadoDia()) }}
+            </div>
+          </div>
+        }
+      </div>
+      
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border-subtle, #1e2130); gap: 12px;">
+        <button class="btn btn-secondary" (click)="cerrarModalDetalleDia()" style="padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-muted); font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.borderColor='#4F8EF7'; this.style.color='#4F8EF7'" onmouseout="this.style.borderColor=''; this.style.color=''">Cerrar Detalle</button>
+      </div>
+      
+    </div>
+  </div>
+}
+

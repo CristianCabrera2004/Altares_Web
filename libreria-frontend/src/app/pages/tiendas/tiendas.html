@@ -1,0 +1,207 @@
+<!-- src/app/pages/tiendas/tiendas.html -->
+<div class="page">
+
+  <!-- ── Header ── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Gestión de Tiendas y Librerías</h1>
+      <p class="page-subtitle">Configuración y administración de locales de la librería (CA 21)</p>
+    </div>
+    <button id="btn-nueva-tienda" class="btn-primary" (click)="toggleForm()">
+      @if (mostrarForm()) {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        Cancelar
+      } @else {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nueva Tienda
+      }
+    </button>
+  </div>
+
+  <!-- ── Mensajes globales ── -->
+  @if (successMsg()) {
+    <div class="alert-success" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      {{ successMsg() }}
+    </div>
+  }
+  @if (errorMsg()) {
+    <div class="alert-error" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {{ errorMsg() }}
+    </div>
+  }
+
+  <!-- ── Formulario Nueva Tienda ── -->
+  @if (mostrarForm()) {
+    <div class="form-card">
+      <h2 class="form-title">Registrar Nueva Tienda/Librería</h2>
+      <form [formGroup]="form" (ngSubmit)="crearTienda()" novalidate class="store-form">
+        <div class="form-row">
+          <div class="field-group">
+            <label>Nombre de la tienda *</label>
+            <input id="input-nombre-tienda" type="text" formControlName="nombre" placeholder="Ej: Sucursal Centro"
+              [class.invalid]="form.get('nombre')?.invalid && form.get('nombre')?.touched"/>
+            @if (form.get('nombre')?.invalid && form.get('nombre')?.touched) {
+              <span class="field-error">Mínimo 3 caracteres.</span>
+            }
+          </div>
+          <div class="field-group">
+            <label>Teléfono de contacto</label>
+            <input id="input-telefono-tienda" type="text" formControlName="telefono" placeholder="Ej: +54 9 11 1234-5678"/>
+          </div>
+        </div>
+        <div class="field-group" style="margin-top: 10px;">
+          <label>Dirección física</label>
+          <input id="input-direccion-tienda" type="text" formControlName="direccion" placeholder="Ej: Av. Siempreviva 742"/>
+        </div>
+        <div class="form-actions" style="margin-top: 15px;">
+          <button type="button" class="btn-ghost" (click)="toggleForm()">Cancelar</button>
+          <button id="btn-guardar-tienda" type="submit" class="btn-primary" [disabled]="form.invalid || guardando()">
+            @if (guardando()) { <span class="spinner-sm"></span> Guardando... }
+            @else { Crear Tienda }
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  <!-- ── Tabla de Tiendas ── -->
+  <div class="table-card">
+    @if (cargando()) {
+      <div class="loading-state">
+        <div class="spinner-lg"></div>
+        <span>Cargando tiendas y librerías...</span>
+      </div>
+    } @else if (tiendas().length === 0 && !errorMsg()) {
+      <div class="empty-state">
+        <svg viewBox="0 0 64 64" fill="none" width="48">
+          <circle cx="32" cy="32" r="30" stroke="var(--border-subtle)" stroke-width="2"/>
+          <path d="M16 22l16-10 16 10v24H16V22z" stroke="#4F8EF7" stroke-width="2"/>
+          <path d="M26 46V34h12v12" stroke="#4F8EF7" stroke-width="2"/>
+        </svg>
+        <p>No hay tiendas o librerías registradas aún.</p>
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre de la Tienda</th>
+              <th>Dirección</th>
+              <th>Teléfono</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of tiendas(); track t.id_tienda) {
+              <tr [class.inactive-row]="t.estado === 'inactiva'">
+                <!-- Nombre / Edición Inline -->
+                <td>
+                  @if (editandoId() === t.id_tienda) {
+                    <input type="text" class="input-sm" [value]="nombreEditado()" (input)="nombreEditado.set($any($event.target).value)" placeholder="Nombre" style="width: 100%; max-width: 200px; padding: 6px; border: 1px solid #4F8EF7; border-radius: 6px; background-color: var(--input-bg, white); color: var(--text-primary);" />
+                  } @else {
+                    <div class="store-cell">
+                      <div class="store-icon">🏪</div>
+                      <div class="store-meta">
+                        <span class="store-name">{{ t.nombre }}</span>
+                        <span class="store-id">ID: {{ t.id_tienda }}</span>
+                      </div>
+                    </div>
+                  }
+                </td>
+
+                <!-- Dirección -->
+                <td>
+                  @if (editandoId() === t.id_tienda) {
+                    <input type="text" class="input-sm" [value]="direccionEditada()" (input)="direccionEditada.set($any($event.target).value)" placeholder="Dirección" style="width: 100%; max-width: 250px; padding: 6px; border: 1px solid #4F8EF7; border-radius: 6px; background-color: var(--input-bg, white); color: var(--text-primary);" />
+                  } @else {
+                    <span class="text-secondary">{{ t.direccion || '—' }}</span>
+                  }
+                </td>
+
+                <!-- Teléfono -->
+                <td>
+                  @if (editandoId() === t.id_tienda) {
+                    <input type="text" class="input-sm" [value]="telefonoEditado()" (input)="telefonoEditado.set($any($event.target).value)" placeholder="Teléfono" style="width: 100%; max-width: 150px; padding: 6px; border: 1px solid #4F8EF7; border-radius: 6px; background-color: var(--input-bg, white); color: var(--text-primary);" />
+                  } @else {
+                    <span class="text-secondary">{{ t.telefono || '—' }}</span>
+                  }
+                </td>
+
+                <!-- Estado -->
+                <td>
+                  @if (editandoId() === t.id_tienda) {
+                    <select class="select-sm" [value]="estadoEditado()" (change)="estadoEditado.set($any($event.target).value)" style="padding: 6px; border: 1px solid #4F8EF7; border-radius: 6px; background-color: var(--input-bg, white); color: var(--text-primary);">
+                      <option value="activa">Activa</option>
+                      <option value="inactiva">Inactiva</option>
+                    </select>
+                  } @else {
+                    <span class="status-badge" [class.active]="t.estado === 'activa'" [class.inactive]="t.estado !== 'activa'">
+                      <span class="dot"></span>
+                      {{ t.estado === 'activa' ? 'Activa' : 'Inactiva' }}
+                    </span>
+                  }
+                </td>
+
+                <!-- Acciones -->
+                <td class="actions-cell">
+                  @if (editandoId() === t.id_tienda) {
+                    <div class="inline-edit-actions" style="display: flex; gap: 4px;">
+                      <button class="icon-btn confirm" (click)="guardarEdicion(t)" title="Guardar Cambios">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      </button>
+                      <button class="icon-btn cancel" (click)="cancelarEdicion()" title="Cancelar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  } @else {
+                    <button class="icon-btn edit" (click)="iniciarEdicion(t)" title="Editar Tienda"
+                      [disabled]="editandoId() !== null">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </button>
+                    <button
+                      class="icon-btn"
+                      [class.deactivate]="t.estado === 'activa'"
+                      [class.activate]="t.estado !== 'activa'"
+                      (click)="toggleEstado(t)"
+                      [title]="t.estado === 'activa' ? 'Desactivar tienda' : 'Reactivar tienda'">
+                      @if (t.estado === 'activa') {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><line x1="8" y1="8" x2="16" y2="16"/>
+                          <line x1="16" y1="8" x2="8" y2="16"/>
+                        </svg>
+                      } @else {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                      }
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+</div>

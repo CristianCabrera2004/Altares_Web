@@ -68,6 +68,28 @@
           </svg>
           @if (sidebarOpen()) { <span>Reportes</span> }
         </a>
+
+        <a routerLink="/clientes" routerLinkActive="active" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+          </svg>
+          @if (sidebarOpen()) { <span>Clientes</span> }
+        </a>
+
+        <a routerLink="/deudores" routerLinkActive="active" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          @if (sidebarOpen()) { <span>Deudores</span> }
+        </a>
+
+        <a routerLink="/predicciones" routerLinkActive="active" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          @if (sidebarOpen()) { <span>Predicciones</span> }
+        </a>
       }
 
       <!-- ── MENÚ ADMINISTRADOR ─────────────────────────────────── -->
@@ -84,6 +106,14 @@
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
           @if (sidebarOpen()) { <span>Usuarios</span> }
+        </a>
+
+        <a routerLink="/tiendas" routerLinkActive="active" class="nav-item admin-only">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          @if (sidebarOpen()) { <span>Tiendas/Librerías</span> }
         </a>
 
         <a routerLink="/usuarios/auditoria" routerLinkActive="active" class="nav-item admin-only">
@@ -106,6 +136,9 @@
           <div class="user-details">
             <span class="user-name">{{ nombre() }}</span>
             <span class="user-role">{{ rol() === 'admin_libreria' ? 'Administrador' : 'Operador' }}</span>
+            <span class="user-store" style="font-size: 0.72rem; color: #4F8EF7; font-weight: 700; margin-top: 3px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" [title]="nombreTienda()">
+              📍 {{ nombreTienda() }}
+            </span>
           </div>
         }
       </div>

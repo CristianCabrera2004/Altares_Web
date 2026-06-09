@@ -29,61 +29,96 @@
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form" novalidate>
 
-      <div class="field-group">
-        <label for="email">Correo electrónico</label>
-        <div class="input-wrapper">
-          <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
-          <input
-            id="email"
-            type="email"
-            formControlName="email"
-            placeholder="admin@losaltares.com"
-            autocomplete="email"
-            [class.invalid]="form.get('email')?.invalid && form.get('email')?.touched"
-          />
+      @if (!twoFactorRequired()) {
+        <div class="field-group">
+          <label for="email">Correo electrónico</label>
+          <div class="input-wrapper">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <input
+              id="email"
+              type="email"
+              formControlName="email"
+              placeholder="admin@losaltares.com"
+              autocomplete="email"
+              [class.invalid]="form.get('email')?.invalid && form.get('email')?.touched"
+            />
+          </div>
+          @if (form.get('email')?.invalid && form.get('email')?.touched) {
+            <span class="field-error">Ingresa un correo electrónico válido.</span>
+          }
         </div>
-        @if (form.get('email')?.invalid && form.get('email')?.touched) {
-          <span class="field-error">Ingresa un correo electrónico válido.</span>
-        }
-      </div>
 
-      <div class="field-group">
-        <label for="password">Contraseña</label>
-        <div class="input-wrapper">
-          <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <input
-            id="password"
-            [type]="showPassword() ? 'text' : 'password'"
-            formControlName="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
-            [class.invalid]="form.get('password')?.invalid && form.get('password')?.touched"
-          />
-          <button type="button" class="toggle-pw" (click)="togglePassword()" tabindex="-1">
-            @if (showPassword()) {
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            } @else {
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            }
-          </button>
+        <div class="field-group">
+          <label for="password">Contraseña</label>
+          <div class="input-wrapper">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <input
+              id="password"
+              [type]="showPassword() ? 'text' : 'password'"
+              formControlName="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              [class.invalid]="form.get('password')?.invalid && form.get('password')?.touched"
+            />
+            <button type="button" class="toggle-pw" (click)="togglePassword()" tabindex="-1">
+              @if (showPassword()) {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              }
+            </button>
+          </div>
+          @if (form.get('password')?.invalid && form.get('password')?.touched) {
+            <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
+          }
         </div>
-        @if (form.get('password')?.invalid && form.get('password')?.touched) {
-          <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
-        }
-      </div>
+      } @else {
+        <div class="field-group 2fa-container" style="animation: fadeIn 0.4s ease-out; text-align: center;">
+          <div style="margin-bottom: 20px; display: inline-block; padding: 12px; background: rgba(79, 142, 247, 0.1); border-radius: 50%;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4F8EF7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="11" width="14" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h2 style="font-size: 1.35rem; color: #1e293b; margin: 0 0 8px 0; font-weight: 700;">Verificación de 2FA</h2>
+          <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 20px 0; line-height: 1.4;">
+            Ingresa el código temporal de 6 dígitos de tu app autenticadora.
+          </p>
+
+          <div class="input-wrapper">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v8M8 12h8"/>
+            </svg>
+            <input
+              id="two_factor_code"
+              type="text"
+              formControlName="two_factor_code"
+              placeholder="000000"
+              maxlength="6"
+              style="letter-spacing: 0.25em; font-size: 1.25rem; text-align: center; font-weight: 700;"
+              autocomplete="one-time-code"
+              [class.invalid]="form.get('two_factor_code')?.invalid && form.get('two_factor_code')?.touched"
+            />
+          </div>
+          @if (form.get('two_factor_code')?.invalid && form.get('two_factor_code')?.touched) {
+            <span class="field-error">Ingresa un código numérico válido de 6 dígitos.</span>
+          }
+        </div>
+      }
 
       @if (errorMsg()) {
         <div class="alert-error" role="alert">
@@ -101,12 +136,13 @@
         type="submit"
         class="btn-primary"
         [disabled]="form.invalid || loading()"
+        style="margin-top: 15px;"
       >
         @if (loading()) {
           <span class="spinner"></span>
           Verificando...
         } @else {
-          Iniciar Sesión
+          {{ twoFactorRequired() ? 'Confirmar y Acceder' : 'Iniciar Sesión' }}
         }
       </button>
     </form>

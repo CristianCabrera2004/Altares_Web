@@ -21,23 +21,27 @@ interface JwtPayload {
   nombre: string;
   email: string;
   rol: string;
+  id_tienda?: number;
+  nombre_tienda?: string;
   exp: number;   // Unix timestamp de expiración
   iat: number;   // Unix timestamp de emisión
 }
 
 // Respuesta del endpoint POST /api/auth/login
 export interface LoginResponse {
-  token: string;
-  rol: string;
-  nombre: string;
-  id_usuario: number;
-  expires_at: string;
+  token?: string;
+  rol?: string;
+  nombre?: string;
+  id_usuario?: number;
+  expires_at?: string;
+  two_factor_required?: boolean;
 }
 
 // Credenciales enviadas al backend
 export interface LoginCredentials {
   email: string;
   password: string;
+  two_factor_code?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -70,11 +74,6 @@ export class AuthService {
   /**
    * Verifica si el usuario tiene un JWT válido y no expirado en el navegador.
    * Utilizado por AuthGuard para proteger rutas (CA 61).
-   *
-   * Proceso:
-   *  1. Obtiene el token del localStorage
-   *  2. Decodifica el payload (parte central del JWT en Base64)
-   *  3. Compara exp (Unix timestamp) con la hora actual
    */
   isAuthenticated(): boolean {
     const token = this.getToken();
@@ -82,10 +81,8 @@ export class AuthService {
 
     try {
       const payload = this.decodePayload(token);
-      // exp está en segundos, Date.now() en milisegundos
       return payload.exp > Date.now() / 1000;
     } catch {
-      // Token malformado → no autenticado
       return false;
     }
   }
@@ -112,6 +109,16 @@ export class AuthService {
     return this.getPayload()?.id_usuario ?? null;
   }
 
+  /** Extrae el id_tienda del payload del JWT (0 para admin). */
+  getIdTienda(): number | null {
+    return this.getPayload()?.id_tienda ?? null;
+  }
+
+  /** Extrae el nombre_tienda del payload del JWT. */
+  getNombreTienda(): string | null {
+    return this.getPayload()?.nombre_tienda ?? null;
+  }
+
   /** Devuelve true si el rol del usuario es 'admin_libreria'. */
   isAdmin(): boolean {
     return this.getRol() === 'admin_libreria';
@@ -121,29 +128,40 @@ export class AuthService {
 
   /**
    * Envía las credenciales al backend Go (POST /api/auth/login).
-   * CA 51/52: El backend verifica BCrypt y emite un JWT válido por 8 horas.
-   * Guarda el token automáticamente si la respuesta es exitosa.
    */
   login(credentials: LoginCredentials): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, credentials).pipe(
       tap((response) => {
-        this.setToken(response.token);
+        if (!response.two_factor_required && response.token) {
+          this.setToken(response.token);
+        }
       })
     );
   }
 
+  /** Obtiene la configuración inicial para habilitar 2FA (secreto y QR URI). */
+  get2faSetup(): Observable<{ secret: string; qr_uri: string }> {
+    return this.http.get<{ secret: string; qr_uri: string }>(`${environment.apiUrl}/auth/2fa/setup`);
+  }
+
+  /** Habilita 2FA de forma permanente validando un código de 6 dígitos. */
+  enable2fa(code: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/enable`, { code });
+  }
+
+  /** Deshabilita 2FA validando un código de 6 dígitos. */
+  disable2fa(code: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/disable`, { code });
+  }
+
   /**
    * Cierra la sesión del usuario:
-   *  1. Llama a POST /api/auth/logout (invalida la sesión en BD)
-   *  2. Elimina el JWT del localStorage
-   *  3. Redirige al login
    */
   logout(): void {
-    // Intentar llamar al endpoint de logout (no crítico si falla)
     const token = this.getToken();
     if (token) {
       this.http.post(`${environment.apiUrl}/auth/logout`, {}).subscribe({
-        error: () => {} // Silenciar error si el servidor no está disponible
+        error: () => {}
       });
     }
     this.removeToken();

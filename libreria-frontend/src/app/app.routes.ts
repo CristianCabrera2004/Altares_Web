@@ -79,6 +79,27 @@ export const routes: Routes = [
           import('./pages/reportes/reportes.component').then(m => m.ReportesComponent),
         title: 'Reportes · Los Altares'
       },
+      {
+        path: 'clientes',
+        canActivate: [operadorGuard],
+        loadComponent: () =>
+          import('./pages/clientes/clientes.component').then(m => m.ClientesComponent),
+        title: 'Clientes · Los Altares'
+      },
+      {
+        path: 'deudores',
+        canActivate: [operadorGuard],
+        loadComponent: () =>
+          import('./pages/deudores/deudores.component').then(m => m.DeudoresComponent),
+        title: 'Deudores / Fiados · Los Altares'
+      },
+      {
+        path: 'predicciones',
+        canActivate: [operadorGuard],
+        loadComponent: () =>
+          import('./pages/predicciones/predicciones.component').then(m => m.PrediccionesComponent),
+        title: 'Predicciones · Los Altares'
+      },
 
       // ── RUTAS DEL ADMINISTRADOR ───────────────────────────────────────────
       // adminGuard bloquea al operador y lo redirige a /dashboard
@@ -88,6 +109,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/usuarios/usuarios.component').then(m => m.UsuariosComponent),
         title: 'Gestión de Usuarios · Los Altares'
+      },
+      {
+        path: 'tiendas',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/tiendas/tiendas').then(m => m.Tiendas),
+        title: 'Gestión de Tiendas · Los Altares'
       },
       {
         path: 'usuarios/auditoria',

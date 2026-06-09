@@ -28,11 +28,26 @@ export interface InvoiceSummary {
 })
 export class InvoiceService {
   private readonly http = inject(HttpClient);
-  private readonly apiUrl = `${environment.apiUrl}/ventas/factura-cierre`;
+  private readonly apiUrlCierre = `${environment.apiUrl}/ventas/factura-cierre`;
+  private readonly apiUrlFactura = `${environment.apiUrl}/facturas`;
 
   generarCierre(): Observable<InvoiceSummary> {
-    // Es un endpoint POST porque representa el acto formal de "Cierre" (podría mutar estado en el futuro)
-    // Actualmente nuestro backend lo soporta tanto como GET como POST.
-    return this.http.post<InvoiceSummary>(this.apiUrl, {});
+    return this.http.post<InvoiceSummary>(this.apiUrlCierre, {});
+  }
+
+  crearFactura(payload: { id_venta: number; id_tipo_factura: number; id_cliente?: number | null; pdf_base64?: string }): Observable<any> {
+    return this.http.post<any>(this.apiUrlFactura, payload);
+  }
+
+  getFacturaByVenta(idVenta: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrlFactura}?venta=${idVenta}`);
+  }
+
+  getFacturaById(idFactura: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrlFactura}?id=${idFactura}`);
+  }
+
+  listarFacturas(): Observable<any[]> {
+    return this.http.get<any[]>(this.apiUrlFactura);
   }
 }

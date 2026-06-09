@@ -1,0 +1,283 @@
+<!-- src/app/pages/deudores/deudores.component.html -->
+<div class="page-container">
+  <header class="page-header">
+    <div class="header-left">
+      <h1 class="page-title">Deudores / Fiados</h1>
+      <p class="page-subtitle">Registro de deudas de dinero y productos</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Nueva Deuda
+    </button>
+  </header>
+
+  @if (success()) {
+    <div class="alert alert-success">{{ success() }}</div>
+  }
+
+  <!-- KPI Cards -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-icon-warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="kpi-data">
+        <span class="kpi-value">{{ formatMoney(totalDeuda()) }}</span>
+        <span class="kpi-label">Deuda Total Activa</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-icon-info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div class="kpi-data">
+        <span class="kpi-value">{{ pendientes() }}</span>
+        <span class="kpi-label">Deudores Activos</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-row">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" placeholder="Buscar deudor…"
+             [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)">
+    </div>
+    <div class="filter-tabs">
+      <button [class.active]="filtroEstado() === 'todos'" (click)="filtroEstado.set('todos')">Todos</button>
+      <button [class.active]="filtroEstado() === 'pendiente'" (click)="filtroEstado.set('pendiente')">Pendientes</button>
+      <button [class.active]="filtroEstado() === 'parcial'" (click)="filtroEstado.set('parcial')">Parciales</button>
+      <button [class.active]="filtroEstado() === 'pagado'" (click)="filtroEstado.set('pagado')">Pagados</button>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-container">
+    @if (loading()) {
+      <div class="loading-state"><div class="spinner"></div><span>Cargando…</span></div>
+    } @else if (filtered().length === 0) {
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        <p>No hay deudas registradas</p>
+        <span>Las deudas de productos y dinero aparecerán aquí</span>
+      </div>
+    } @else {
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Deudor</th>
+            <th>Tipo</th>
+            <th>Monto / Detalle</th>
+            <th>Abonado</th>
+            <th>Saldo</th>
+            <th>Estado</th>
+            <th>Fecha</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of filtered(); track d.id_deuda) {
+            <tr [class.row-paid]="d.estado === 'pagado'">
+              <td>
+                <div class="cell-deudor">
+                  <span class="deudor-name">{{ d.nombre_deudor }}</span>
+                  @if (d.telefono) {
+                    <span class="deudor-tel">{{ d.telefono }}</span>
+                  }
+                </div>
+              </td>
+              <td>
+                <span class="badge" [class]="d.tipo_deuda === 'dinero' ? 'badge-money' : 'badge-product'">
+                  {{ d.tipo_deuda === 'dinero' ? '💵 Dinero' : '📦 Producto' }}
+                </span>
+              </td>
+              <td>
+                @if (d.tipo_deuda === 'dinero') {
+                  <strong>{{ formatMoney(d.monto_deuda) }}</strong>
+                } @else {
+                  <span class="detail-text">{{ d.detalle_producto }}</span>
+                }
+              </td>
+              <td>{{ formatMoney(d.monto_abonado) }}</td>
+              <td>
+                <strong class="saldo">{{ formatMoney(d.monto_deuda - d.monto_abonado) }}</strong>
+              </td>
+              <td>
+                <span class="badge" [class]="getEstadoClass(d.estado)">{{ getEstadoLabel(d.estado) }}</span>
+              </td>
+              <td class="cell-date">{{ d.fecha_registro.split(' ')[0] }}</td>
+              <td>
+                <div class="actions-row">
+                  @if (d.estado !== 'pagado') {
+                    <button class="btn-action btn-abono" (click)="openAbono(d)" title="Registrar Abono">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                      </svg>
+                      Abono
+                    </button>
+                    <button class="btn-action btn-pay" (click)="marcarPagado(d.id_deuda)" title="Marcar como Pagado">
+                      ✓
+                    </button>
+                  } @else {
+                    <span class="paid-label">✓ Pagado</span>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <div class="table-footer">
+        <span class="text-muted">{{ filtered().length }} registros</span>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Modal: Nueva Deuda -->
+@if (showModal()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Registrar Nueva Deuda</h2>
+        <button class="btn-icon" (click)="closeModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      @if (error()) { <div class="alert alert-error" style="margin: 16px 24px 0;">{{ error() }}</div> }
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nombre del Deudor *</label>
+          <input type="text" [ngModel]="form().nombre_deudor" (ngModelChange)="form.update(f => ({...f, nombre_deudor: $event}))"
+                 placeholder="Nombre de la persona">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" [ngModel]="form().telefono" (ngModelChange)="form.update(f => ({...f, telefono: $event}))"
+                   placeholder="Opcional">
+          </div>
+          <div class="form-group">
+            <label>Tipo de Deuda *</label>
+            <select [ngModel]="form().tipo_deuda" (ngModelChange)="form.update(f => ({...f, tipo_deuda: $event}))">
+              <option value="dinero">💵 Dinero</option>
+              <option value="producto">📦 Producto</option>
+            </select>
+          </div>
+        </div>
+        @if (form().tipo_deuda === 'dinero') {
+          <div class="form-group">
+            <label>Monto de la Deuda (USD) *</label>
+            <input type="number" [ngModel]="(form().monto_deuda || 0) / 100" step="0.01" min="0.01"
+                   (ngModelChange)="form.update(f => ({...f, monto_deuda: Math.round($event * 100)}))"
+                   placeholder="0.00">
+          </div>
+        }
+        @if (form().tipo_deuda === 'producto') {
+          <div class="form-group">
+            <label>Detalle del Producto *</label>
+            <input type="text" [ngModel]="form().detalle_producto" (ngModelChange)="form.update(f => ({...f, detalle_producto: $event}))"
+                   placeholder="Descripción del producto fiado">
+          </div>
+          <div class="form-group">
+            <label>Valor Estimado (USD)</label>
+            <input type="number" [ngModel]="(form().monto_deuda || 0) / 100" step="0.01" min="0"
+                   (ngModelChange)="form.update(f => ({...f, monto_deuda: Math.round($event * 100)}))"
+                   placeholder="0.00">
+          </div>
+        }
+        <div class="form-group">
+          <label>Motivo</label>
+          <input type="text" [ngModel]="form().motivo" (ngModelChange)="form.update(f => ({...f, motivo: $event}))"
+                 placeholder="Razón del fiado (opcional)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="save()" [disabled]="loading()">Registrar Deuda</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal: Abono -->
+@if (showAbonoModal()) {
+  <div class="modal-overlay" (click)="closeAbonoModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Registrar Abono</h2>
+        <button class="btn-icon" (click)="closeAbonoModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      @if (error()) { <div class="alert alert-error" style="margin: 16px 24px 0;">{{ error() }}</div> }
+      <div class="modal-body">
+        @if (abonoDeuda(); as d) {
+          <div class="abono-summary">
+            <div class="abono-info-row">
+              <span class="abono-label">Deudor:</span>
+              <strong>{{ d.nombre_deudor }}</strong>
+            </div>
+            <div class="abono-info-row">
+              <span class="abono-label">Deuda Total:</span>
+              <strong>{{ formatMoney(d.monto_deuda) }}</strong>
+            </div>
+            <div class="abono-info-row">
+              <span class="abono-label">Ya Abonado:</span>
+              <span>{{ formatMoney(d.monto_abonado) }}</span>
+            </div>
+            <div class="abono-info-row abono-highlight">
+              <span class="abono-label">Saldo Pendiente:</span>
+              <strong class="saldo-big">{{ formatMoney(d.monto_deuda - d.monto_abonado) }}</strong>
+            </div>
+          </div>
+        }
+
+        <div class="form-group">
+          <label>Monto del Abono (USD) *</label>
+          <input type="number" [ngModel]="abonoMonto() / 100" step="0.01" min="0.01"
+                 (ngModelChange)="abonoMonto.set(Math.round($event * 100))"
+                 placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Observación</label>
+          <input type="text" [ngModel]="abonoObservacion()" (ngModelChange)="abonoObservacion.set($event)"
+                 placeholder="Nota opcional">
+        </div>
+
+        @if (abonos().length > 0) {
+          <div class="abonos-history">
+            <h4>Historial de Abonos</h4>
+            @for (a of abonos(); track a.id_abono) {
+              <div class="abono-row">
+                <span class="abono-date">{{ a.fecha_abono.split(' ')[0] }}</span>
+                <strong>{{ formatMoney(a.monto_abono) }}</strong>
+                @if (a.observacion) { <span class="abono-obs">{{ a.observacion }}</span> }
+              </div>
+            }
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeAbonoModal()">Cancelar</button>
+        <button class="btn btn-primary" (click)="registrarAbono()" [disabled]="loading()">Registrar Abono</button>
+      </div>
+    </div>
+  </div>
+}

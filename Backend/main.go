@@ -52,53 +52,71 @@ func main() {
 	mux.HandleFunc("/api/auth/login", onlyMethod(http.MethodPost, handlers.LoginHandler(db)))
 
 	// POST /api/auth/logout           → Invalida sesión activa en seguridad.sesiones
-	mux.HandleFunc("/api/auth/logout", middleware.RequireAuth(handlers.LogoutHandler(db)))
+	mux.HandleFunc("/api/auth/logout", middleware.RequireAuth(db, handlers.LogoutHandler(db)))
 
 	// GET  /api/auth/perfil           → Datos del usuario autenticado (desde claims JWT)
-	mux.HandleFunc("/api/auth/perfil", middleware.RequireAuth(handlers.PerfilHandler(db)))
+	mux.HandleFunc("/api/auth/perfil", middleware.RequireAuth(db, handlers.PerfilHandler(db)))
 
 	// PUT  /api/auth/cambiar-password → BCrypt verify actual + nuevo hash (CA 51)
-	mux.HandleFunc("/api/auth/cambiar-password", middleware.RequireAuth(handlers.CambiarPasswordHandler(db)))
+	mux.HandleFunc("/api/auth/cambiar-password", middleware.RequireAuth(db, handlers.CambiarPasswordHandler(db)))
+
+	// ── Endpoints de 2FA (TOTP) ──────────────────────────────────────────────
+	mux.HandleFunc("/api/auth/2fa/setup", middleware.RequireAuth(db, handlers.Setup2FAHandler(db)))
+	mux.HandleFunc("/api/auth/2fa/enable", middleware.RequireAuth(db, handlers.Enable2FAHandler(db)))
+	mux.HandleFunc("/api/auth/2fa/disable", middleware.RequireAuth(db, handlers.Disable2FAHandler(db)))
 
 	// ─── HT-02: Catálogo de Productos (CA 43, 44, 45, 46) ───────────────────
 	// IMPORTANTE: /api/productos/buscar se registra ANTES de /api/productos
-	mux.HandleFunc("/api/productos/buscar", middleware.RequireRole("operador_caja")(handlers.BuscarProductoHandler(db)))
+	mux.HandleFunc("/api/productos/buscar", middleware.RequireRole(db, "operador_caja")(handlers.BuscarProductoHandler(db)))
 
 	// GET/POST/PUT/DELETE /api/productos
-	mux.HandleFunc("/api/productos", middleware.RequireRole("operador_caja")(handlers.ProductHandler(db)))
+	mux.HandleFunc("/api/productos", middleware.RequireRole(db, "operador_caja")(handlers.ProductHandler(db)))
 
 	// ─── HT-02: Categorías y Proveedores ─────────────────────────────────────
-	mux.HandleFunc("/api/categorias", middleware.RequireRole("operador_caja")(handlers.CategoryHandler(db)))
-	mux.HandleFunc("/api/proveedores", middleware.RequireRole("operador_caja")(handlers.ProviderHandler(db)))
+	mux.HandleFunc("/api/categorias", middleware.RequireRole(db, "operador_caja")(handlers.CategoryHandler(db)))
+	mux.HandleFunc("/api/proveedores", middleware.RequireRole(db, "operador_caja")(handlers.ProviderHandler(db)))
 
 	// ─── HT-02: Inventario Transaccional (CA 45) ────────────────────────────
-	mux.HandleFunc("/api/inventario/ingreso", middleware.RequireRole("operador_caja")(handlers.IngresoHandler(db)))
-	mux.HandleFunc("/api/inventario/baja", middleware.RequireRole("operador_caja")(handlers.BajaHandler(db)))
-	mux.HandleFunc("/api/inventario/movimientos", middleware.RequireRole("operador_caja")(handlers.MovimientosHandler(db)))
+	mux.HandleFunc("/api/inventario/ingreso", middleware.RequireRole(db, "operador_caja")(handlers.IngresoHandler(db)))
+	mux.HandleFunc("/api/inventario/baja", middleware.RequireRole(db, "operador_caja")(handlers.BajaHandler(db)))
+	mux.HandleFunc("/api/inventario/movimientos", middleware.RequireRole(db, "operador_caja")(handlers.MovimientosHandler(db)))
 
 	// ─── HU-04: Devoluciones ──────────────────────────────────────────────────
-	mux.HandleFunc("/api/devoluciones", middleware.RequireRole("operador_caja")(handlers.DevolucionHandler(db)))
+	mux.HandleFunc("/api/devoluciones", middleware.RequireRole(db, "operador_caja")(handlers.DevolucionHandler(db)))
 
 	// ─── HT-02: Ventas y Cuaderno Transaccional ───────────────────────────────
 	// HU-02: Factura Global (Cierre)
-	mux.HandleFunc("/api/ventas/factura-cierre", middleware.RequireRole("operador_caja")(handlers.InvoiceHandler(db)))
+	mux.HandleFunc("/api/ventas/factura-cierre", middleware.RequireRole(db, "operador_caja")(handlers.InvoiceHandler(db)))
+	// POST /api/facturas -> Crear factura; GET /api/facturas -> Consultar factura
+	mux.HandleFunc("/api/facturas", middleware.RequireRole(db, "operador_caja")(handlers.FacturasHandler(db)))
 	// POST /api/ventas/cuaderno → Carga masiva del cuaderno del día
-	mux.HandleFunc("/api/ventas/cuaderno", middleware.RequireRole("operador_caja")(handlers.CuadernoHandler(db)))
+	mux.HandleFunc("/api/ventas/cuaderno", middleware.RequireRole(db, "operador_caja")(handlers.CuadernoHandler(db)))
 	// POST /api/ventas → Venta individual
-	mux.HandleFunc("/api/ventas", middleware.RequireRole("operador_caja")(handlers.SalesHandler(db)))
+	mux.HandleFunc("/api/ventas", middleware.RequireRole(db, "operador_caja")(handlers.SalesHandler(db)))
 
 	// ─── HU-08: Auditoría y Logs (Solo Administrador) ────────────────────────
-	mux.HandleFunc("/api/auditoria", middleware.RequireRole("admin_libreria")(handlers.AuditHandler(db)))
+	mux.HandleFunc("/api/auditoria", middleware.RequireRole(db, "admin_libreria")(handlers.AuditHandler(db)))
 
 	// ─── HU-07: Reportes (Solo Operador) ─────────────────────────────────────
-	mux.HandleFunc("/api/reportes/ventas", middleware.RequireRole("operador_caja")(handlers.ReportesVentasHandler(db)))
-	mux.HandleFunc("/api/dashboard/grafica", middleware.RequireRole("operador_caja")(handlers.ReporteGraficaHandler(db)))
+	mux.HandleFunc("/api/reportes/ventas", middleware.RequireRole(db, "operador_caja")(handlers.ReportesVentasHandler(db)))
+	mux.HandleFunc("/api/dashboard/grafica", middleware.RequireRole(db, "operador_caja")(handlers.ReporteGraficaHandler(db)))
 
-	// ─── Gestión de Usuarios (Solo Administrador) ────────────────────────────
-	mux.HandleFunc("/api/usuarios", middleware.RequireRole("admin_libreria")(handlers.UserHandler(db)))
+	// ─── Gestión de Usuarios y Tiendas (Solo Administrador) ───────────────────
+	mux.HandleFunc("/api/usuarios", middleware.RequireRole(db, "admin_libreria")(handlers.UserHandler(db)))
+	mux.HandleFunc("/api/tiendas", middleware.RequireRole(db, "admin_libreria")(handlers.TiendaHandler(db)))
 
 	// ─── HT-03: Motor de Predicción Analítica (Solo Operador) ────────────────
-	mux.HandleFunc("/api/predicciones", middleware.RequireRole("operador_caja")(handlers.PredictionHandler(db)))
+	mux.HandleFunc("/api/predicciones/lista-compras", middleware.RequireRole(db, "operador_caja")(handlers.PredictionHandler(db)))
+	mux.HandleFunc("/api/predicciones", middleware.RequireRole(db, "operador_caja")(handlers.PredictionHandler(db)))
+
+	// ─── Catálogo de Clientes (Anexo 3) ───────────────────────────────────────
+	mux.HandleFunc("/api/clientes/buscar", middleware.RequireRole(db, "operador_caja")(handlers.BuscarClienteHandler(db)))
+	mux.HandleFunc("/api/clientes", middleware.RequireRole(db, "operador_caja")(handlers.ClientHandler(db)))
+
+	// ─── Módulo de Deudores/Fiados (Anexo 4) ──────────────────────────────────
+	mux.HandleFunc("/api/deudores/abono", middleware.RequireRole(db, "operador_caja")(handlers.AbonoHandler(db)))
+	mux.HandleFunc("/api/deudores/abonos", middleware.RequireRole(db, "operador_caja")(handlers.AbonosListHandler(db)))
+	mux.HandleFunc("/api/deudores", middleware.RequireRole(db, "operador_caja")(handlers.DeudorHandler(db)))
 
 	// 4. Puerto del servidor
 	port := os.Getenv("PORT")
@@ -128,10 +146,16 @@ func main() {
 	fmt.Printf("║  GET    /api/inventario/movimientos                  ║\n")
 	fmt.Printf("║  POST   /api/ventas                  [TXN]           ║\n")
 	fmt.Printf("║  POST   /api/ventas/cuaderno         [BULK-TXN]      ║\n")
+	fmt.Printf("║  GET|POST|PUT  /api/clientes         [Catálogo]      ║\n")
+	fmt.Printf("║  GET    /api/clientes/buscar         [Autocompletado]║\n")
+	fmt.Printf("║  GET|POST|PUT|DEL  /api/deudores     [Fiados]        ║\n")
+	fmt.Printf("║  POST   /api/deudores/abono          [Abono parcial] ║\n")
 	fmt.Printf("╠══════════════════════════════════════════════════════╣\n")
 	fmt.Printf("║  ADMIN ONLY (rol: admin_libreria)                    ║\n")
 	fmt.Printf("║  GET|POST|PUT|DELETE  /api/usuarios                  ║\n")
+	fmt.Printf("║  GET|POST|PUT|DELETE  /api/tiendas                   ║\n")
 	fmt.Printf("╚══════════════════════════════════════════════════════╝\n\n")
+
 
 	// 6. Iniciar servidor con CORS habilitado para Angular
 	log.Fatal(http.ListenAndServe(":"+port, corsMiddleware(mux)))

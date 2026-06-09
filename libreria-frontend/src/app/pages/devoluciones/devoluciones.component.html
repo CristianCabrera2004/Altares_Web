@@ -1,11 +1,10 @@
-<!-- src/app/pages/devoluciones/devoluciones.component.html -->
 <div class="page">
 
   <!-- ── Header ── -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Devoluciones</h1>
-      <p class="page-subtitle">Registro de productos devueltos · {{ devolucionesFiltradas().length }} registros</p>
+      <h1 class="page-title">Devoluciones y Cambios</h1>
+      <p class="page-subtitle">Registro de operaciones · {{ devolucionesFiltradas().length }} registros</p>
     </div>
   </div>
 
@@ -38,7 +37,7 @@
           <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
           <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
         </svg>
-        <h2 class="form-card-title">Registrar Devolución</h2>
+        <h2 class="form-card-title">Registrar Operación</h2>
       </div>
 
       <form [formGroup]="form" (ngSubmit)="registrar()" novalidate class="registro-form">
@@ -53,9 +52,9 @@
           </div>
         }
 
-        <!-- Producto (autocomplete por nombre o código de barras) -->
+        <!-- Producto Original -->
         <div class="field-group">
-          <label for="dev-busqueda-prod">Producto *</label>
+          <label for="dev-busqueda-prod">Producto Devuelto *</label>
           <div class="autocomplete-wrapper">
             <svg class="autocomplete-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -80,7 +79,7 @@
                 </svg>
               </span>
             }
-            <!-- Lista de sugerencias -->
+            <!-- Lista de sugerencias 1 -->
             @if (mostrarSugerencias() && sugerencias().length > 0) {
               <ul class="sugerencias-list">
                 @for (p of sugerencias(); track p.id_producto) {
@@ -89,7 +88,7 @@
                     <div class="sug-info">
                       <span class="sug-nombre">{{ p.nombre }}</span>
                       <span class="sug-meta">
-                        @if (p.codigo_barras) { <span class="sug-codigo">{{ p.codigo_barras }}</span> }
+                        <span class="sug-precio">{{ formatPrecio(p.precio_venta) }}</span>
                         <span class="sug-stock" [class.sug-stock-zero]="p.stock_actual === 0">Stock: {{ p.stock_actual }}</span>
                       </span>
                     </div>
@@ -98,53 +97,139 @@
               </ul>
             }
           </div>
-          @if (form.get('id_producto')?.invalid && form.get('id_producto')?.touched) {
-            <span class="field-error">Selecciona un producto de la lista.</span>
-          }
-          @if (stockDisponible() !== null) {
-            <span class="stock-hint">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-              Stock actual: <strong>{{ stockDisponible() }}</strong> unidades
-            </span>
-          }
         </div>
 
+        <!-- Tipo de Operación (Dropdown Unificado) -->
+        <div class="field-group">
+          <label for="dev-flujo">Tipo de Operación *</label>
+          <select id="dev-flujo" formControlName="flujo" class="select-input">
+            <option value="DEV_SIMPLE">Otro Motivo (Devolución Simple a Inventario)</option>
+            <option value="DEV_DANO">Por Daño (Se da de baja por Merma)</option>
+            <option value="CAMBIO_SIMPLE">Cambio de Producto (Buen estado)</option>
+            <option value="CAMBIO_DANO">Cambio por Daño (Merma + Cambio)</option>
+          </select>
+        </div>
+
+        <!-- Sección de Cambio Condicional -->
+        @if (esCambio()) {
+          <div class="cambio-section">
+            <div class="cambio-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M8 3L3 8L8 13"></path>
+                <path d="M3 8H16C18.7614 8 21 10.2386 21 13V15"></path>
+              </svg>
+              <span>Producto Nuevo a Entregar</span>
+            </div>
+            
+            <div class="field-group">
+              <label for="dev-busqueda-cambio">Producto a Entregar *</label>
+              <div class="autocomplete-wrapper">
+                <svg class="autocomplete-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  id="dev-busqueda-cambio"
+                  type="text"
+                  class="autocomplete-input"
+                  [class.invalid]="form.get('id_producto_cambio')?.invalid && form.get('id_producto_cambio')?.touched"
+                  [class.selected]="productoCambioSeleccionado() !== null"
+                  placeholder="Buscar producto de cambio..."
+                  [value]="busquedaCambio()"
+                  (input)="onBusquedaCambioInput($any($event.target).value)"
+                  (focus)="mostrarSugerenciasCambio.set(true)"
+                  (blur)="ocultarSugerenciasCambio()"
+                  autocomplete="off"
+                />
+                @if (productoCambioSeleccionado()) {
+                  <span class="autocomplete-check">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </span>
+                }
+                <!-- Lista de sugerencias 2 -->
+                @if (mostrarSugerenciasCambio() && sugerenciasCambio().length > 0) {
+                  <ul class="sugerencias-list">
+                    @for (p of sugerenciasCambio(); track p.id_producto) {
+                      <li class="sugerencia-item" (mousedown)="seleccionarProductoCambio(p)">
+                        <div class="sug-icon cb-icon">{{ p.nombre[0].toUpperCase() }}</div>
+                        <div class="sug-info">
+                          <span class="sug-nombre">{{ p.nombre }}</span>
+                          <span class="sug-meta">
+                            <span class="sug-precio">{{ formatPrecio(p.precio_venta) }}</span>
+                            <span class="sug-stock" [class.sug-stock-zero]="p.stock_actual === 0">Disp: {{ p.stock_actual }}</span>
+                          </span>
+                        </div>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            </div>
+            
+            <div class="field-group">
+              <label for="dev-cantidad-cambio">Cantidad a Entregar *</label>
+              <input id="dev-cantidad-cambio" type="number" min="1" formControlName="cantidad_cambio"
+                     class="select-input" />
+            </div>
+
+            <!-- Preview Diferencia Precio -->
+            @if (diferenciaCalc() !== null) {
+              <div class="diferencia-card" [class.diferencia-paga]="diferenciaCalc()!.diff > 0" [class.diferencia-reembolso]="diferenciaCalc()!.diff < 0">
+                <div class="dif-row">
+                  <span>Devuelto:</span>
+                  <span>{{ formatPrecio(diferenciaCalc()!.totalOrig) }}</span>
+                </div>
+                <div class="dif-row">
+                  <span>Nuevo:</span>
+                  <span>{{ formatPrecio(diferenciaCalc()!.totalCamb) }}</span>
+                </div>
+                <div class="dif-divider"></div>
+                <div class="dif-total">
+                  <span>Diferencia:</span>
+                  <strong>
+                    @if (diferenciaCalc()!.diff > 0) {
+                      Cliente paga {{ formatPrecio(diferenciaCalc()!.diff) }}
+                    } @else if (diferenciaCalc()!.diff < 0) {
+                      Reembolso de {{ formatPrecio(diferenciaCalc()!.diff) }}
+                    } @else {
+                      Cambio exacto ($0.00)
+                    }
+                  </strong>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ID de Venta y Cantidad -->
         <div class="form-row">
-          <!-- ID de Venta -->
           <div class="field-group">
             <label for="dev-venta">ID Venta (Opcional)</label>
             <input id="dev-venta" type="number" min="1" formControlName="id_venta"
                    placeholder="Ej: 1042" class="select-input" />
           </div>
 
-          <!-- Cantidad -->
           <div class="field-group">
-            <label for="dev-cantidad">Cantidad Devuelta *</label>
+            <label for="dev-cantidad">Cant. Devuelta *</label>
             <input id="dev-cantidad" type="number" min="1" formControlName="cantidad_devuelta"
                    class="select-input"
                    [class.invalid]="form.get('cantidad_devuelta')?.invalid && form.get('cantidad_devuelta')?.touched" />
-            @if (form.get('cantidad_devuelta')?.invalid && form.get('cantidad_devuelta')?.touched) {
-              <span class="field-error">Ingresa una cantidad válida (≥ 1).</span>
-            }
           </div>
         </div>
 
-        <!-- Motivo -->
+        <!-- Motivo Text Input -->
         <div class="field-group">
-          <label for="dev-motivo">Motivo de Devolución *</label>
+          <label for="dev-motivo">Detalle del Motivo *</label>
           <input id="dev-motivo" type="text" formControlName="motivo"
-                 placeholder="Ej: Cliente canceló la compra" class="select-input"
+                 placeholder="Ej: El producto vino roto de fábrica" class="select-input"
                  [class.invalid]="form.get('motivo')?.invalid && form.get('motivo')?.touched" />
           @if (form.get('motivo')?.invalid && form.get('motivo')?.touched) {
             <span class="field-error">Ingresa el motivo de la devolución.</span>
           }
         </div>
 
-        <button id="btn-registrar-devolucion" type="submit" class="btn-dev"
-                [disabled]="form.invalid || guardando()">
+        <button id="btn-registrar-devolucion" type="submit" class="btn-dev" [disabled]="form.invalid || guardando()">
           @if (guardando()) {
             <span class="spinner-sm"></span> Registrando...
           } @else {
@@ -152,7 +237,7 @@
               <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
               <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
             </svg>
-            Registrar Devolución
+            Registrar Operación
           }
         </button>
 
@@ -189,40 +274,81 @@
             <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"
                   stroke="#4ade80" stroke-width="2"/>
           </svg>
-          <p>No hay devoluciones registradas aún.</p>
+          <p>No hay operaciones registradas aún.</p>
         </div>
       } @else {
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Producto</th>
-                <th>Cant.</th>
-                <th>Motivo</th>
-                <th>ID Venta</th>
+                <th>Tipo</th>
+                <th>Producto Devuelto</th>
+                <th>Producto Entregado</th>
+                <th>Diferencia</th>
                 <th>Fecha</th>
               </tr>
             </thead>
             <tbody>
               @for (d of devolucionesFiltradas(); track d.id_devolucion) {
                 <tr>
-                  <td><span class="id-badge">{{ d.id_devolucion }}</span></td>
-                  <td class="product-cell">
-                    <div class="product-icon dev-color">{{ d.nombre_producto[0].toUpperCase() }}</div>
-                    <span class="product-name">{{ d.nombre_producto }}</span>
-                  </td>
+                  <!-- Tipo -->
                   <td>
-                    <span class="qty-badge dev-qty">+{{ d.cantidad_devuelta }}</span>
+                    <div class="tipo-badge-container">
+                      @if (d.tipo === 'DEVOLUCION') {
+                        @if (d.en_mal_estado) {
+                          <span class="tipo-badge badge-merma">Merma</span>
+                        } @else {
+                          <span class="tipo-badge badge-dev">Devolución</span>
+                        }
+                      } @else {
+                        @if (d.en_mal_estado) {
+                          <span class="tipo-badge badge-cambiomerma">Merma + Cambio</span>
+                        } @else {
+                          <span class="tipo-badge badge-cambio">Cambio</span>
+                        }
+                      }
+                      <span class="venta-ref" *ngIf="d.id_venta">#{{ d.id_venta }}</span>
+                    </div>
                   </td>
-                  <td class="motivo-cell">{{ d.motivo }}</td>
+                  
+                  <!-- Producto Devuelto -->
                   <td>
-                    @if (d.id_venta) {
-                      <span class="venta-badge">#{{ d.id_venta }}</span>
+                    <div class="product-cell">
+                      <span class="qty-badge dev-qty">+{{ d.cantidad_devuelta }}</span>
+                      <div class="prod-details">
+                        <span class="product-name">{{ d.nombre_producto }}</span>
+                        <span class="prod-motivo">{{ d.motivo }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  <!-- Producto Entregado (Cambio) -->
+                  <td>
+                    @if (d.tipo === 'CAMBIO' && d.nombre_producto_cambio) {
+                      <div class="product-cell">
+                        <span class="qty-badge cam-qty">-{{ d.cantidad_cambio }}</span>
+                        <div class="prod-details">
+                          <span class="product-name">{{ d.nombre_producto_cambio }}</span>
+                        </div>
+                      </div>
                     } @else {
                       <span class="na-badge">—</span>
                     }
                   </td>
+                  
+                  <!-- Diferencia -->
+                  <td>
+                    @if (d.tipo === 'CAMBIO') {
+                      <span class="diferencia-badge" 
+                            [class.dif-pos]="d.diferencia_precio > 0"
+                            [class.dif-neg]="d.diferencia_precio < 0">
+                        {{ d.diferencia_precio > 0 ? '+' : (d.diferencia_precio < 0 ? '-' : '') }}{{ formatPrecio(d.diferencia_precio) }}
+                      </span>
+                    } @else {
+                      <span class="na-badge">—</span>
+                    }
+                  </td>
+                  
                   <td class="fecha-cell">{{ formatFecha(d.fecha_devolucion) }}</td>
                 </tr>
               }

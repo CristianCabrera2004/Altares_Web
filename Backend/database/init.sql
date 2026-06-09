@@ -1,7 +1,8 @@
 -- ============================================================
 -- SCRIPT MAESTRO FINAL - BASE DE DATOS: LIBRERÍA LOS ALTARES
 -- Motor: PostgreSQL 15+
--- Arquitectura: Esquemas, RBAC, Pgcrypto Nativo y Precios en INT
+-- Arquitectura: Esquemas, RBAC, Pgcrypto Nativo, Precios en INT
+--               y SOPORTE MULTITIENDA (inventario y ventas por tienda)
 -- ============================================================
 
 -- Paso 1: Crear base de datos (Ejecutar primero si no existe, luego conectarse)
@@ -23,9 +24,22 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Crear esquemas lógicos
+CREATE SCHEMA configuracion;
 CREATE SCHEMA seguridad;
 CREATE SCHEMA inventario;
 CREATE SCHEMA operaciones;
+
+-- ==========================================
+-- 1.5 ESQUEMA: CONFIGURACIÓN (Tiendas)
+-- ==========================================
+
+CREATE TABLE configuracion.tiendas (
+    id_tienda   SERIAL PRIMARY KEY,
+    nombre      VARCHAR(150) NOT NULL,
+    direccion   TEXT,
+    telefono    VARCHAR(20),
+    estado      VARCHAR(20) NOT NULL DEFAULT 'activa'
+);
 
 -- ==========================================
 -- 2. ESQUEMA: SEGURIDAD (Acceso Restringido)
@@ -38,8 +52,13 @@ CREATE TABLE seguridad.usuarios (
     contrasena_hash VARCHAR(255) NOT NULL,
     rol VARCHAR(20) NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'activo',
+    -- Cada operador de caja se asigna a una tienda fija.
+    -- Administradores pueden tener NULL (acceso global).
+    id_tienda INT REFERENCES configuracion.tiendas(id_tienda),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ultima_sesion TIMESTAMP
+    ultima_sesion TIMESTAMP,
+    two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    two_factor_secret VARCHAR(100) DEFAULT NULL
 );
 
 CREATE TABLE seguridad.sesiones (
@@ -84,12 +103,12 @@ CREATE TABLE inventario.proveedores (
     telefono VARCHAR(20)
 );
 
+-- Catálogo centralizado de productos (compartido entre tiendas).
+-- El stock ya NO está aquí — se maneja en inventario.stock_tiendas.
 CREATE TABLE inventario.productos (
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(200) NOT NULL,
     id_categoria INT NOT NULL REFERENCES inventario.categorias(id_categoria),
-    stock_actual INT NOT NULL DEFAULT 0,
-    stock_alerta_min INT NOT NULL DEFAULT 5,
     precio_venta INT NOT NULL, -- Manejado en INT (centavos)
     estado VARCHAR(20) NOT NULL DEFAULT 'activo'
 );
@@ -100,11 +119,31 @@ CREATE TABLE inventario.codigos_barras (
     codigo VARCHAR(50) UNIQUE NOT NULL
 );
 
+-- ==========================================
+-- 3.5 INVENTARIO POR TIENDA (stock separado)
+-- ==========================================
+
+-- Cada fila representa el stock de un producto en UNA tienda específica.
+-- Se reemplaza el antiguo stock_actual / stock_alerta_min de inventario.productos.
+CREATE TABLE inventario.stock_tiendas (
+    id_stock_tienda SERIAL PRIMARY KEY,
+    id_tienda       INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
+    id_producto     INT NOT NULL REFERENCES inventario.productos(id_producto),
+    stock_actual    INT NOT NULL DEFAULT 0,
+    stock_alerta_min INT NOT NULL DEFAULT 5,
+    UNIQUE (id_tienda, id_producto)
+);
+
+-- ==========================================
+-- 3.6 INVENTARIO TRANSACCIONAL (por tienda)
+-- ==========================================
+
 CREATE TABLE inventario.ingreso_inventario (
     id_ingreso SERIAL PRIMARY KEY,
     id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
     id_proveedor INT REFERENCES inventario.proveedores(id_proveedor),
     id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
     cantidad_ingresada INT NOT NULL,
     costo_unitario INT NOT NULL,
     fecha_ingreso TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -115,6 +154,7 @@ CREATE TABLE inventario.bajas_inventario (
     id_baja SERIAL PRIMARY KEY,
     id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
     id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
     cantidad_baja INT NOT NULL,
     motivo VARCHAR(50) NOT NULL,
     fecha_baja TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -124,11 +164,24 @@ CREATE TABLE inventario.pronosticos_demanda (
     id_pronostico SERIAL PRIMARY KEY,
     id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
     id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
     fecha_proyeccion_inicio DATE NOT NULL,
     fecha_proyeccion_fin DATE NOT NULL,
     cantidad_estimada INT NOT NULL,
     margen_error DECIMAL(5,4),
     fecha_generacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE inventario.movimientos_stock (
+    id_movimiento SERIAL PRIMARY KEY,
+    id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
+    id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    cantidad INT NOT NULL,
+    stock_resultante INT NOT NULL,
+    referencia_id INT,
+    fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================
@@ -143,12 +196,14 @@ CREATE TABLE operaciones.clientes (
     nombre      VARCHAR(150) NOT NULL,
     direccion   TEXT,
     telefono    VARCHAR(20),
+    email       VARCHAR(150),
     CONSTRAINT uq_clientes_cedula_ruc UNIQUE (cedula_ruc)
 );
 
 CREATE TABLE operaciones.cierres_diarios (
     id_cierre         SERIAL PRIMARY KEY,
     id_usuario        INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda         INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
     fecha_cierre      DATE NOT NULL,
     total_recaudado   INT NOT NULL DEFAULT 0,
     estado            VARCHAR(20) NOT NULL DEFAULT 'cuadrado',
@@ -159,6 +214,7 @@ CREATE TABLE operaciones.cierres_diarios (
 CREATE TABLE operaciones.ventas (
     id_venta SERIAL PRIMARY KEY,
     id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
     fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     subtotal INT NOT NULL,
     total_iva INT NOT NULL DEFAULT 0,
@@ -181,8 +237,14 @@ CREATE TABLE operaciones.devoluciones (
     id_venta INT REFERENCES operaciones.ventas(id_venta),
     id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
     id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
     cantidad_devuelta INT NOT NULL,
     motivo TEXT,
+    tipo VARCHAR(20) NOT NULL DEFAULT 'DEVOLUCION',
+    en_mal_estado BOOLEAN NOT NULL DEFAULT FALSE,
+    id_producto_cambio INT REFERENCES inventario.productos(id_producto),
+    cantidad_cambio INT,
+    diferencia_precio INT DEFAULT 0,
     fecha_devolucion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -204,15 +266,28 @@ CREATE TABLE operaciones.facturas (
     fecha_emision           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE inventario.movimientos_stock (
-    id_movimiento SERIAL PRIMARY KEY,
-    id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
-    id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
-    tipo_movimiento VARCHAR(20) NOT NULL,
-    cantidad INT NOT NULL,
-    stock_resultante INT NOT NULL,
-    referencia_id INT,
-    fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE operaciones.deudores (
+    id_deuda         SERIAL PRIMARY KEY,
+    id_usuario       INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    id_tienda        INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
+    nombre_deudor    VARCHAR(200) NOT NULL,
+    telefono         VARCHAR(20),
+    tipo_deuda       VARCHAR(20) NOT NULL, -- 'dinero' o 'producto'
+    monto_deuda      INT DEFAULT 0,        -- centavos (si dinero)
+    monto_abonado    INT DEFAULT 0,        -- total abonado
+    detalle_producto TEXT,                   -- descripción (si producto)
+    motivo           TEXT,
+    estado           VARCHAR(20) DEFAULT 'pendiente', -- 'pendiente', 'parcial', 'pagado'
+    fecha_registro   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_pago       TIMESTAMP
+);
+
+CREATE TABLE operaciones.abonos_deuda (
+    id_abono    SERIAL PRIMARY KEY,
+    id_deuda    INT NOT NULL REFERENCES operaciones.deudores(id_deuda) ON DELETE CASCADE,
+    monto_abono INT NOT NULL,
+    observacion TEXT,
+    fecha_abono TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================
@@ -230,11 +305,13 @@ BEGIN
 END
 $$;
 
-GRANT ALL ON SCHEMA seguridad, inventario, operaciones TO admin_libreria;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA seguridad, inventario, operaciones TO admin_libreria;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA seguridad, inventario, operaciones TO admin_libreria;
+GRANT ALL ON SCHEMA configuracion, seguridad, inventario, operaciones TO admin_libreria;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA configuracion, seguridad, inventario, operaciones TO admin_libreria;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA configuracion, seguridad, inventario, operaciones TO admin_libreria;
 
-GRANT USAGE ON SCHEMA seguridad, inventario, operaciones TO operador_caja;
+GRANT USAGE ON SCHEMA configuracion, seguridad, inventario, operaciones TO operador_caja;
+
+GRANT SELECT ON configuracion.tiendas TO operador_caja;
 
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA inventario TO operador_caja;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA inventario TO operador_caja;
@@ -262,19 +339,26 @@ GRANT admin_libreria TO app_backend_go;
 -- 6. INSERCIÓN DE DATOS INICIALES (SEEDING)
 -- ==========================================
 
-INSERT INTO seguridad.usuarios (nombre, email, contrasena_hash, rol)
+-- Crear las dos tiendas
+INSERT INTO configuracion.tiendas (nombre, direccion) VALUES
+    ('Los Altares - Sucursal Principal', 'Dirección Sucursal Principal'),
+    ('Los Altares - Sucursal 2', 'Dirección Sucursal 2');
+
+-- Administrador global (sin tienda fija → acceso a ambas)
+INSERT INTO seguridad.usuarios (nombre, email, contrasena_hash, rol, id_tienda)
 VALUES (
     'Administrador Principal',
     'admin@losaltares.com',
     crypt('Admin123!', gen_salt('bf', 10)),
-    'admin_libreria'
+    'admin_libreria',
+    NULL
 );
 
 INSERT INTO operaciones.tipo_factura (nombre, descripcion)
 VALUES
     ('Consumidor Final', 'Ventas menores sin datos requeridos'),
     ('Factura con Datos', 'Venta con RUC o Cédula registrada'),
-    ('Cierre de Jornada (Cuaderno)', 'Registro masivo de ventas del día');
+    ('Factura Electrónica', 'Venta electrónica con datos de cliente enviada por correo');
 
 INSERT INTO inventario.categorias (nombre, detalle, tasa_iva)
 VALUES
@@ -305,15 +389,25 @@ CREATE INDEX idx_clientes_cedula ON operaciones.clientes(cedula_ruc);
 -- Índice FK en facturas → clientes para JOINs rápidos
 CREATE INDEX idx_facturas_id_cliente ON operaciones.facturas(id_cliente);
 
+-- Índice de stock por tienda (consultas frecuentes de inventario por tienda)
+CREATE INDEX idx_stock_tiendas_tienda_producto ON inventario.stock_tiendas(id_tienda, id_producto);
+
+-- Índice de movimientos por tienda
+CREATE INDEX idx_movimientos_tienda ON inventario.movimientos_stock(id_tienda);
+
+-- Índice de ventas por tienda
+CREATE INDEX idx_ventas_tienda ON operaciones.ventas(id_tienda);
+
 -- ==========================================
 -- 8. VISTA MATERIALIZADA DE VENTAS DIARIAS
 -- ==========================================
 
 CREATE MATERIALIZED VIEW operaciones.ventas_diarias_mv AS
 SELECT
-    id_producto,
-    DATE(fecha_movimiento) as fecha,
-    SUM(ABS(cantidad)) as demanda_diaria
-FROM inventario.movimientos_stock
-WHERE tipo_movimiento = 'VENTA'
-GROUP BY id_producto, DATE(fecha_movimiento);
+    m.id_producto,
+    m.id_tienda,
+    DATE(m.fecha_movimiento) as fecha,
+    SUM(ABS(m.cantidad)) as demanda_diaria
+FROM inventario.movimientos_stock m
+WHERE m.tipo_movimiento = 'VENTA'
+GROUP BY m.id_producto, m.id_tienda, DATE(m.fecha_movimiento);

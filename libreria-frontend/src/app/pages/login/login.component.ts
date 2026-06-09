@@ -20,6 +20,7 @@ export class LoginComponent implements OnInit {
   readonly errorMsg = signal('');
   readonly showPassword = signal(false);
   readonly sessionExpired = signal(false);
+  readonly twoFactorRequired = signal(false);
 
   ngOnInit(): void {
     // Mostrar aviso si el interceptor redirigió por token expirado (CA 23)
@@ -32,7 +33,8 @@ export class LoginComponent implements OnInit {
 
   readonly form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(6)]]
+    password: ['', [Validators.required, Validators.minLength(6)]],
+    two_factor_code: ['', []]
   });
 
   togglePassword(): void {
@@ -50,9 +52,24 @@ export class LoginComponent implements OnInit {
     this.errorMsg.set('');
     this.loading.set(true);
 
-    this.authService.login(this.form.value as { email: string; password: string }).subscribe({
-      next: () => {
-        this.redirectByRole();
+    const payload = { ...this.form.value } as any;
+    if (!this.twoFactorRequired()) {
+      delete payload.two_factor_code;
+    }
+
+    this.authService.login(payload).subscribe({
+      next: (res) => {
+        if (res.two_factor_required) {
+          this.twoFactorRequired.set(true);
+          this.form.get('two_factor_code')?.setValidators([
+            Validators.required,
+            Validators.pattern(/^\d{6}$/)
+          ]);
+          this.form.get('two_factor_code')?.updateValueAndValidity();
+          this.loading.set(false);
+        } else {
+          this.redirectByRole();
+        }
       },
       error: (err) => {
         const msg = err?.error?.error ?? 'Error al conectar con el servidor.';

@@ -15,6 +15,7 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../core/services/auth.service';
 
 interface Usuario {
   id_usuario: number;
@@ -22,8 +23,17 @@ interface Usuario {
   email: string;
   rol: string;
   estado: string;
+  id_tienda?: number;
   fecha_creacion: string;
   ultima_sesion?: string;
+}
+
+interface Tienda {
+  id_tienda: number;
+  nombre: string;
+  direccion?: string;
+  telefono?: string;
+  estado?: string;
 }
 
 @Component({
@@ -35,6 +45,7 @@ interface Usuario {
 export class UsuariosComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly fb   = inject(FormBuilder);
+  private readonly authService = inject(AuthService);
   private readonly api  = `${environment.apiUrl}/usuarios`;
 
   readonly usuarios     = signal<Usuario[]>([]);
@@ -44,20 +55,115 @@ export class UsuariosComponent implements OnInit {
   readonly mostrarForm  = signal(false);
   readonly guardando    = signal(false);
 
-  // Usuario seleccionado para edición inline de rol
+  // Señales de 2FA para el usuario activo
+  readonly twoFactorEnabled = signal(false);
+  readonly show2faSetup     = signal(false);
+  readonly totpSecret       = signal('');
+  readonly totpQrUri        = signal('');
+  readonly totpCode         = signal('');
+  readonly loading2fa       = signal(false);
+
+  // Tiendas
+  readonly tiendas      = signal<Tienda[]>([]);
+  readonly apiTiendas   = `${environment.apiUrl}/tiendas`;
+
+  // Usuario seleccionado para edición inline de rol/tienda
   readonly editandoId   = signal<number | null>(null);
   readonly rolEditado   = signal('');
+  readonly tiendaEditada = signal<number | null>(null);
 
   // Formulario de nuevo usuario
   readonly form = this.fb.group({
     nombre:   ['', [Validators.required, Validators.minLength(3)]],
     email:    ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(8)]],
-    rol:      ['operador_caja', Validators.required]
+    rol:      ['operador_caja', Validators.required],
+    id_tienda: [0]
   });
 
   ngOnInit(): void {
     this.cargarUsuarios();
+    this.cargarTiendas();
+    this.cargarPerfil();
+  }
+
+  cargarPerfil(): void {
+    this.http.get<{ two_factor_enabled: boolean }>(`${environment.apiUrl}/auth/perfil`).subscribe({
+      next: (perfil) => {
+        this.twoFactorEnabled.set(perfil.two_factor_enabled);
+      },
+      error: () => console.error("Error al cargar perfil de usuario")
+    });
+  }
+
+  // ─── Lógica de 2FA ────────────────────────────────────────────────────────
+  iniciar2faSetup(): void {
+    this.loading2fa.set(true);
+    this.errorMsg.set('');
+    this.successMsg.set('');
+
+    this.authService.get2faSetup().subscribe({
+      next: (data) => {
+        this.totpSecret.set(data.secret);
+        this.totpQrUri.set(data.qr_uri);
+        this.show2faSetup.set(true);
+        this.loading2fa.set(false);
+      },
+      error: (err) => {
+        this.errorMsg.set(err?.error?.error ?? 'Error al iniciar configuración 2FA.');
+        this.loading2fa.set(false);
+      }
+    });
+  }
+
+  confirmar2fa(): void {
+    const code = this.totpCode().trim();
+    if (code.length !== 6 || this.loading2fa()) return;
+
+    this.loading2fa.set(true);
+    this.errorMsg.set('');
+
+    this.authService.enable2fa(code).subscribe({
+      next: (res) => {
+        this.successMsg.set(`✓ ${res.mensaje}`);
+        this.twoFactorEnabled.set(true);
+        this.show2faSetup.set(false);
+        this.totpCode.set('');
+        this.loading2fa.set(false);
+      },
+      error: (err) => {
+        this.errorMsg.set(err?.error?.error ?? 'Código incorrecto. Vuelva a intentar.');
+        this.loading2fa.set(false);
+      }
+    });
+  }
+
+  desactivar2fa(): void {
+    const code = prompt("Ingrese su código 2FA de 6 dígitos para desactivar la autenticación de dos factores:");
+    if (!code) return;
+
+    this.loading2fa.set(true);
+    this.errorMsg.set('');
+    this.successMsg.set('');
+
+    this.authService.disable2fa(code).subscribe({
+      next: (res) => {
+        this.successMsg.set(`✓ ${res.mensaje}`);
+        this.twoFactorEnabled.set(false);
+        this.loading2fa.set(false);
+      },
+      error: (err) => {
+        this.errorMsg.set(err?.error?.error ?? 'Código incorrecto. No se pudo desactivar 2FA.');
+        this.loading2fa.set(false);
+      }
+    });
+  }
+
+  cargarTiendas(): void {
+    this.http.get<Tienda[]>(this.apiTiendas).subscribe({
+      next: (data) => this.tiendas.set(data),
+      error: () => console.error("Error al cargar tiendas")
+    });
   }
 
   // ─── Cargar Lista ─────────────────────────────────────────────────────────
@@ -83,11 +189,16 @@ export class UsuariosComponent implements OnInit {
     this.errorMsg.set('');
     this.successMsg.set('');
 
-    this.http.post<{ mensaje: string; id_usuario: number }>(this.api, this.form.value).subscribe({
+    const payload = {
+      ...this.form.value,
+      id_tienda: Number(this.form.value.id_tienda ?? 0)
+    };
+
+    this.http.post<{ mensaje: string; id_usuario: number }>(this.api, payload).subscribe({
       next: (res) => {
         this.successMsg.set(`✓ ${res.mensaje}`);
         this.mostrarForm.set(false);
-        this.form.reset({ rol: 'operador_caja' });
+        this.form.reset({ rol: 'operador_caja', id_tienda: 0 });
         this.guardando.set(false);
         this.cargarUsuarios();
       },
@@ -98,18 +209,26 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
-  // ─── Edición Inline de Rol ────────────────────────────────────────────────
+  // ─── Edición Inline de Rol/Tienda ─────────────────────────────────────────
   iniciarEdicion(u: Usuario): void {
     this.editandoId.set(u.id_usuario);
     this.rolEditado.set(u.rol);
+    this.tiendaEditada.set(u.id_tienda ?? 0);
   }
   cancelarEdicion(): void { this.editandoId.set(null); }
 
-  guardarRol(u: Usuario): void {
+  guardarEdicion(u: Usuario): void {
     const nuevoRol = this.rolEditado();
-    if (nuevoRol === u.rol) { this.cancelarEdicion(); return; }
+    const nuevaTienda = Number(this.tiendaEditada() ?? 0);
+    
+    if (nuevoRol === u.rol && (nuevaTienda === u.id_tienda || (nuevaTienda === 0 && u.id_tienda === undefined))) { 
+      this.cancelarEdicion(); 
+      return; 
+    }
+    
     this.errorMsg.set('');
-    this.http.put<{ mensaje: string }>(`${this.api}?id=${u.id_usuario}`, { rol: nuevoRol }).subscribe({
+    const payload = { rol: nuevoRol, id_tienda: nuevaTienda };
+    this.http.put<{ mensaje: string }>(`${this.api}?id=${u.id_usuario}`, payload).subscribe({
       next: (res) => {
         this.successMsg.set(`✓ ${res.mensaje}`);
         this.cancelarEdicion();
@@ -143,9 +262,14 @@ export class UsuariosComponent implements OnInit {
   rolLabel(rol: string): string {
     return rol === 'admin_libreria' ? 'Administrador' : 'Operador';
   }
+  tiendaLabel(idTienda: number | undefined): string {
+    if (!idTienda) return 'Global';
+    const t = this.tiendas().find(x => x.id_tienda === idTienda);
+    return t ? t.nombre : `Tienda ${idTienda}`;
+  }
   toggleForm(): void {
     this.mostrarForm.update(v => !v);
-    if (!this.mostrarForm()) this.form.reset({ rol: 'operador_caja' });
+    if (!this.mostrarForm()) this.form.reset({ rol: 'operador_caja', id_tienda: 0 });
     this.errorMsg.set('');
     this.successMsg.set('');
   }

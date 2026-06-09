@@ -1,17 +1,15 @@
 // Backend/handlers/product_handler.go
 // ─────────────────────────────────────────────────────────────────────────────
-// HT-02 — Catálogo de Productos
+// HT-02 — Catálogo de Productos (MULTITIENDA)
 //
 // Implementa los cuatro métodos HTTP estándar sobre /api/productos (CA 43):
-//   GET    /api/productos          → Lista todo el catálogo activo con su categoría
-//   GET    /api/productos?id=X     → Devuelve un producto específico
+//   GET    /api/productos          → Lista todo el catálogo activo con stock de la tienda
+//   GET    /api/productos?id=X     → Devuelve un producto específico con stock de la tienda
 //   POST   /api/productos          → Crea un producto (con transacción SQL)
 //   PUT    /api/productos?id=X     → Actualiza un producto (con transacción SQL)
 //   DELETE /api/productos?id=X     → Baja lógica: estado = 'inactivo' (con transacción SQL)
 //
-// Todas las respuestas son application/json (CA 44).
-// Las operaciones de escritura usan BEGIN/COMMIT/ROLLBACK (CA 45).
-// Las consultas SELECT usan JOIN + índice GIN para latencia < 200ms (CA 46).
+// El stock se obtiene de inventario.stock_tiendas filtrado por la tienda del usuario JWT.
 // ─────────────────────────────────────────────────────────────────────────────
 package handlers
 
@@ -26,7 +24,7 @@ import (
 	"libreria-altares/utils"
 )
 
-// Producto mapea la tabla inventario.productos.
+// Producto mapea la tabla inventario.productos + stock de la tienda actual.
 // precio_venta se maneja en centavos (INT en la BD, igual que en el esquema).
 // tasa_iva proviene del JOIN con inventario.categorias (0 ó 15).
 type Producto struct {
@@ -64,11 +62,15 @@ func ProductHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// getTiendaFromRequest has been replaced by GetTiendaIDFromCtxOrDb
+
+
 // ─── GET ─────────────────────────────────────────────────────────────────────
 // getProducts lista todo el catálogo o un producto específico si se pasa ?id=X.
-// El JOIN con categorias y el índice GIN en nombre garantizan latencia < 200ms (CA 46).
+// El stock viene de inventario.stock_tiendas filtrado por la tienda del JWT.
 func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
+	idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 	// Consulta de un producto específico
 	if idStr != "" {
@@ -82,10 +84,12 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		var p Producto
 		err = db.QueryRow(`
 			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
-			       p.stock_actual, p.stock_alerta_min, p.precio_venta, p.estado
+			       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
+			       p.precio_venta, p.estado
 			FROM inventario.productos p
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
-			WHERE p.id_producto = $1`, id,
+			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
+			WHERE p.id_producto = $1`, id, idTienda,
 		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
 			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado)
 
@@ -103,15 +107,16 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Listar todo el catálogo activo con JOIN de categoría.
-	// ORDER BY nombre usa el índice GIN para mantener latencia < 200ms (CA 46).
+	// Listar todo el catálogo activo con stock de la tienda.
 	rows, err := db.Query(`
 		SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
-		       p.stock_actual, p.stock_alerta_min, p.precio_venta, p.estado
+		       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
+		       p.precio_venta, p.estado
 		FROM inventario.productos p
 		JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
+		LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $1
 		WHERE p.estado = 'activo'
-		ORDER BY p.nombre ASC`)
+		ORDER BY p.nombre ASC`, idTienda)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al listar el catálogo de productos."})
@@ -137,8 +142,8 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 // ─── POST ────────────────────────────────────────────────────────────────────
 // createProduct verifica primero si el código de barras ya existe:
-//   - Si existe  → incrementa stock_actual del producto ligado (sin duplicar)
-//   - Si no existe → crea el producto y liga el código de barras en la misma TXN
+//   - Si existe  → incrementa stock de la tienda del producto ligado (sin duplicar)
+//   - Si no existe → crea el producto e inicializa stock en la tienda
 func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	var p Producto
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
@@ -146,6 +151,8 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Cuerpo JSON inválido o malformado."})
 		return
 	}
+
+	idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 	// ── VERIFICACIÓN DE CÓDIGO DE BARRAS (Capa Lógica de Negocio) ────────────
 	// Si se envía codigo_barras, buscar si ya está ligado a algún producto.
@@ -157,7 +164,7 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		).Scan(&idExistente)
 
 		if err == nil {
-			// ── PRODUCTO EXISTENTE: incrementar stock ─────────────────────────
+			// ── PRODUCTO EXISTENTE: incrementar stock de la tienda ──────────
 			cantidad := p.StockActual
 			if cantidad <= 0 {
 				cantidad = 1
@@ -170,20 +177,37 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			}
 			defer tx.Rollback()
 
-			var updated Producto
-			err = tx.QueryRow(`
-				UPDATE inventario.productos
-				SET stock_actual = stock_actual + $1
-				WHERE id_producto = $2
-				RETURNING id_producto, nombre, id_categoria, stock_actual, stock_alerta_min, precio_venta, estado`,
-				cantidad, idExistente,
-			).Scan(&updated.IdProducto, &updated.Nombre, &updated.IdCategoria,
-				&updated.StockActual, &updated.StockAlertaMin, &updated.PrecioVenta, &updated.Estado)
+			// UPSERT: si ya existe stock para esta tienda, incrementar; si no, crear
+			_, err = tx.Exec(`
+				INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
+				VALUES ($1, $2, $3, 5)
+				ON CONFLICT (id_tienda, id_producto)
+				DO UPDATE SET stock_actual = inventario.stock_tiendas.stock_actual + $3`,
+				idTienda, idExistente, cantidad)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{"error": "Error al incrementar el stock del producto."})
 				return
 			}
+
+			// Recuperar producto actualizado para respuesta
+			var updated Producto
+			err = tx.QueryRow(`
+				SELECT p.id_producto, p.nombre, p.id_categoria,
+				       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
+				       p.precio_venta, p.estado
+				FROM inventario.productos p
+				LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
+				WHERE p.id_producto = $1`,
+				idExistente, idTienda,
+			).Scan(&updated.IdProducto, &updated.Nombre, &updated.IdCategoria,
+				&updated.StockActual, &updated.StockAlertaMin, &updated.PrecioVenta, &updated.Estado)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Error al recuperar producto actualizado."})
+				return
+			}
+
 			if err := tx.Commit(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{"error": "Error al confirmar la transacción."})
@@ -232,7 +256,7 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── TRANSACCIÓN SQL: INSERT producto + liga código de barras ──────────────
+	// ── TRANSACCIÓN SQL: INSERT producto + stock tienda + código de barras ────
 	tx, err := db.Begin()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -242,14 +266,25 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 
 	err = tx.QueryRow(`
-		INSERT INTO inventario.productos (nombre, id_categoria, stock_actual, stock_alerta_min, precio_venta, estado)
-		VALUES ($1, $2, $3, $4, $5, 'activo')
+		INSERT INTO inventario.productos (nombre, id_categoria, precio_venta, estado)
+		VALUES ($1, $2, $3, 'activo')
 		RETURNING id_producto`,
-		p.Nombre, p.IdCategoria, p.StockActual, p.StockAlertaMin, p.PrecioVenta,
+		p.Nombre, p.IdCategoria, p.PrecioVenta,
 	).Scan(&p.IdProducto)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al insertar el producto en la base de datos."})
+		return
+	}
+
+	// Insertar stock inicial para la tienda del usuario
+	_, err = tx.Exec(`
+		INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
+		VALUES ($1, $2, $3, $4)`,
+		idTienda, p.IdProducto, p.StockActual, p.StockAlertaMin)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error al inicializar el stock del producto en la tienda."})
 		return
 	}
 
@@ -283,8 +318,7 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 // ─── GET /api/productos/buscar ────────────────────────────────────────────────
 // BuscarProductoHandler busca un producto por su código de barras.
-// Permite al frontend previsualizar si el producto ya existe ANTES de guardar.
-// Registrarse en main.go ANTES que /api/productos (ruta más específica).
+// Devuelve stock de la tienda del usuario JWT.
 func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -299,14 +333,19 @@ func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 			json.NewEncoder(w).Encode(map[string]string{"error": "El parámetro ?codigo es obligatorio."})
 			return
 		}
+
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
 		var p Producto
 		err := db.QueryRow(`
 			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
-			       p.stock_actual, p.stock_alerta_min, p.precio_venta, p.estado, cb.codigo
+			       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
+			       p.precio_venta, p.estado, cb.codigo
 			FROM inventario.codigos_barras cb
 			JOIN inventario.productos p ON cb.id_producto = p.id_producto
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
-			WHERE cb.codigo = $1`, codigo,
+			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
+			WHERE cb.codigo = $1`, codigo, idTienda,
 		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
 			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, &p.CodigoBarras)
 
@@ -326,6 +365,7 @@ func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 
 // ─── PUT ─────────────────────────────────────────────────────────────────────
 // updateProduct actualiza todos los campos de un producto en transacción (CA 45).
+// Actualiza el catálogo global y el stock de la tienda del usuario.
 func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
@@ -346,6 +386,8 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Cuerpo JSON inválido."})
 		return
 	}
+
+	idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 	// Validaciones de negocio → HTTP 400 (CA 45)
 	if p.Nombre == "" || p.IdCategoria <= 0 || p.PrecioVenta < 0 {
@@ -377,13 +419,12 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
+	// Actualizar catálogo global (nombre, categoría, precio, estado)
 	result, err := tx.Exec(`
 		UPDATE inventario.productos
-		SET nombre = $1, id_categoria = $2, stock_actual = $3,
-		    stock_alerta_min = $4, precio_venta = $5, estado = $6
-		WHERE id_producto = $7`,
-		p.Nombre, p.IdCategoria, p.StockActual, p.StockAlertaMin,
-		p.PrecioVenta, p.Estado, id,
+		SET nombre = $1, id_categoria = $2, precio_venta = $3, estado = $4
+		WHERE id_producto = $5`,
+		p.Nombre, p.IdCategoria, p.PrecioVenta, p.Estado, id,
 	)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -395,6 +436,19 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	if rowsAffected == 0 {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "No se encontró un producto con el id_producto proporcionado."})
+		return
+	}
+
+	// Actualizar stock de la tienda (UPSERT)
+	_, err = tx.Exec(`
+		INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id_tienda, id_producto)
+		DO UPDATE SET stock_actual = $3, stock_alerta_min = $4`,
+		idTienda, id, p.StockActual, p.StockAlertaMin)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar el stock de la tienda."})
 		return
 	}
 
