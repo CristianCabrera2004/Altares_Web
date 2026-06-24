@@ -15,21 +15,18 @@ func main() {
 	}
 	defer db.Close()
 
-	// Mostrar columnas de inventario.productos
-	fmt.Println("--- Columnas de inventario.productos ---")
-	rows, err := db.Query(`
-		SELECT column_name, data_type 
-		FROM information_schema.columns 
-		WHERE table_schema = 'inventario' AND table_name = 'productos'
-	`)
-	if err != nil {
-		log.Fatal(err)
+	fmt.Println("Ejecutando alteración de tabla inventario.transferencias...")
+	queries := []string{
+		`ALTER TABLE inventario.transferencias ADD COLUMN IF NOT EXISTS estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente'`,
+		`ALTER TABLE inventario.transferencias ADD COLUMN IF NOT EXISTS requiere_confirmacion_destino BOOLEAN NOT NULL DEFAULT FALSE`,
+		`ALTER TABLE inventario.transferencias ADD COLUMN IF NOT EXISTS parcial BOOLEAN NOT NULL DEFAULT FALSE`,
 	}
-	for rows.Next() {
-		var col, typ string
-		if err := rows.Scan(&col, &typ); err == nil {
-			fmt.Printf("Columna: %s, Tipo: %s\n", col, typ)
+
+	for _, q := range queries {
+		_, err := db.Exec(q)
+		if err != nil {
+			log.Fatalf("Error ejecutando query (%s): %v", q, err)
 		}
 	}
-	rows.Close()
+	fmt.Println("Migración rápida completada con éxito!")
 }

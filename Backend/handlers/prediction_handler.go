@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -80,8 +81,9 @@ func PredictionHandler(db *sql.DB) http.HandlerFunc {
 
 		select {
 		case err := <-errChan:
+			log.Printf("ERROR prediction_handler.go: Error interno al calcular predicciones: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al calcular predicciones: " + err.Error()})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Ocurrió un error interno al calcular las predicciones."})
 		case result := <-resultChan:
 			if filtrarListaCompras {
 				filtered := []PredictionOutput{}
@@ -279,6 +281,29 @@ func runPredictionAlgorithm(db *sql.DB, diasProyeccion float64, idTienda int) (P
 			cantidadAComprar = 0
 		}
 
+		// Calcular margen de error como RMSE relativo sobre la serie histórica
+		// (residuos del modelo AR(1) normalizado por la media de la demanda)
+		var sumSquaredResiduals float64
+		residualCount := 0
+		prevY := series[0]
+		for t := 1; t < diasAnalizados; t++ {
+			fitted := c + phi*prevY
+			residual := series[t] - fitted
+			sumSquaredResiduals += residual * residual
+			residualCount++
+			prevY = series[t]
+		}
+		var margenError float64
+		if residualCount > 0 && mean > 0 {
+			rmse := math.Sqrt(sumSquaredResiduals / float64(residualCount))
+			margenError = rmse / mean
+			if margenError > 0.95 {
+				margenError = 0.95 // cap para no mostrar más del 95%
+			}
+		} else {
+			margenError = 0.50 // sin historial suficiente, margen conservador
+		}
+
 		meta := productMeta[idProd]
 		predictions = append(predictions, PredictionOutput{
 			IdProducto:         idProd,
@@ -286,7 +311,7 @@ func runPredictionAlgorithm(db *sql.DB, diasProyeccion float64, idTienda int) (P
 			IdCategoria:        meta.IdCategoria,
 			NombreCategoria:    meta.NombreCategoria,
 			CantidadProyectada: resultadoProyeccion,
-			MargenError:        0.12,
+			MargenError:        margenError,
 			StockActual:        stockVal,
 			StockAlertaMin:     stockAlertVal,
 			CantidadAComprar:   cantidadAComprar,

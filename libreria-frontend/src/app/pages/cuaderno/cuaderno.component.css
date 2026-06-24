@@ -205,10 +205,10 @@
 .right-col  { text-align: right  !important; }
 
 .items-table tbody tr {
-  border-bottom: 1px solid #1a1d27;
+  border-bottom: 1px solid var(--border-subtle);
   transition: background 0.1s;
 }
-.items-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+.items-table tbody tr:hover { background: rgba(79,142,247,0.04); }
 .items-table td { padding: 10px 12px; font-size: 0.82rem; color: var(--text-title); vertical-align: middle; }
 
 .item-nombre { display: flex; flex-direction: column; }
@@ -312,7 +312,7 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal-card {
-  background: #1a1d27; border: 1px solid var(--border-strong); border-radius: 18px;
+  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 18px;
   padding: 22px 24px; max-width: 480px; width: 100%;
   box-shadow: 0 25px 60px rgba(0,0,0,0.5);
   animation: scaleIn 0.2s ease;
@@ -396,7 +396,7 @@
   animation: fadeIn 0.2s ease;
 }
 .voucher-card {
-  background: #1a1d27; border: 1px solid var(--border-strong); border-radius: 20px;
+  background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 20px;
   padding: 40px 36px; max-width: 380px; width: 100%;
   text-align: center; box-shadow: 0 30px 70px rgba(0,0,0,0.6);
   animation: scaleIn 0.25s ease;

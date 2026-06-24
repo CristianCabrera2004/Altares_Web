@@ -5,9 +5,18 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <div class="logo-mark">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="8" fill="#4F8EF7"/>
-          <path d="M7 8h14M7 14h10M7 20h12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <defs>
+            <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4F8EF7"/>
+              <stop offset="100%" stop-color="#7B61FF"/>
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="10" fill="url(#logoGrad)"/>
+          <!-- Libro abierto -->
+          <path d="M8 10 C8 10 12 9 16 10 C20 9 24 10 24 10 L24 22 C24 22 20 21 16 22 C12 21 8 22 8 22 Z" 
+                fill="none" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="16" y1="10" x2="16" y2="22" stroke="white" stroke-width="1.5"/>
         </svg>
       </div>
       @if (sidebarOpen()) {
@@ -19,7 +28,7 @@
 
       <!-- ── MENÚ OPERADOR ─────────────────────────────────────── -->
       @if (!isAdmin()) {
-        <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+        <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" title="Dashboard">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
             <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -27,7 +36,7 @@
           @if (sidebarOpen()) { <span>Dashboard</span> }
         </a>
 
-        <a routerLink="/cuaderno" routerLinkActive="active" class="nav-item">
+        <a routerLink="/cuaderno" routerLinkActive="active" class="nav-item" title="Facturación">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
@@ -36,7 +45,7 @@
           @if (sidebarOpen()) { <span>Facturación</span> }
         </a>
 
-        <a routerLink="/inventario" routerLinkActive="active" class="nav-item">
+        <a routerLink="/inventario" routerLinkActive="active" class="nav-item" title="Inventario">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
@@ -44,7 +53,7 @@
           @if (sidebarOpen()) { <span>Inventario</span> }
         </a>
 
-        <a routerLink="/devoluciones" routerLinkActive="active" class="nav-item">
+        <a routerLink="/devoluciones" routerLinkActive="active" class="nav-item" title="Devoluciones">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="1 4 1 10 7 10"/>
             <path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
@@ -52,7 +61,7 @@
           @if (sidebarOpen()) { <span>Devoluciones</span> }
         </a>
 
-        <a routerLink="/bajas" routerLinkActive="active" class="nav-item">
+        <a routerLink="/bajas" routerLinkActive="active" class="nav-item" title="Bajas por Merma">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
             <line x1="15" y1="9" x2="9" y2="15"/>
@@ -61,7 +70,7 @@
           @if (sidebarOpen()) { <span>Bajas por Merma</span> }
         </a>
 
-        <a routerLink="/reportes" routerLinkActive="active" class="nav-item">
+        <a routerLink="/reportes" routerLinkActive="active" class="nav-item" title="Reportes">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
             <line x1="6" y1="20" x2="6" y2="14"/>
@@ -69,7 +78,7 @@
           @if (sidebarOpen()) { <span>Reportes</span> }
         </a>
 
-        <a routerLink="/clientes" routerLinkActive="active" class="nav-item">
+        <a routerLink="/clientes" routerLinkActive="active" class="nav-item" title="Clientes">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
@@ -77,18 +86,28 @@
           @if (sidebarOpen()) { <span>Clientes</span> }
         </a>
 
-        <a routerLink="/deudores" routerLinkActive="active" class="nav-item">
+        <a routerLink="/deudores" routerLinkActive="active" class="nav-item" title="Deudores">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
           </svg>
           @if (sidebarOpen()) { <span>Deudores</span> }
         </a>
 
-        <a routerLink="/predicciones" routerLinkActive="active" class="nav-item">
+        <a routerLink="/predicciones" routerLinkActive="active" class="nav-item" title="Predicciones">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
           </svg>
           @if (sidebarOpen()) { <span>Predicciones</span> }
+        </a>
+
+        <a routerLink="/transferencias" routerLinkActive="active" class="nav-item" title="Transferencias">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="17 1 21 5 17 9"/>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+          @if (sidebarOpen()) { <span>Transferencias</span> }
         </a>
       }
 
@@ -98,7 +117,7 @@
           <span class="nav-section-label">Panel de Administración</span>
         }
 
-        <a routerLink="/usuarios" routerLinkActive="active" class="nav-item admin-only"
+        <a routerLink="/usuarios" routerLinkActive="active" class="nav-item admin-only" title="Usuarios"
            [routerLinkActiveOptions]="{exact: true}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -108,7 +127,7 @@
           @if (sidebarOpen()) { <span>Usuarios</span> }
         </a>
 
-        <a routerLink="/tiendas" routerLinkActive="active" class="nav-item admin-only">
+        <a routerLink="/tiendas" routerLinkActive="active" class="nav-item admin-only" title="Tiendas/Librerías">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
             <polyline points="9 22 9 12 15 12 15 22"/>
@@ -116,7 +135,17 @@
           @if (sidebarOpen()) { <span>Tiendas/Librerías</span> }
         </a>
 
-        <a routerLink="/usuarios/auditoria" routerLinkActive="active" class="nav-item admin-only">
+        <a routerLink="/transferencias" routerLinkActive="active" class="nav-item admin-only" title="Transferencias">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="17 1 21 5 17 9"/>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+          @if (sidebarOpen()) { <span>Transferencias</span> }
+        </a>
+
+        <a routerLink="/usuarios/auditoria" routerLinkActive="active" class="nav-item admin-only" title="Auditoría">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
@@ -136,8 +165,12 @@
           <div class="user-details">
             <span class="user-name">{{ nombre() }}</span>
             <span class="user-role">{{ rol() === 'admin_libreria' ? 'Administrador' : 'Operador' }}</span>
-            <span class="user-store" style="font-size: 0.72rem; color: #4F8EF7; font-weight: 700; margin-top: 3px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" [title]="nombreTienda()">
-              📍 {{ nombreTienda() }}
+            <span class="user-store" [title]="nombreTienda()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              {{ nombreTienda() }}
             </span>
           </div>
         }
@@ -160,6 +193,9 @@
           <line x1="3" y1="18" x2="21" y2="18"/>
         </svg>
       </button>
+      <div class="topbar-center">
+        <span class="topbar-route">{{ getPageTitle() }}</span>
+      </div>
       <div class="topbar-right">
         <button class="theme-toggle-btn" (click)="toggleTheme()" [title]="isLightMode() ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'">
           @if (isLightMode()) {

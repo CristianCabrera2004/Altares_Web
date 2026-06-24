@@ -105,12 +105,36 @@
               </td>
               <td>
                 @if (d.tipo_deuda === 'dinero') {
-                  <strong>{{ formatMoney(d.monto_deuda) }}</strong>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <strong>{{ formatMoney(d.monto_deuda) }}</strong>
+                    <button class="btn-icon" (click)="openDetail(d)" title="Ver Detalle Completo" style="padding: 2px; width: 22px; height: 22px; border: none; background: transparent;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                      </svg>
+                    </button>
+                  </div>
                 } @else {
-                  <span class="detail-text">{{ d.detalle_producto }}</span>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="detail-text" [title]="getDetalleText(d.detalle_producto)">{{ getDetalleText(d.detalle_producto) }}</span>
+                    <button class="btn-icon" (click)="openDetail(d)" title="Ver Detalle Completo" style="padding: 2px; width: 22px; height: 22px; border: none; background: transparent;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                      </svg>
+                    </button>
+                  </div>
                 }
               </td>
-              <td>{{ formatMoney(d.monto_abonado) }}</td>
+              <td>
+                <div class="debt-bar-wrapper">
+                  <div class="debt-bar-fill" 
+                       [style.width.%]="d.monto_deuda > 0 ? (d.monto_abonado * 100) / d.monto_deuda : 0"
+                       [class.bar-full]="d.estado === 'pagado'">
+                  </div>
+                </div>
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">
+                  {{ formatMoney(d.monto_abonado) }} / {{ formatMoney(d.monto_deuda) }}
+                </small>
+              </td>
               <td>
                 <strong class="saldo">{{ formatMoney(d.monto_deuda - d.monto_abonado) }}</strong>
               </td>
@@ -188,16 +212,95 @@
           </div>
         }
         @if (form().tipo_deuda === 'producto') {
-          <div class="form-group">
-            <label>Detalle del Producto *</label>
-            <input type="text" [ngModel]="form().detalle_producto" (ngModelChange)="form.update(f => ({...f, detalle_producto: $event}))"
-                   placeholder="Descripción del producto fiado">
+          <!-- Selector de Productos -->
+          <div class="form-group" style="position: relative;">
+            <label>Buscar Producto del Inventario *</label>
+            <div class="search-bar" style="margin-bottom: 0; background: var(--bg-base); border: 1px solid var(--border-strong);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" style="color: var(--text-muted);">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" placeholder="Escriba el nombre del producto..."
+                     [ngModel]="busquedaProducto()"
+                     (ngModelChange)="busquedaProducto.set($event); mostrarSugerencias.set(true)"
+                     (focus)="mostrarSugerencias.set(true)"
+                     style="background: transparent; border: none; color: var(--text-main); font-family: inherit; font-size: 0.875rem; width: 100%; outline: none;">
+              @if (busquedaProducto()) {
+                <button type="button" class="btn-icon" (click)="busquedaProducto.set(''); mostrarSugerencias.set(false)" style="padding: 2px; border: none; background: transparent; cursor: pointer; color: var(--text-muted);">×</button>
+              }
+            </div>
+
+            <!-- Sugerencias Dropdown -->
+            @if (mostrarSugerencias() && sugerencias().length > 0) {
+              <div class="suggestions-dropdown" style="position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 10px; z-index: 1100; max-height: 200px; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.35);">
+                @for (prod of sugerencias(); track prod.id_producto) {
+                  <div class="suggestion-item" 
+                       (click)="selectProduct(prod)" 
+                       style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s;"
+                       onmouseover="this.style.background='rgba(79,142,247,0.1)'"
+                       onmouseout="this.style.background=''">
+                    <div style="display: flex; flex-direction: column;">
+                      <strong style="font-size: 0.85rem; color: var(--text-heading);">{{ prod.nombre }}</strong>
+                      <span style="font-size: 0.75rem; color: var(--text-muted);">Stock: {{ prod.stock_actual }} u.</span>
+                    </div>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: #22c55e;">
+                      {{ formatMoney(prod.precio_venta) }}
+                    </span>
+                  </div>
+                }
+              </div>
+            }
           </div>
-          <div class="form-group">
-            <label>Valor Estimado (USD)</label>
-            <input type="number" [ngModel]="(form().monto_deuda || 0) / 100" step="0.01" min="0"
-                   (ngModelChange)="form.update(f => ({...f, monto_deuda: Math.round($event * 100)}))"
-                   placeholder="0.00">
+
+          <!-- Productos Seleccionados -->
+          <div class="form-group" style="margin-top: 8px;">
+            <label>Productos Fiados (Seleccionados)</label>
+            @if (selectedProducts().length === 0) {
+              <div style="border: 1px dashed var(--border-strong); border-radius: 10px; padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem; background: rgba(0,0,0,0.05);">
+                Ningún producto seleccionado. Busque arriba para agregar.
+              </div>
+            } @else {
+              <div class="selected-products-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px;">
+                @for (item of selectedProducts(); track item.id_producto) {
+                  <div class="selected-product-card" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 10px; justify-content: space-between;">
+                    <div style="flex: 1; min-width: 0; text-align: left;">
+                      <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-heading); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                        {{ item.nombre }}
+                      </div>
+                      <div style="font-size: 0.78rem; color: var(--text-muted);">
+                        P. Unit: {{ formatMoney(item.precio_venta) }}
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <!-- Cantidad -->
+                      <div style="display: flex; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 2px 4px;">
+                        <button type="button" (click)="updateQuantity(item.id_producto, item.cantidad - 1)" style="border: none; background: none; color: var(--text-main); font-weight: bold; cursor: pointer; padding: 4px 8px; font-size: 0.9rem;">-</button>
+                        <span style="min-width: 24px; text-align: center; color: var(--text-main); font-size: 0.85rem; font-weight: 600;">{{ item.cantidad }}</span>
+                        <button type="button" (click)="updateQuantity(item.id_producto, item.cantidad + 1)" style="border: none; background: none; color: var(--text-main); font-weight: bold; cursor: pointer; padding: 4px 8px; font-size: 0.9rem;">+</button>
+                      </div>
+                      <!-- Subtotal -->
+                      <div style="font-size: 0.85rem; font-weight: 700; color: #22c55e; min-width: 65px; text-align: right;">
+                        {{ formatMoney(item.precio_venta * item.cantidad) }}
+                      </div>
+                      <!-- Remover -->
+                      <button type="button" (click)="removeProduct(item.id_producto)" style="background: transparent; border: none; color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 6px; border-radius: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background=''" title="Quitar producto">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- Total General de Productos -->
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding: 12px 14px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px;">
+                <span style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Total de la Deuda</span>
+                <strong style="font-size: 1.15rem; font-weight: 800; color: #22c55e;">
+                  {{ formatMoney(totalDeudaProductos()) }}
+                </strong>
+              </div>
+            }
           </div>
         }
         <div class="form-group">
@@ -277,6 +380,141 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" (click)="closeAbonoModal()">Cancelar</button>
         <button class="btn btn-primary" (click)="registrarAbono()" [disabled]="loading()">Registrar Abono</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal: Detalle Completo de Deuda -->
+@if (showDetailModal()) {
+  <div class="modal-overlay" (click)="showDetailModal.set(false)">
+    <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>Detalle de la Deuda</h2>
+        <button class="btn-icon" (click)="showDetailModal.set(false)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="gap: 20px;">
+        @if (selectedDetailDeuda(); as d) {
+          <!-- Información del Deudor -->
+          <div class="abono-summary" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,0.015);">
+            <div>
+              <span class="abono-label" style="font-size: 0.75rem; text-transform: uppercase;">Deudor</span>
+              <div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); margin-top: 2px;">{{ d.nombre_deudor }}</div>
+            </div>
+            <div>
+              <span class="abono-label" style="font-size: 0.75rem; text-transform: uppercase;">Teléfono</span>
+              <div style="font-weight: 600; margin-top: 2px;">{{ d.telefono || 'No registrado' }}</div>
+            </div>
+            <div>
+              <span class="abono-label" style="font-size: 0.75rem; text-transform: uppercase;">Tipo de Deuda</span>
+              <div style="margin-top: 2px;">
+                <span class="badge" [class]="d.tipo_deuda === 'dinero' ? 'badge-money' : 'badge-product'">
+                  {{ d.tipo_deuda === 'dinero' ? '💵 Dinero' : '📦 Producto' }}
+                </span>
+              </div>
+            </div>
+            <div>
+              <span class="abono-label" style="font-size: 0.75rem; text-transform: uppercase;">Estado</span>
+              <div style="margin-top: 2px;">
+                <span class="badge" [class]="getEstadoClass(d.estado)">{{ getEstadoLabel(d.estado) }}</span>
+              </div>
+            </div>
+            <div style="grid-column: span 2; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+              <span class="abono-label" style="font-size: 0.75rem; text-transform: uppercase;">Fecha de Registro</span>
+              <div style="font-weight: 500; font-size: 0.85rem; margin-top: 2px; color: var(--text-secondary);">{{ d.fecha_registro }}</div>
+            </div>
+          </div>
+
+          <!-- Concepto / Detalle de Productos -->
+          <div class="detail-section">
+            <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.04em;">Concepto / Productos</h4>
+            
+            @if (d.tipo_deuda === 'dinero') {
+              <div style="padding: 12px 14px; background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 10px; font-size: 0.9rem; text-align: left;">
+                Préstamo de dinero en efectivo.
+              </div>
+            } @else {
+              @if (parsedItems(d.detalle_producto).length > 0) {
+                <!-- Tabla de productos desde el JSON -->
+                <div style="border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; background: var(--bg-base);">
+                  <table class="data-table" style="width: 100%; font-size: 0.82rem;">
+                    <thead>
+                      <tr style="background: rgba(255,255,255,0.01);">
+                        <th style="padding: 8px 12px;">Producto</th>
+                        <th style="padding: 8px 12px; text-align: right;">Cant</th>
+                        <th style="padding: 8px 12px; text-align: right;">P. Unit</th>
+                        <th style="padding: 8px 12px; text-align: right;">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of parsedItems(d.detalle_producto); track item.id_producto) {
+                        <tr>
+                          <td style="padding: 8px 12px; font-weight: 600; color: var(--text-heading); text-align: left;">{{ item.nombre || 'Producto' }}</td>
+                          <td style="padding: 8px 12px; text-align: right;">{{ item.cantidad }} u.</td>
+                          <td style="padding: 8px 12px; text-align: right; color: var(--text-muted);">{{ formatMoney(item.precio_unitario) }}</td>
+                          <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #22c55e;">{{ formatMoney(item.precio_unitario * item.cantidad) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <!-- Detalle de texto plano antiguo -->
+                <div style="padding: 12px 14px; background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 10px; font-size: 0.9rem; font-weight: 600; text-align: left;">
+                  {{ d.detalle_producto }}
+                </div>
+              }
+            }
+          </div>
+
+          <!-- Motivo -->
+          @if (d.motivo) {
+            <div class="detail-section">
+              <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em;">Motivo</h4>
+              <div style="padding: 12px 14px; background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 10px; font-size: 0.85rem; font-style: italic; text-align: left;">
+                {{ d.motivo }}
+              </div>
+            </div>
+          }
+
+          <!-- Totales de la Deuda -->
+          <div class="abono-summary" style="margin-top: 8px; gap: 10px; border: 1px solid var(--border-strong);">
+            <div class="abono-info-row">
+              <span class="abono-label">Total de la Deuda:</span>
+              <strong style="color: var(--text-heading);">{{ formatMoney(d.monto_deuda) }}</strong>
+            </div>
+            <div class="abono-info-row">
+              <span class="abono-label">Total Abonado:</span>
+              <span style="color: #22c55e; font-weight: 600;">{{ formatMoney(d.monto_abonado) }}</span>
+            </div>
+            <div class="abono-info-row abono-highlight" style="padding-top: 10px; border-top: 1px solid var(--border-subtle);">
+              <span class="abono-label" style="font-weight: 700;">Saldo Pendiente:</span>
+              <strong class="saldo-big" style="font-size: 1.25rem;">{{ formatMoney(d.monto_deuda - d.monto_abonado) }}</strong>
+            </div>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="showDetailModal.set(false)">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}
+<!-- Modal de Confirmación Global -->
+@if (confirmModalVisible()) {
+  <div class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title" style="margin-bottom: 12px; font-size: 1.1rem;">Confirmar Acción</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; white-space: pre-line;">
+        {{ confirmModalMessage() }}
+      </p>
+      <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn btn-secondary" (click)="cancelarConfirmacion()">Cancelar</button>
+        <button class="btn btn-primary" (click)="confirmarAccion()">Confirmar</button>
       </div>
     </div>
   </div>

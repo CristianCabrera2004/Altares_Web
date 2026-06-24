@@ -52,9 +52,11 @@
 }
 .data-table th {
   text-align: left;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-secondary);
   background: rgba(255,255,255,0.02);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .data-table td { color: var(--text-hover); }
 .product-name { font-weight: 500; color: var(--text-heading); }
@@ -63,7 +65,7 @@
   background: rgba(79,142,247,0.15);
   color: #4F8EF7;
   padding: 4px 10px;
-  border-radius: 12px;
+  border-radius: 6px;
   font-size: 0.75rem;
 }
 

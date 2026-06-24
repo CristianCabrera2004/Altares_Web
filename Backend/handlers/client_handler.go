@@ -16,6 +16,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -183,6 +184,7 @@ func createClient(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"error": "Ya existe un cliente con esa cédula/RUC."})
 			return
 		}
+		log.Printf("ERROR client_handler.go: Error al crear el cliente: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al crear el cliente."})
 		return

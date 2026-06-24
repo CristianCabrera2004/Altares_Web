@@ -47,13 +47,13 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		args := []interface{}{startDate, endDate, idTienda}
 		query := `
 			SELECT 
-				TO_CHAR(v.fecha_venta, 'YYYY-MM-DD'),
+				TO_CHAR(v.fecha_venta, 'YYYY-MM-DD') as fecha_v,
 				p.id_producto,
 				p.nombre as producto,
 				c.nombre as categoria,
-				d.cantidad,
+				SUM(d.cantidad) as cantidad,
 				d.precio_unitario,
-				d.subtotal as total
+				SUM(d.subtotal) as total
 			FROM operaciones.detalle_ventas d
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
@@ -68,7 +68,11 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 			query += fmt.Sprintf(" AND c.nombre = $%d", len(args))
 		}
 
-		query += " ORDER BY v.fecha_venta DESC LIMIT 1000"
+		query += `
+			GROUP BY TO_CHAR(v.fecha_venta, 'YYYY-MM-DD'), p.id_producto, p.nombre, c.nombre, d.precio_unitario
+			ORDER BY fecha_v DESC, total DESC
+			LIMIT 50000
+		`
 
 		rows, err := db.Query(query, args...)
 		if err != nil {

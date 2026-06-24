@@ -27,10 +27,13 @@ export class DashboardService {
     return this.http.get<GraficaData[]>(url);
   }
 
-  /** HU-06 CA#26 — Cuenta productos con stock <= stock_alerta_min */
+  /** HU-06 CA#26 — Cuenta productos con stock <= stock_alerta_min.
+   *  Se filtra directamente en backend para evitar descargar el catálogo completo.
+   *  El endpoint devuelve sólo los productos con stock bajo de la tienda activa.
+   */
   getStockBajoCount(): Observable<number> {
-    return this.http.get<ProductoStock[]>(`${environment.apiUrl}/productos`).pipe(
-      map(productos => productos.filter(p => p.stock_actual <= p.stock_alerta_min).length)
+    return this.http.get<ProductoStock[]>(`${environment.apiUrl}/productos?stock_bajo=true`).pipe(
+      map(productos => productos.length)
     );
   }
 }

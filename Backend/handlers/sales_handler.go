@@ -183,16 +183,8 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// ─── FUNCIÓN INTERNA TRANSACCIONAL ───────────────────────────────────────────
-// procesarVenta ejecuta los 4 pasos de una venta dentro de una SOLA transacción:
-//  1. INSERT en operaciones.ventas            (cabecera)
-//  2. Para cada item:
-//     a. SELECT FOR UPDATE del stock          (bloqueo de fila en stock_tiendas)
-//     b. Validar stock suficiente             (error 400 → ROLLBACK)
-//     c. INSERT en operaciones.detalle_ventas
-//     d. UPDATE inventario.stock_tiendas.stock_actual
-//     e. INSERT en inventario.movimientos_stock
-func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
+// ─── FUNCIÓN INTERNA TRANSACCIONAL CON TRANSACCIÓN EXTERNA ────────────────────
+func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
 	var subtotalBase int // suma de precios sin IVA
 	var totalIva     int // suma de IVA calculado
 	for _, item := range items {
@@ -203,15 +195,9 @@ func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVenta
 	}
 	totalConIva := subtotalBase + totalIva
 
-	tx, err := db.Begin()
-	if err != nil {
-		return 0, 0, fmt.Errorf("error_transaccion")
-	}
-	defer tx.Rollback()
-
 	// Paso 1 — Insertar la cabecera de la venta
 	var idVenta int
-	err = tx.QueryRow(`
+	err := tx.QueryRow(`
 		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado)
 		VALUES ($1, $2, $3, $4, $5, 'completada')
 		RETURNING id_venta`,
@@ -279,11 +265,71 @@ func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVenta
 		}
 	}
 
+	return idVenta, totalConIva, nil
+}
+
+func procesarVentaSaldadaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
+	var subtotalBase int // suma de precios sin IVA
+	var totalIva     int // suma de IVA calculado
+	for _, item := range items {
+		lineBase := item.PrecioUnitario * item.Cantidad
+		lineIva  := int(math.Round(float64(lineBase) * float64(item.IvaAplicado) / 100.0))
+		subtotalBase += lineBase
+		totalIva     += lineIva
+	}
+	totalConIva := subtotalBase + totalIva
+
+	// Paso 1 — Insertar la cabecera de la venta
+	var idVenta int
+	err := tx.QueryRow(`
+		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado)
+		VALUES ($1, $2, $3, $4, $5, 'completada')
+		RETURNING id_venta`,
+		idUsuario, idTienda, subtotalBase, totalIva, totalConIva,
+	).Scan(&idVenta)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error_creando_venta")
+	}
+
+	// Paso 2 — Registrar el detalle de la venta sin tocar stock ni movimientos
+	for _, item := range items {
+		lineBase    := item.PrecioUnitario * item.Cantidad
+		lineIva     := int(math.Round(float64(lineBase) * float64(item.IvaAplicado) / 100.0))
+		lineTotalConIva := lineBase + lineIva
+
+		_, err = tx.Exec(`
+			INSERT INTO operaciones.detalle_ventas
+			  (id_venta, id_producto, cantidad, precio_unitario, iva_aplicado, subtotal)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			idVenta, item.IdProducto, item.Cantidad, item.PrecioUnitario, item.IvaAplicado, lineTotalConIva,
+		)
+		if err != nil {
+			return 0, 0, fmt.Errorf("error_insertando_detalle")
+		}
+	}
+
+	return idVenta, totalConIva, nil
+}
+
+// ─── FUNCIÓN INTERNA TRANSACCIONAL ───────────────────────────────────────────
+// procesarVenta ejecuta los 4 pasos de una venta dentro de una SOLA transacción:
+func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return 0, 0, fmt.Errorf("error_transaccion")
+	}
+	defer tx.Rollback()
+
+	idVenta, total, err := procesarVentaConTx(tx, idUsuario, idTienda, items, clienteId, clienteNombre)
+	if err != nil {
+		return 0, 0, err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return 0, 0, fmt.Errorf("error_confirmando_transaccion")
 	}
 
-	return idVenta, totalConIva, nil
+	return idVenta, total, nil
 }
 
 func tradError(code string) string {

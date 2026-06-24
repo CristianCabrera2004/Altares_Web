@@ -97,17 +97,17 @@
   </div>
 
   <!-- Nueva sección de Gráfica con filtros de periodo -->
-  <div class="chart-section" style="margin-top: 24px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px;">
+  <div class="chart-section">
     <!-- Header de la sección -->
-    <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+    <div class="chart-header">
       <div>
-        <h2 class="section-title" style="margin-bottom: 4px;">
+        <h2 class="section-title" style="margin-bottom: 0;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" style="margin-right: 8px; vertical-align: text-bottom;">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
           </svg>
           Histórico de Ventas
         </h2>
-        <p class="section-desc" style="color: var(--text-secondary); font-size: 0.8rem; margin: 0;">
+        <p class="section-desc">
           @switch (periodoGrafica()) {
             @case ('7')   { Últimos 7 días (semana actual) }
             @case ('15')  { Últimos 15 días }
@@ -119,15 +119,13 @@
       </div>
 
       <!-- Botones de periodo -->
-      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <div class="periodo-buttons">
         @for (p of periodos; track p.valor) {
           <button
             [id]="'btn-periodo-' + p.valor"
             (click)="setPeriodo(p.valor)"
-            style="padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s;"
-            [style.background]="periodoGrafica() === p.valor ? 'rgba(79,142,247,0.15)' : 'var(--border-subtle)'"
-            [style.border-color]="periodoGrafica() === p.valor ? '#4F8EF7' : 'var(--border-strong)'"
-            [style.color]="periodoGrafica() === p.valor ? '#4F8EF7' : 'var(--text-muted)'">
+            class="periodo-btn"
+            [class.active]="periodoGrafica() === p.valor">
             {{ p.etiqueta }}
           </button>
         }

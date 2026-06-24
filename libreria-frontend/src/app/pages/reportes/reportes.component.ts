@@ -69,7 +69,7 @@ export class ReportesComponent implements OnInit {
       // Precio y total en centavos, los dividimos para decimales
       const pu = (i.precio_unitario / 100).toFixed(2);
       const total = (i.total / 100).toFixed(2);
-      csv += `"${i.id_producto}","${i.fecha_venta}","${i.producto}","${i.categoria}","${i.cantidad}","${pu}","${total}"\n`;
+      csv += `"${i.id_producto}","${this.formatDate(i.fecha_venta)}","${i.producto}","${i.categoria}","${i.cantidad}","${pu}","${total}"\n`;
     });
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -116,7 +116,7 @@ export class ReportesComponent implements OnInit {
 
     // Tabla de datos
     const tableData = this.items().map(item => [
-      item.fecha_venta,
+      this.formatDate(item.fecha_venta),
       item.producto,
       item.categoria,
       item.cantidad.toString(),
@@ -143,6 +143,17 @@ export class ReportesComponent implements OnInit {
 
     // Guardado (CA 32: Inicia en menos de 3s)
     doc.save(`reporte_ventas_${this.startDate()}_a_${this.endDate()}.pdf`);
+  }
+
+  formatDate(isoString: string): string {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   }
 
   formatCurrency(centavos: number): string {

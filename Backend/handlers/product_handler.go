@@ -72,6 +72,14 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
+	// Si se especifica un parámetro tienda, permitimos leer el stock de esa sucursal
+	tiendaParam := r.URL.Query().Get("tienda")
+	if tiendaParam != "" {
+		if t, err := strconv.Atoi(tiendaParam); err == nil && t > 0 {
+			idTienda = t
+		}
+	}
+
 	// Consulta de un producto específico
 	if idStr != "" {
 		id, err := strconv.Atoi(idStr)
@@ -108,15 +116,22 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Listar todo el catálogo activo con stock de la tienda.
-	rows, err := db.Query(`
+	// Soporte de ?stock_bajo=true para filtrar solo productos con stock <= stock_alerta_min
+	stockBajoFilter := r.URL.Query().Get("stock_bajo") == "true"
+	query := `
 		SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
 		       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
 		       p.precio_venta, p.estado
 		FROM inventario.productos p
 		JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 		LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $1
-		WHERE p.estado = 'activo'
-		ORDER BY p.nombre ASC`, idTienda)
+		WHERE p.estado = 'activo'`
+	if stockBajoFilter {
+		query += ` AND COALESCE(st.stock_actual, 0) <= COALESCE(st.stock_alerta_min, 5)`
+	}
+	query += ` ORDER BY p.nombre ASC`
+
+	rows, err := db.Query(query, idTienda)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al listar el catálogo de productos."})
@@ -139,6 +154,7 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(productos)
 }
+
 
 // ─── POST ────────────────────────────────────────────────────────────────────
 // createProduct verifica primero si el código de barras ya existe:

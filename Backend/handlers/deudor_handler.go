@@ -57,6 +57,49 @@ type AbonoRow struct {
 	FechaAbono  string `json:"fecha_abono"`
 }
 
+type DetalleProductoJSON struct {
+	Descripcion string `json:"descripcion"`
+	Items       []struct {
+		IdProducto     int `json:"id_producto"`
+		Cantidad       int `json:"cantidad"`
+		PrecioUnitario int `json:"precio_unitario"`
+		IvaAplicado    int `json:"iva_aplicado"`
+	} `json:"items"`
+}
+
+func registrarVentaDesdeDeuda(tx *sql.Tx, idUsuario int, idTienda int, nombreDeudor string, detalleProducto string) error {
+	if detalleProducto == "" {
+		return nil
+	}
+
+	var parsed DetalleProductoJSON
+	if err := json.Unmarshal([]byte(detalleProducto), &parsed); err != nil {
+		// No es JSON válido (compatibilidad con deudas antiguas de texto plano)
+		return nil
+	}
+
+	if len(parsed.Items) == 0 {
+		return nil
+	}
+
+	items := make([]DetalleVentaInput, len(parsed.Items))
+	for i, item := range parsed.Items {
+		items[i] = DetalleVentaInput{
+			IdProducto:     item.IdProducto,
+			Cantidad:       item.Cantidad,
+			PrecioUnitario: item.PrecioUnitario,
+			IvaAplicado:    item.IvaAplicado,
+		}
+	}
+
+	_, _, err := procesarVentaSaldadaConTx(tx, idUsuario, idTienda, items, "9999999999999", nombreDeudor)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // DeudorHandler despacha por método HTTP.
 func DeudorHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -225,7 +268,15 @@ func createDeudor(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := db.QueryRow(`
+	tx, err := db.Begin()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error al iniciar la transacción."})
+		return
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRow(`
 		INSERT INTO operaciones.deudores
 		  (id_usuario, id_tienda, nombre_deudor, telefono, tipo_deuda,
 		   monto_deuda, monto_abonado, detalle_producto, motivo, estado)
@@ -238,6 +289,66 @@ func createDeudor(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al registrar la deuda."})
+		return
+	}
+
+	if d.TipoDeuda == "producto" {
+		var parsed DetalleProductoJSON
+		if err := json.Unmarshal([]byte(d.DetalleProducto), &parsed); err == nil {
+			for _, item := range parsed.Items {
+				var stockActual int
+				err = tx.QueryRow(`
+					SELECT stock_actual FROM inventario.stock_tiendas 
+					WHERE id_producto = $1 AND id_tienda = $2 FOR UPDATE`,
+					item.IdProducto, d.IdTienda,
+				).Scan(&stockActual)
+				if err == sql.ErrNoRows {
+					w.WriteHeader(http.StatusBadRequest)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Producto no encontrado o sin stock inicial en esta tienda."})
+					return
+				}
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar stock del producto."})
+					return
+				}
+
+				if item.Cantidad > stockActual {
+					w.WriteHeader(http.StatusBadRequest)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Stock insuficiente en la tienda para uno o más productos."})
+					return
+				}
+
+				nuevoStock := stockActual - item.Cantidad
+				_, err = tx.Exec(`
+					UPDATE inventario.stock_tiendas SET stock_actual = $1 
+					WHERE id_producto = $2 AND id_tienda = $3`,
+					nuevoStock, item.IdProducto, d.IdTienda,
+				)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar stock del producto."})
+					return
+				}
+
+				_, err = tx.Exec(`
+					INSERT INTO inventario.movimientos_stock
+					  (id_producto, id_usuario, id_tienda, tipo_movimiento, cantidad, stock_resultante, referencia_id)
+					VALUES ($1, $2, $3, 'DEUDA', $4, $5, $6)`,
+					item.IdProducto, d.IdUsuario, d.IdTienda, -item.Cantidad, nuevoStock, d.IdDeuda,
+				)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Error al registrar movimiento de stock."})
+					return
+				}
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error al confirmar registro de deuda."})
 		return
 	}
 
@@ -309,6 +420,11 @@ func registrarAbono(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "'id_deuda' e 'monto_abono' (>0) son obligatorios."})
 		return
 	}
+	if input.MontoAbono > 1_000_000_00 { // límite: $1.000.000 en centavos
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "El monto del abono supera el límite permitido."})
+		return
+	}
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -320,12 +436,12 @@ func registrarAbono(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	// Obtener deuda actual con bloqueo
 	var montoDeuda, montoAbonado int
-	var tipoDeuda, estado string
+	var tipoDeuda, estado, nombreDeudor, detalleProducto string
 	err = tx.QueryRow(`
-		SELECT monto_deuda, COALESCE(monto_abonado, 0), tipo_deuda, estado
+		SELECT monto_deuda, COALESCE(monto_abonado, 0), tipo_deuda, estado, nombre_deudor, COALESCE(detalle_producto, '')
 		FROM operaciones.deudores WHERE id_deuda = $1 FOR UPDATE`,
 		input.IdDeuda,
-	).Scan(&montoDeuda, &montoAbonado, &tipoDeuda, &estado)
+	).Scan(&montoDeuda, &montoAbonado, &tipoDeuda, &estado, &nombreDeudor, &detalleProducto)
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Deuda no encontrada."})
@@ -356,6 +472,17 @@ func registrarAbono(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validar que el abono no supere el saldo pendiente
+	saldoPendiente := montoDeuda - montoAbonado
+	if input.MontoAbono > saldoPendiente {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("El abono ($%.2f) supera el saldo pendiente ($%.2f). Ingrese un monto igual o menor al saldo.",
+				float64(input.MontoAbono)/100, float64(saldoPendiente)/100),
+		})
+		return
+	}
+
 	// Actualizar monto abonado y estado
 	nuevoAbonado := montoAbonado + input.MontoAbono
 	nuevoEstado := "parcial"
@@ -374,6 +501,25 @@ func registrarAbono(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error actualizando deuda."})
 		return
+	}
+
+	// Si es de tipo producto y se completa el pago (nuevoEstado == "pagado"), procesamos la venta
+	if nuevoEstado == "pagado" && tipoDeuda == "producto" {
+		claims, ok := middleware.GetClaims(r)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Sesión no válida."})
+			return
+		}
+		idUsuario := claims.IdUsuario
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		err = registrarVentaDesdeDeuda(tx, idUsuario, idTienda, nombreDeudor, detalleProducto)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": tradError(err.Error())})
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -407,19 +553,68 @@ func pagarDeudor(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := db.Exec(`
+	claims, ok := middleware.GetClaims(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Sesión no válida."})
+		return
+	}
+	idUsuario := claims.IdUsuario
+	idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+	tx, err := db.Begin()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error iniciando transacción."})
+		return
+	}
+	defer tx.Rollback()
+
+	var tipoDeuda, estado, nombreDeudor, detalleProducto string
+	err = tx.QueryRow(`
+		SELECT tipo_deuda, estado, nombre_deudor, COALESCE(detalle_producto, '')
+		FROM operaciones.deudores WHERE id_deuda = $1 FOR UPDATE`,
+		id,
+	).Scan(&tipoDeuda, &estado, &nombreDeudor, &detalleProducto)
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Deuda no encontrada."})
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error consultando deuda."})
+		return
+	}
+
+	if estado == "pagado" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Esta deuda ya fue pagada."})
+		return
+	}
+
+	// Si es de tipo producto, procesamos la venta
+	if tipoDeuda == "producto" {
+		err = registrarVentaDesdeDeuda(tx, idUsuario, idTienda, nombreDeudor, detalleProducto)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": tradError(err.Error())})
+			return
+		}
+	}
+
+	_, err = tx.Exec(`
 		UPDATE operaciones.deudores SET estado = 'pagado', fecha_pago = NOW()
-		WHERE id_deuda = $1 AND estado != 'pagado'`, id)
+		WHERE id_deuda = $1`, id)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al marcar como pagado."})
 		return
 	}
 
-	affected, _ := result.RowsAffected()
-	if affected == 0 {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Deuda no encontrada o ya pagada."})
+	if err := tx.Commit(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Error confirmando transacción."})
 		return
 	}
 

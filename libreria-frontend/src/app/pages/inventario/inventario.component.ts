@@ -60,6 +60,11 @@ export class InventarioComponent implements OnInit {
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
 
+  // ─── Modal de Confirmación ──────────────────────────────────────────────
+  readonly confirmModalVisible = signal(false);
+  readonly confirmModalMessage = signal('');
+  private confirmAction: (() => void) | null = null;
+
   // ─── Filtros de ordenamiento ──────────────────────────────────────────────
   readonly sortField = signal<'nombre' | 'precio_venta' | 'stock_actual'>('nombre');
   readonly sortDir   = signal<'asc' | 'desc'>('asc');
@@ -334,16 +339,35 @@ export class InventarioComponent implements OnInit {
 
   // ─── Baja lógica (desactivar del catálogo) ───────────────────────────────
   darDeBaja(p: Producto): void {
-    if (!confirm(`¿Desactivar "${p.nombre}" del catálogo?\nEl producto quedará inactivo pero sus registros se conservan.`)) return;
-    this.errorMsg.set('');
-    this.http.delete<{ mensaje: string }>(`${this.apiProductos}?id=${p.id_producto}`).subscribe({
-      next: (res) => {
-        this.successMsg.set(`✓ ${res.mensaje}`);
-        this.cargarProductos();
-        setTimeout(() => this.successMsg.set(''), 4000);
-      },
-      error: (err) => this.errorMsg.set(err?.error?.error ?? 'Error al dar de baja el producto.')
-    });
+    this.confirmModalMessage.set(`¿Desactivar "${p.nombre}" del catálogo?\nEl producto quedará inactivo pero sus registros se conservan.`);
+    this.confirmAction = () => {
+      this.errorMsg.set('');
+      this.http.delete<{ mensaje: string }>(`${this.apiProductos}?id=${p.id_producto}`).subscribe({
+        next: (res) => {
+          this.successMsg.set(`✓ ${res.mensaje}`);
+          this.cargarProductos();
+          this.confirmModalVisible.set(false);
+          setTimeout(() => this.successMsg.set(''), 4000);
+        },
+        error: (err) => {
+          this.errorMsg.set(err?.error?.error ?? 'Error al dar de baja el producto.');
+          this.confirmModalVisible.set(false);
+        }
+      });
+    };
+    this.confirmModalVisible.set(true);
+  }
+
+  // ─── Acciones del Modal de Confirmación ─────────────────────────────────────
+  confirmarAccion(): void {
+    if (this.confirmAction) {
+      this.confirmAction();
+    }
+  }
+
+  cancelarConfirmacion(): void {
+    this.confirmModalVisible.set(false);
+    this.confirmAction = null;
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
