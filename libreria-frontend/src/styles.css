@@ -1,26 +1,65 @@
 /* src/styles.css — Estilos globales de la aplicación */
 
-/* ── Fuente Inter desde Google Fonts (debe ir primero) ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* ── Fuente Inter desde Google Fonts (importada en index.html) ── */
 
 /* ── Variables de Tema ── */
 :root {
+  /* Fondos (existentes + nuevos) */
   --bg-base: #0f1117;
   --bg-surface: #16181f;
+  --bg-elevated: #1c1f2e;         /* NUEVO: para cards flotantes/modales */
+
+  /* Bordes (ya existen) */
   --border-subtle: #1e2130;
   --border-strong: #2d3148;
+
+  /* Textos (ya existen) */
   --text-main: #e5e7eb;
   --text-heading: #f0f2f8;
   --text-title: #d0d5e8;
   --text-muted: #8b92a5;
   --text-secondary: #6b7280;
   --text-hover: #c8cdd8;
+
+  /* ── NUEVAS: Paleta de acentos ── */
+  --accent-blue: #4F8EF7;
+  --accent-blue-dim: rgba(79, 142, 247, 0.12);
+  --accent-blue-glow: rgba(79, 142, 247, 0.25);
+  --accent-purple: #7B61FF;
+  --accent-purple-dim: rgba(123, 97, 255, 0.12);
+  --accent-green: #22c55e;
+  --accent-green-dim: rgba(34, 197, 94, 0.12);
+  --accent-orange: #fb923c;
+  --accent-orange-dim: rgba(251, 146, 60, 0.12);
+  --accent-red: #ef4444;
+  --accent-red-dim: rgba(239, 68, 68, 0.12);
+  --accent-yellow: #f59e0b;
+  --accent-yellow-dim: rgba(245, 158, 11, 0.12);
+
+  /* ── NUEVAS: Sombras ── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.4);
+  --shadow-glow-blue: 0 0 20px rgba(79, 142, 247, 0.2);
+
+  /* ── NUEVAS: Radios ── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* ── NUEVAS: Transiciones ── */
+  --transition-fast: all 0.15s ease;
+  --transition-base: all 0.2s ease;
+  --transition-slow: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+
   color-scheme: dark;
 }
 
 body.light-mode {
   --bg-base: #f8fafc;
   --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
   --border-subtle: #e2e8f0;
   --border-strong: #cbd5e1;
   --text-main: #334155;
@@ -29,6 +68,28 @@ body.light-mode {
   --text-muted: #64748b;
   --text-secondary: #475569;
   --text-hover: #0f172a;
+
+  /* Acentos claros */
+  --accent-blue: #3b82f6;
+  --accent-blue-dim: rgba(59, 130, 246, 0.1);
+  --accent-blue-glow: rgba(59, 130, 246, 0.2);
+  --accent-purple: #6366f1;
+  --accent-purple-dim: rgba(99, 102, 241, 0.1);
+  --accent-green: #10b981;
+  --accent-green-dim: rgba(16, 185, 129, 0.1);
+  --accent-orange: #f97316;
+  --accent-orange-dim: rgba(249, 115, 22, 0.1);
+  --accent-red: #ef4444;
+  --accent-red-dim: rgba(239, 68, 68, 0.1);
+  --accent-yellow: #f59e0b;
+  --accent-yellow-dim: rgba(245, 158, 11, 0.1);
+
+  /* Sombras claras */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.12);
+  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.15);
+
   color-scheme: light;
 }
 
@@ -53,4 +114,125 @@ html, body {
 
 /* ── Utilidades globales ── */
 .text-muted { color: var(--text-secondary); }
-.text-accent { color: #4F8EF7; }
+.text-accent { color: var(--accent-blue); }
+
+.text-display {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--text-heading), var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Skeleton Loader Global ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 25%,
+    var(--border-strong) 50%,
+    var(--border-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes skeleton-wave {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-text  { height: 14px; margin: 4px 0; }
+.skeleton-title { height: 20px; width: 60%; margin: 4px 0; }
+.skeleton-row   { height: 48px; border-radius: 0; border-bottom: 1px solid var(--border-subtle); }
+
+/* ── Empty State Mejorado ── */
+.empty-state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 60px 20px;
+  text-align: center;
+}
+.empty-icon { width: 80px; height: 80px; opacity: 0.4; margin-bottom: 8px; }
+.empty-title { font-size: 1rem; font-weight: 600; color: var(--text-muted); margin: 0; }
+.empty-desc  { font-size: 0.85rem; color: var(--text-secondary); margin: 0; }
+
+/* ── Mejoras en Tablas de Datos ── */
+tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.015);
+}
+body.light-mode tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.015);
+}
+tbody tr:hover {
+  background: rgba(79, 142, 247, 0.05) !important;
+  cursor: default;
+}
+body.light-mode tbody tr:hover {
+  background: rgba(59, 130, 246, 0.06) !important;
+}
+/* Animaciones de filas eliminadas por rendimiento — ver plan de coherencia */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Form Controls & Focus Rings ── */
+.form-control:focus, input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-glow), 0 1px 4px rgba(0,0,0,0.2);
+  outline: none;
+}
+
+/* ── Botones con Gradiente Animado ── */
+.btn-primary {
+  background: linear-gradient(135deg, #4F8EF7 0%, #7B61FF 100%);
+  background-size: 200% 200%;
+  background-position: 0% 50%;
+  transition: background-position 0.4s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background-position: 100% 50%;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(79, 142, 247, 0.4);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Modales Animados ── */
+.modal-backdrop {
+  animation: fadeIn 0.2s ease;
+}
+.modal-card {
+  animation: modalEnter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes modalEnter {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Utilidades de Animación Global ── */
+.anim-fade { animation: fadeIn 0.3s ease; }
+.anim-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.anim-zoom { animation: zoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes zoomIn  { from { opacity: 0; transform: scale(0.92); }     to { opacity: 1; transform: scale(1); } }
+
+/* Resaltado de badge con pulso */
+.badge-pulse {
+  animation: badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes badge-pop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* Transición suave para cambios de estado en texto */
+.value-change {
+  transition: color 0.3s ease, transform 0.2s ease;
+}

@@ -22,98 +22,117 @@
     </button>
   </div>
 
-  <!-- ── Card de Seguridad 2FA ── -->
-  <div class="form-card security-card" style="margin-bottom: 25px; border-left: 4px solid var(--accent-color, #4f8ef7); background: rgba(79, 142, 247, 0.03);">
-    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <div style="padding: 10px; background: rgba(79, 142, 247, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4f8ef7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
+  <!-- ── Barra compacta de Seguridad 2FA ── -->
+  <div class="security-bar">
+    <div class="security-bar-left">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <span class="security-bar-title">Autenticación de Dos Factores</span>
+      @if (twoFactorEnabled()) {
+        <span class="status-badge active" style="padding: 3px 10px; font-size: 0.72rem;">
+          <span class="dot"></span> Activo
+        </span>
+      } @else {
+        <span class="status-badge inactive" style="padding: 3px 10px; font-size: 0.72rem;">
+          <span class="dot"></span> Inactivo
+        </span>
+      }
+    </div>
+    <div class="security-bar-right">
+      @if (twoFactorEnabled()) {
+        <button class="btn-sm btn-danger" (click)="mostrarFormDesactivar()" [disabled]="loading2fa()">
+          {{ showDisable2faForm() ? 'Cancelar' : 'Desactivar' }}
+        </button>
+      } @else {
+        <button class="btn-sm btn-setup" (click)="iniciar2faSetup()" [disabled]="loading2fa()">
+          @if (loading2fa()) { <span class="spinner-sm"></span> }
+          @else { Configurar }
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Panel de desactivación de 2FA (requiere código TOTP + contraseña) -->
+  @if (showDisable2faForm()) {
+    <div class="disable-2fa-panel" style="animation: fadeIn 0.3s ease-out;">
+      <p class="disable-2fa-text">Para desactivar la autenticación de dos factores, ingresa tu código TOTP y tu contraseña de cuenta:</p>
+      <div class="disable-2fa-fields">
+        <div class="disable-2fa-field">
+          <label>Código 2FA</label>
+          <input
+            type="text"
+            placeholder="000000"
+            maxlength="6"
+            [value]="disable2faCode()"
+            (input)="disable2faCode.set($any($event.target).value)"
+            style="letter-spacing: 0.15em; text-align: center; font-weight: 600;"
+          />
         </div>
-        <div>
-          <h2 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--text-primary, #1e293b);">Autenticación de Doble Factor (2FA - NIST SP 800-53 IA-2(1))</h2>
-          <p style="font-size: 0.82rem; margin: 3px 0 0 0; color: var(--text-secondary, #64748b);">
-            Protege tu cuenta administrativa exigiendo un código TOTP dinámico al iniciar sesión.
-          </p>
+        <div class="disable-2fa-field">
+          <label>Contraseña</label>
+          <input
+            type="password"
+            placeholder="Tu contraseña"
+            [value]="disable2faPassword()"
+            (input)="disable2faPassword.set($any($event.target).value)"
+          />
         </div>
-      </div>
-      <div>
-        @if (twoFactorEnabled()) {
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span class="status-badge active" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
-              <span class="dot"></span> Habilitado (AAL2/AAL3)
-            </span>
-            <button class="btn-primary" style="background-color: #ef4444; border-color: #ef4444; color: white;" (click)="desactivar2fa()" [disabled]="loading2fa()">
-              Desactivar 2FA
-            </button>
-          </div>
-        } @else {
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span class="status-badge inactive" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
-              <span class="dot"></span> Deshabilitado
-            </span>
-            <button class="btn-primary" (click)="iniciar2faSetup()" [disabled]="loading2fa()">
-              @if (loading2fa()) { <span class="spinner-sm"></span> Cargando... }
-              @else { Configurar 2FA }
-            </button>
-          </div>
-        }
+        <button
+          class="btn-primary btn-confirm-disable"
+          (click)="desactivar2fa()"
+          [disabled]="disable2faCode().trim().length !== 6 || !disable2faPassword() || loading2fa()"
+        >
+          @if (loading2fa()) { <span class="spinner-sm"></span> }
+          @else { Confirmar Desactivación }
+        </button>
       </div>
     </div>
+  }
 
-    <!-- Panel de Configuración de 2FA -->
-    @if (show2faSetup()) {
-      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e2e8f0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 25px; animation: fadeIn 0.4s ease-out;">
-        
+  <!-- Panel de Configuración de 2FA (setup) -->
+  @if (show2faSetup()) {
+    <div class="setup-2fa-panel" style="animation: fadeIn 0.4s ease-out;">
+      <div class="setup-2fa-grid">
         <!-- Paso 1: Escanear QR -->
-        <div style="display: flex; flex-direction: column; align-items: center; text-align: center; border-right: 1px solid #e2e8f0; padding-right: 20px;">
-          <span style="font-weight: 700; color: #4f8ef7; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Paso 1: Escanear Código QR</span>
-          <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 15px; max-width: 280px;">
-            Escanea este código con Google Authenticator, Microsoft Authenticator o Authy.
-          </p>
-          <div style="padding: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-            <img [src]="'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + totpQrUri()" alt="Código QR de 2FA" style="display: block; width: 160px; height: 160px;" />
+        <div class="setup-step">
+          <span class="step-label">Paso 1: Escanear QR</span>
+          <p class="step-desc">Escanea con Google Authenticator, Microsoft Authenticator o Authy.</p>
+          <div style="padding: 8px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; display: inline-block;">
+            <img [src]="'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + totpQrUri()" alt="Código QR de 2FA" style="display: block; width: 140px; height: 140px;" />
           </div>
         </div>
 
-        <!-- Paso 2: Ingresar Clave Manual -->
-        <div style="display: flex; flex-direction: column; justify-content: center; text-align: center; border-right: 1px solid #e2e8f0; padding-right: 20px;">
-          <span style="font-weight: 700; color: #4f8ef7; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Paso 2: Registro Manual</span>
-          <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 10px;">
-            Si no puedes escanear el QR, ingresa esta clave secreta manualmente en tu aplicación:
-          </p>
-          <div style="padding: 10px 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #334155; text-align: center; letter-spacing: 0.1em; margin-bottom: 15px; user-select: all;">
-            {{ totpSecret() }}
-          </div>
+        <!-- Paso 2: Clave Manual -->
+        <div class="setup-step">
+          <span class="step-label">Paso 2: Clave Manual</span>
+          <p class="step-desc">Si no puedes escanear el QR, ingresa esta clave en tu app:</p>
+          <div class="totp-secret-display">{{ totpSecret() }}</div>
         </div>
 
         <!-- Paso 3: Confirmar Código -->
-        <div style="display: flex; flex-direction: column; justify-content: center; padding-left: 10px;">
-          <span style="font-weight: 700; color: #4f8ef7; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Paso 3: Validar e Activar</span>
-          <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 15px;">
-            Ingresa el código temporal de 6 dígitos que muestra tu app para confirmar el enlace:
-          </p>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <input 
-              type="text" 
-              placeholder="000000" 
-              maxlength="6" 
-              [value]="totpCode()" 
-              (input)="totpCode.set($any($event.target).value)" 
-              style="width: 120px; text-align: center; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.15em; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: var(--input-bg, white); color: var(--text-primary);" 
+        <div class="setup-step">
+          <span class="step-label">Paso 3: Validar</span>
+          <p class="step-desc">Ingresa el código de 6 dígitos de tu app:</p>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input
+              type="text"
+              placeholder="000000"
+              maxlength="6"
+              [value]="totpCode()"
+              (input)="totpCode.set($any($event.target).value)"
+              class="totp-input"
             />
-            <button class="btn-primary" (click)="confirmar2fa()" [disabled]="totpCode().trim().length !== 6 || loading2fa()">
+            <button class="btn-primary" (click)="confirmar2fa()" [disabled]="totpCode().trim().length !== 6 || loading2fa()" style="white-space: nowrap;">
               @if (loading2fa()) { <span class="spinner-sm"></span> }
-              @else { Activar 2FA }
+              @else { Activar }
             </button>
           </div>
         </div>
-
       </div>
-    @}
-  </div>
+    </div>
+  }
 
   <!-- ── Mensajes globales ── -->
   @if (successMsg()) {
@@ -155,6 +174,15 @@
             @if (form.get('email')?.invalid && form.get('email')?.touched) {
               <span class="field-error">Ingresa un email válido.</span>
             }
+            @if (emailExiste()) {
+              <span class="field-error" style="color: #f87171; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Este correo ya está registrado en el sistema.
+              </span>
+            }
           </div>
         </div>
         <div class="form-row">
@@ -195,7 +223,7 @@
         </div>
         <div class="form-actions">
           <button type="button" class="btn-ghost" (click)="toggleForm()">Cancelar</button>
-          <button id="btn-guardar-usuario" type="submit" class="btn-primary" [disabled]="form.invalid || guardando()">
+          <button id="btn-guardar-usuario" type="submit" class="btn-primary" [disabled]="form.invalid || guardando() || emailExiste()">
             @if (guardando()) { <span class="spinner-sm"></span> Guardando... }
             @else { Crear Usuario }
           </button>
@@ -335,5 +363,21 @@
       </div>
     }
   </div>
+
+  <!-- Modal de Confirmación -->
+  @if (confirmModalVisible()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="modal-title" style="margin-bottom: 12px; font-size: 1.1rem;">Confirmar Acción</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">
+          {{ confirmModalMessage() }}
+        </p>
+        <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button class="btn-secondary" (click)="cancelarConfirmacion()">Cancelar</button>
+          <button class="btn-primary" (click)="confirmarAccion()">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  }
 
 </div>

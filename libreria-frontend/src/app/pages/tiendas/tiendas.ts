@@ -1,15 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
-import { environment } from '../../../environments/environment';
-
-interface Tienda {
-  id_tienda: number;
-  nombre: string;
-  direccion: string;
-  telefono: string;
-  estado: string;
-}
+import { TiendasService, Tienda } from '../../core/services/tiendas.service';
 
 @Component({
   selector: 'app-tiendas',
@@ -19,9 +10,8 @@ interface Tienda {
   styleUrl: './tiendas.css',
 })
 export class Tiendas implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly tiendasService = inject(TiendasService);
   private readonly fb   = inject(FormBuilder);
-  private readonly api  = `${environment.apiUrl}/tiendas`;
 
   readonly tiendas      = signal<Tienda[]>([]);
   readonly cargando     = signal(true);
@@ -37,12 +27,16 @@ export class Tiendas implements OnInit {
   readonly telefonoEditado  = signal('');
   readonly estadoEditado    = signal('');
 
-  // Formulario de nueva tienda
   readonly form = this.fb.group({
     nombre:    ['', [Validators.required, Validators.minLength(3)]],
     direccion: [''],
     telefono:  ['']
   });
+
+  // Modal de Confirmación
+  readonly confirmModalVisible = signal(false);
+  readonly confirmModalMessage = signal('');
+  private confirmAction: (() => void) | null = null;
 
   ngOnInit(): void {
     this.cargarTiendas();
@@ -52,7 +46,7 @@ export class Tiendas implements OnInit {
   cargarTiendas(): void {
     this.cargando.set(true);
     this.errorMsg.set('');
-    this.http.get<Tienda[]>(this.api).subscribe({
+    this.tiendasService.getTiendas().subscribe({
       next: (data) => {
         this.tiendas.set(data);
         this.cargando.set(false);
@@ -71,7 +65,7 @@ export class Tiendas implements OnInit {
     this.errorMsg.set('');
     this.successMsg.set('');
 
-    this.http.post<{ mensaje: string; id_tienda: number }>(this.api, this.form.value).subscribe({
+    this.tiendasService.crearTienda(this.form.value as Partial<Tienda>).subscribe({
       next: (res) => {
         this.successMsg.set(`✓ ${res.mensaje}`);
         this.mostrarForm.set(false);
@@ -116,7 +110,7 @@ export class Tiendas implements OnInit {
       estado: this.estadoEditado()
     };
 
-    this.http.put<{ mensaje: string }>(`${this.api}?id=${t.id_tienda}`, payload).subscribe({
+    this.tiendasService.actualizarTienda(t.id_tienda, payload).subscribe({
       next: (res) => {
         this.successMsg.set(`✓ ${res.mensaje}`);
         this.cancelarEdicion();
@@ -132,41 +126,57 @@ export class Tiendas implements OnInit {
   // ─── Activar / Desactivar Tienda ───────────────────────────────────────────
   toggleEstado(t: Tienda): void {
     const nuevoEstado = t.estado === 'activa' ? 'inactiva' : 'activa';
-    const confirmar = `¿${nuevoEstado === 'inactiva' ? 'Desactivar' : 'Reactivar'} la tienda "${t.nombre}"?`;
-    if (!confirm(confirmar)) return;
+    this.confirmModalMessage.set(`¿${nuevoEstado === 'inactiva' ? 'Desactivar' : 'Reactivar'} la tienda "${t.nombre}"?`);
+    
+    this.confirmAction = () => {
+      this.errorMsg.set('');
+      this.successMsg.set('');
 
-    this.errorMsg.set('');
-    this.successMsg.set('');
+      if (nuevoEstado === 'inactiva') {
+        this.tiendasService.desactivarTienda(t.id_tienda).subscribe({
+          next: (res) => {
+            this.successMsg.set(`✓ ${res.mensaje}`);
+            this.cargarTiendas();
+            this.confirmModalVisible.set(false);
+          },
+          error: (err) => {
+            this.errorMsg.set(err?.error?.error ?? 'Error al desactivar la tienda.');
+            this.confirmModalVisible.set(false);
+          }
+        });
+      } else {
+        const payload = {
+          nombre: t.nombre,
+          direccion: t.direccion,
+          telefono: t.telefono,
+          estado: 'activa'
+        };
+        this.tiendasService.actualizarTienda(t.id_tienda, payload).subscribe({
+          next: (res) => {
+            this.successMsg.set(`✓ ${res.mensaje}`);
+            this.cargarTiendas();
+            this.confirmModalVisible.set(false);
+          },
+          error: (err) => {
+            this.errorMsg.set(err?.error?.error ?? 'Error al reactivar la tienda.');
+            this.confirmModalVisible.set(false);
+          }
+        });
+      }
+    };
+    this.confirmModalVisible.set(true);
+  }
 
-    if (nuevoEstado === 'inactiva') {
-      // Usamos el endpoint DELETE para la baja lógica
-      this.http.delete<{ mensaje: string }>(`${this.api}?id=${t.id_tienda}`).subscribe({
-        next: (res) => {
-          this.successMsg.set(`✓ ${res.mensaje}`);
-          this.cargarTiendas();
-        },
-        error: (err) => {
-          this.errorMsg.set(err?.error?.error ?? 'Error al desactivar la tienda.');
-        }
-      });
-    } else {
-      // Para reactivar usamos PUT
-      const payload = {
-        nombre: t.nombre,
-        direccion: t.direccion,
-        telefono: t.telefono,
-        estado: 'activa'
-      };
-      this.http.put<{ mensaje: string }>(`${this.api}?id=${t.id_tienda}`, payload).subscribe({
-        next: (res) => {
-          this.successMsg.set(`✓ ${res.mensaje}`);
-          this.cargarTiendas();
-        },
-        error: (err) => {
-          this.errorMsg.set(err?.error?.error ?? 'Error al reactivar la tienda.');
-        }
-      });
+  // ─── Acciones del Modal de Confirmación ─────────────────────────────────────
+  confirmarAccion(): void {
+    if (this.confirmAction) {
+      this.confirmAction();
     }
+  }
+
+  cancelarConfirmacion(): void {
+    this.confirmModalVisible.set(false);
+    this.confirmAction = null;
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

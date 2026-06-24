@@ -35,6 +35,8 @@ export interface LoginResponse {
   id_usuario?: number;
   expires_at?: string;
   two_factor_required?: boolean;
+  email_verification_required?: boolean;
+  email_hint?: string;
 }
 
 // Credenciales enviadas al backend
@@ -42,6 +44,7 @@ export interface LoginCredentials {
   email: string;
   password: string;
   two_factor_code?: string;
+  verification_code?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -149,9 +152,14 @@ export class AuthService {
     return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/enable`, { code });
   }
 
-  /** Deshabilita 2FA validando un código de 6 dígitos. */
-  disable2fa(code: string): Observable<{ mensaje: string }> {
-    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/disable`, { code });
+  /** Deshabilita 2FA validando un código de 6 dígitos y la contraseña. */
+  disable2fa(code: string, password: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/2fa/disable`, { code, password });
+  }
+
+  /** Reenvía el código de verificación de email. */
+  reenviarCodigo(email: string): Observable<{ mensaje: string }> {
+    return this.http.post<{ mensaje: string }>(`${environment.apiUrl}/auth/reenviar-codigo`, { email });
   }
 
   /**

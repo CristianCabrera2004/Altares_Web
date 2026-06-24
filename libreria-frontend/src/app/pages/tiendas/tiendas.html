@@ -204,4 +204,20 @@
     }
   </div>
 
+  <!-- Modal de Confirmación -->
+  @if (confirmModalVisible()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="modal-title" style="margin-bottom: 12px; font-size: 1.1rem;">Confirmar Acción</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">
+          {{ confirmModalMessage() }}
+        </p>
+        <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button class="btn-secondary" (click)="cancelarConfirmacion()">Cancelar</button>
+          <button class="btn-primary" (click)="confirmarAccion()">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  }
+
 </div>

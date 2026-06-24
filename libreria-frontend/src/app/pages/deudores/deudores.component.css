@@ -121,3 +121,23 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .text-muted { color: var(--text-secondary); font-size: 0.8rem; }
+
+/* ── Debt Progress Bar ── */
+.debt-bar-wrapper {
+  height: 4px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+  width: 100%;
+  min-width: 80px;
+}
+.debt-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #22c55e);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+.debt-bar-fill.bar-full {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}

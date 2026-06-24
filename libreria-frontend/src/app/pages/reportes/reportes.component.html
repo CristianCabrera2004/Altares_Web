@@ -85,7 +85,7 @@
         <tbody>
           @for (item of items(); track $index) {
             <tr>
-              <td>{{ item.fecha_venta }}</td>
+              <td>{{ formatDate(item.fecha_venta) }}</td>
               <td class="product-name">{{ item.producto }}</td>
               <td><span class="badge">{{ item.categoria }}</span></td>
               <td class="text-right">{{ item.cantidad }}</td>

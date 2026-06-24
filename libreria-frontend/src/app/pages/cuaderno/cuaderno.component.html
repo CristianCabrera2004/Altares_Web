@@ -26,6 +26,12 @@
           <strong class="total-amount">{{ currency(r.total) }}</strong>
         </div>
       </div>
+      @if (clienteNuevoMsg()) {
+        <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(79, 142, 247, 0.08); border: 1px solid rgba(79, 142, 247, 0.2); border-radius: 10px; margin-bottom: 16px; font-size: 0.85rem; color: #4F8EF7; animation: fadeIn 0.3s ease;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          {{ clienteNuevoMsg() }}
+        </div>
+      }
       <button id="btn-nuevo-cuaderno" class="btn-primary" (click)="nuevoCuaderno()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -74,29 +80,48 @@
             </label>
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #a0a8bb; font-size: 0.85rem;">
               <input type="radio" name="tipoFactura" value="digital" [checked]="tipoFactura() === 'digital'" (change)="tipoFactura.set('digital')" style="accent-color: #22c55e;">
-              Factura Digital
+              Factura Digital (envío por correo)
             </label>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="arqueo-field" style="margin-bottom: 0;">
+            <div class="arqueo-field" style="margin-bottom: 0; position: relative;">
               <label>RUC / CI</label>
-              <input type="text" placeholder="Identificación..." [value]="clienteIdentificacion()" (input)="clienteIdentificacion.set($any($event.target).value)" />
+              <div style="position: relative;">
+                <input type="text" placeholder="Ej: 1723456789" [value]="clienteIdentificacion()" 
+                  (input)="clienteIdentificacion.set($any($event.target).value); buscarClientePorCedula()"
+                  maxlength="13"
+                  style="padding-right: 36px;" />
+                @if (buscandoCliente()) {
+                  <div style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border: 2px solid var(--border-strong); border-top-color: #4F8EF7; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                }
+              </div>
+              @if (clienteEncontrado()) {
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 10px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 8px; font-size: 0.78rem; color: #22c55e;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+                  Cliente encontrado — campos llenados automáticamente
+                </div>
+              }
+              @if (!clienteEncontrado() && !buscandoCliente() && (clienteIdentificacion().length === 10 || clienteIdentificacion().length === 13)) {
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 10px; background: rgba(79, 142, 247, 0.08); border: 1px solid rgba(79, 142, 247, 0.15); border-radius: 8px; font-size: 0.78rem; color: #4F8EF7;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  Nuevo cliente — complete los datos para registrarlo
+                </div>
+              }
             </div>
             <div class="arqueo-field" style="margin-bottom: 0;">
               <label>Nombre / Razón Social</label>
-              <input type="text" placeholder="Nombre completo..." [value]="clienteNombre()" (input)="clienteNombre.set($any($event.target).value)" />
+              <input type="text" placeholder="Nombre completo..." [value]="clienteNombre()" (input)="clienteNombre.set($any($event.target).value)" [readOnly]="clienteEncontrado()"
+                [style.opacity]="clienteEncontrado() ? '0.7' : '1'" />
             </div>
-            @if (tipoFactura() === 'digital') {
-              <div class="arqueo-field" style="margin-bottom: 0;">
-                <label>Correo Electrónico</label>
-                <input type="email" placeholder="correo@ejemplo.com" [value]="clienteCorreo()" (input)="clienteCorreo.set($any($event.target).value)" />
-              </div>
-              <div class="arqueo-field" style="margin-bottom: 0;">
-                <label>Teléfono (opcional)</label>
-                <input type="text" placeholder="099..." [value]="clienteTelefono()" (input)="clienteTelefono.set($any($event.target).value)" />
-              </div>
-            }
+            <div class="arqueo-field" style="margin-bottom: 0;">
+              <label>Correo Electrónico {{ tipoFactura() === 'digital' ? '(requerido para envío)' : '(opcional)' }}</label>
+              <input type="email" placeholder="correo@ejemplo.com" [value]="clienteCorreo()" (input)="clienteCorreo.set($any($event.target).value)" />
+            </div>
+            <div class="arqueo-field" style="margin-bottom: 0;">
+              <label>Teléfono (opcional)</label>
+              <input type="text" placeholder="099..." [value]="clienteTelefono()" (input)="clienteTelefono.set($any($event.target).value)" />
+            </div>
           </div>
         }
       </div>
@@ -448,4 +473,21 @@
     </div>
 
   </div><!-- /cuaderno-layout -->
+
+  <!-- Modal de Confirmación Global -->
+  @if (confirmModalVisible()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <h3 class="modal-title" style="margin-bottom: 12px; font-size: 1.1rem;">Confirmar Acción</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; white-space: pre-line;">
+          {{ confirmModalMessage() }}
+        </p>
+        <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button class="btn-ghost" (click)="cancelarConfirmacion()">Cancelar</button>
+          <button class="btn-confirm" (click)="confirmarAccion()">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  }
+
 </div><!-- /page -->

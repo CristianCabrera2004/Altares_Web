@@ -100,6 +100,12 @@ export const routes: Routes = [
           import('./pages/predicciones/predicciones.component').then(m => m.PrediccionesComponent),
         title: 'Predicciones · Los Altares'
       },
+      {
+        path: 'transferencias',
+        loadComponent: () =>
+          import('./pages/transferencias/transferencias.component').then(m => m.TransferenciasComponent),
+        title: 'Transferencias · Los Altares'
+      },
 
       // ── RUTAS DEL ADMINISTRADOR ───────────────────────────────────────────
       // adminGuard bloquea al operador y lo redirige a /dashboard

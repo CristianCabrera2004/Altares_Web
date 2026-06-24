@@ -4,6 +4,13 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     <div class="orb orb-3"></div>
+    <div class="particles">
+      <div class="particle" style="top:20%;left:15%;animation-delay:0s"></div>
+      <div class="particle" style="top:60%;left:80%;animation-delay:1.5s"></div>
+      <div class="particle" style="top:40%;left:45%;animation-delay:3s"></div>
+      <div class="particle" style="top:80%;left:25%;animation-delay:2s"></div>
+      <div class="particle" style="top:10%;left:70%;animation-delay:4s"></div>
+    </div>
   </div>
 
   <div class="login-card">
@@ -29,7 +36,91 @@
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form" novalidate>
 
-      @if (!twoFactorRequired()) {
+      @if (emailVerificationRequired()) {
+        <!-- ── Vista de Verificación de Email ── -->
+        <div class="field-group" style="animation: fadeIn 0.4s ease-out; text-align: center;">
+          <div style="margin-bottom: 20px; display: inline-block; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 50%;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <h2 style="font-size: 1.25rem; color: #1e293b; margin: 0 0 8px 0; font-weight: 700;">Verificación de Correo</h2>
+          <p style="font-size: 0.82rem; color: #64748b; margin: 0 0 6px 0; line-height: 1.4;">
+            Hemos enviado un código de 6 dígitos a:
+          </p>
+          <p style="font-size: 0.88rem; color: #334155; font-weight: 600; margin: 0 0 20px 0;">
+            {{ emailHint() }}
+          </p>
+
+          <div class="input-wrapper">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <input
+              id="verification_code"
+              type="text"
+              formControlName="verification_code"
+              placeholder="000000"
+              maxlength="6"
+              style="letter-spacing: 0.25em; font-size: 1.25rem; text-align: center; font-weight: 700;"
+              autocomplete="one-time-code"
+              [class.invalid]="form.get('verification_code')?.invalid && form.get('verification_code')?.touched"
+            />
+          </div>
+          @if (form.get('verification_code')?.invalid && form.get('verification_code')?.touched) {
+            <span class="field-error">Ingresa un código numérico válido de 6 dígitos.</span>
+          }
+
+          <button type="button" class="resend-link" (click)="reenviarCodigo()" style="margin-top: 14px; background: none; border: none; color: #4F8EF7; font-size: 0.82rem; cursor: pointer; text-decoration: underline; font-weight: 500;">
+            ¿No recibiste el código? Reenviar
+          </button>
+
+          @if (reenvioMsg()) {
+            <div style="margin-top: 8px; font-size: 0.8rem; color: #10b981; font-weight: 500;">
+              {{ reenvioMsg() }}
+            </div>
+          }
+        </div>
+
+      } @else if (twoFactorRequired()) {
+        <!-- ── Vista de 2FA (TOTP) ── -->
+        <div class="field-group 2fa-container" style="animation: fadeIn 0.4s ease-out; text-align: center;">
+          <div style="margin-bottom: 20px; display: inline-block; padding: 12px; background: rgba(79, 142, 247, 0.1); border-radius: 50%;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4F8EF7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="11" width="14" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h2 style="font-size: 1.35rem; color: #1e293b; margin: 0 0 8px 0; font-weight: 700;">Verificación de 2FA</h2>
+          <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 20px 0; line-height: 1.4;">
+            Ingresa el código temporal de 6 dígitos de tu app autenticadora.
+          </p>
+
+          <div class="input-wrapper">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v8M8 12h8"/>
+            </svg>
+            <input
+              id="two_factor_code"
+              type="text"
+              formControlName="two_factor_code"
+              placeholder="000000"
+              maxlength="6"
+              style="letter-spacing: 0.25em; font-size: 1.25rem; text-align: center; font-weight: 700;"
+              autocomplete="one-time-code"
+              [class.invalid]="form.get('two_factor_code')?.invalid && form.get('two_factor_code')?.touched"
+            />
+          </div>
+          @if (form.get('two_factor_code')?.invalid && form.get('two_factor_code')?.touched) {
+            <span class="field-error">Ingresa un código numérico válido de 6 dígitos.</span>
+          }
+        </div>
+
+      } @else {
+        <!-- ── Vista de Login Normal ── -->
         <div class="field-group">
           <label for="email">Correo electrónico</label>
           <div class="input-wrapper">
@@ -41,7 +132,7 @@
               id="email"
               type="email"
               formControlName="email"
-              placeholder="admin@losaltares.com"
+              placeholder="correo@ejemplo.com"
               autocomplete="email"
               [class.invalid]="form.get('email')?.invalid && form.get('email')?.touched"
             />
@@ -85,39 +176,6 @@
             <span class="field-error">La contraseña debe tener al menos 6 caracteres.</span>
           }
         </div>
-      } @else {
-        <div class="field-group 2fa-container" style="animation: fadeIn 0.4s ease-out; text-align: center;">
-          <div style="margin-bottom: 20px; display: inline-block; padding: 12px; background: rgba(79, 142, 247, 0.1); border-radius: 50%;">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4F8EF7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="5" y="11" width="14" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-          </div>
-          <h2 style="font-size: 1.35rem; color: #1e293b; margin: 0 0 8px 0; font-weight: 700;">Verificación de 2FA</h2>
-          <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 20px 0; line-height: 1.4;">
-            Ingresa el código temporal de 6 dígitos de tu app autenticadora.
-          </p>
-
-          <div class="input-wrapper">
-            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 8v8M8 12h8"/>
-            </svg>
-            <input
-              id="two_factor_code"
-              type="text"
-              formControlName="two_factor_code"
-              placeholder="000000"
-              maxlength="6"
-              style="letter-spacing: 0.25em; font-size: 1.25rem; text-align: center; font-weight: 700;"
-              autocomplete="one-time-code"
-              [class.invalid]="form.get('two_factor_code')?.invalid && form.get('two_factor_code')?.touched"
-            />
-          </div>
-          @if (form.get('two_factor_code')?.invalid && form.get('two_factor_code')?.touched) {
-            <span class="field-error">Ingresa un código numérico válido de 6 dígitos.</span>
-          }
-        </div>
       }
 
       @if (errorMsg()) {
@@ -142,7 +200,7 @@
           <span class="spinner"></span>
           Verificando...
         } @else {
-          {{ twoFactorRequired() ? 'Confirmar y Acceder' : 'Iniciar Sesión' }}
+          {{ emailVerificationRequired() ? 'Verificar y Acceder' : twoFactorRequired() ? 'Confirmar y Acceder' : 'Iniciar Sesión' }}
         }
       </button>
     </form>

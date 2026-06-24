@@ -51,6 +51,9 @@ func main() {
 	// POST /api/auth/login            → BCrypt verify + JWT HS256 8h (CA 51, 52)
 	mux.HandleFunc("/api/auth/login", onlyMethod(http.MethodPost, handlers.LoginHandler(db)))
 
+	// POST /api/auth/reenviar-codigo  → Reenvía código de verificación de email (público)
+	mux.HandleFunc("/api/auth/reenviar-codigo", onlyMethod(http.MethodPost, handlers.ReenviarCodigoHandler(db)))
+
 	// POST /api/auth/logout           → Invalida sesión activa en seguridad.sesiones
 	mux.HandleFunc("/api/auth/logout", middleware.RequireAuth(db, handlers.LogoutHandler(db)))
 
@@ -80,6 +83,10 @@ func main() {
 	mux.HandleFunc("/api/inventario/ingreso", middleware.RequireRole(db, "operador_caja")(handlers.IngresoHandler(db)))
 	mux.HandleFunc("/api/inventario/baja", middleware.RequireRole(db, "operador_caja")(handlers.BajaHandler(db)))
 	mux.HandleFunc("/api/inventario/movimientos", middleware.RequireRole(db, "operador_caja")(handlers.MovimientosHandler(db)))
+	mux.HandleFunc("/api/inventario/transferencias/responder", middleware.RequireRole(db, "operador_caja")(handlers.ResponderTransferenciaHandler(db)))
+	mux.HandleFunc("/api/inventario/transferencias/confirmar-parcial", middleware.RequireRole(db, "operador_caja")(handlers.ConfirmarParcialTransferenciaHandler(db)))
+	mux.HandleFunc("/api/inventario/transferencias/recibir", middleware.RequireRole(db, "operador_caja")(handlers.RecibirTransferenciaHandler(db)))
+	mux.HandleFunc("/api/inventario/transferencias", middleware.RequireRole(db, "operador_caja")(handlers.TransferenciasHandler(db)))
 
 	// ─── HU-04: Devoluciones ──────────────────────────────────────────────────
 	mux.HandleFunc("/api/devoluciones", middleware.RequireRole(db, "operador_caja")(handlers.DevolucionHandler(db)))
@@ -99,11 +106,15 @@ func main() {
 
 	// ─── HU-07: Reportes (Solo Operador) ─────────────────────────────────────
 	mux.HandleFunc("/api/reportes/ventas", middleware.RequireRole(db, "operador_caja")(handlers.ReportesVentasHandler(db)))
+	// GET /api/dashboard/grafica -> Reportes Gráficos
 	mux.HandleFunc("/api/dashboard/grafica", middleware.RequireRole(db, "operador_caja")(handlers.ReporteGraficaHandler(db)))
 
 	// ─── Gestión de Usuarios y Tiendas (Solo Administrador) ───────────────────
+	mux.HandleFunc("/api/usuarios/verificar-email", middleware.RequireRole(db, "admin_libreria")(handlers.VerificarEmailHandler(db)))
 	mux.HandleFunc("/api/usuarios", middleware.RequireRole(db, "admin_libreria")(handlers.UserHandler(db)))
+	mux.HandleFunc("/api/tiendas/activas", middleware.RequireRole(db, "operador_caja")(handlers.TiendasActivasHandler(db)))
 	mux.HandleFunc("/api/tiendas", middleware.RequireRole(db, "admin_libreria")(handlers.TiendaHandler(db)))
+
 
 	// ─── HT-03: Motor de Predicción Analítica (Solo Operador) ────────────────
 	mux.HandleFunc("/api/predicciones/lista-compras", middleware.RequireRole(db, "operador_caja")(handlers.PredictionHandler(db)))
@@ -175,13 +186,20 @@ func onlyMethod(method string, h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// corsMiddleware habilita el acceso desde Angular (localhost:4200) y cualquier
-// cliente de desarrollo. Responde correctamente a las peticiones OPTIONS (preflight).
+// corsMiddleware habilita el acceso desde Angular y permite configurar el
+// origen permitido mediante la variable de entorno ALLOWED_ORIGIN.
+// En desarrollo, si ALLOWED_ORIGIN no está definido, se permite '*'.
+// En producción, configurar: ALLOWED_ORIGIN=https://tu-dominio.com
 func corsMiddleware(next http.Handler) http.Handler {
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "*" // solo para desarrollo
+		log.Println("⚠️  CORS: ALLOWED_ORIGIN no configurado, usando '*' (solo válido en desarrollo)")
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("📥 %s %s", r.Method, r.URL.Path)
 
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 

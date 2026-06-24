@@ -33,7 +33,25 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  animation: fadeSlideUp 0.4s ease both;
+  cursor: default;
 }
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+.kpi-card:nth-child(1) { animation-delay: 0ms; }
+.kpi-card:nth-child(2) { animation-delay: 80ms; }
+.kpi-card:nth-child(3) { animation-delay: 160ms; }
+.kpi-card:nth-child(4) { animation-delay: 240ms; }
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .kpi-icon {
   width: 44px; height: 44px;
   border-radius: 12px;
@@ -47,8 +65,63 @@
 .kpi-icon.purple { background: rgba(167,139,250,0.15); color: #a78bfa; }
 
 .kpi-info { display: flex; flex-direction: column; }
-.kpi-label { font-size: 0.75rem; color: var(--text-secondary); }
-.kpi-value { font-size: 1.4rem; font-weight: 700; color: var(--text-heading); }
+.kpi-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: 1;
+  margin-top: 4px;
+  letter-spacing: -0.02em;
+}
+
+/* ── Chart Section Improvements ── */
+.chart-section {
+  margin-top: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 20px;
+  animation: fadeSlideUp 0.4s ease 0.3s both;
+}
+.chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.periodo-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.periodo-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--border-subtle);
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+.periodo-btn.active,
+.periodo-btn:hover {
+  background: rgba(79, 142, 247, 0.15);
+  border-color: #4F8EF7;
+  color: #4F8EF7;
+}
 
 /* ── Empty State ── */
 .empty-state {

@@ -81,22 +81,25 @@
     </div>
 
     @if (cargando()) {
-      <div class="loading-state">
-        <div class="spinner-lg"></div>
-        <span>Cargando catálogo...</span>
+      <div class="table-wrapper">
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
       </div>
     } @else if (productosFiltrados().length === 0 && !errorMsg()) {
-      <div class="empty-state">
-        <svg viewBox="0 0 64 64" fill="none" width="52">
-          <rect x="10" y="14" width="44" height="44" rx="6" stroke="var(--border-subtle)" stroke-width="2"/>
-          <path d="M22 14V10a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4" stroke="#4F8EF7" stroke-width="2"/>
-          <line x1="22" y1="30" x2="42" y2="30" stroke="#4F8EF7" stroke-width="2"/>
-          <line x1="22" y1="38" x2="35" y2="38" stroke="#4F8EF7" stroke-width="2" opacity="0.5"/>
+      <div class="empty-state-box">
+        <svg viewBox="0 0 80 80" fill="none" class="empty-icon">
+          <circle cx="40" cy="40" r="38" stroke="var(--border-strong)" stroke-width="2" stroke-dasharray="4 4"/>
+          <path d="M25 50 L40 30 L55 50 Z" stroke="var(--border-strong)" stroke-width="2" fill="none" stroke-linejoin="round"/>
+          <circle cx="40" cy="55" r="3" fill="var(--border-strong)"/>
         </svg>
+        <p class="empty-title">Sin registros</p>
         @if (busqueda()) {
-          <p>No se encontraron productos para "{{ busqueda() }}".</p>
+          <p class="empty-desc">No se encontraron productos para "{{ busqueda() }}".</p>
         } @else {
-          <p>No hay productos registrados. ¡Ingresa el primero!</p>
+          <p class="empty-desc">No hay productos registrados. ¡Ingresa el primero!</p>
         }
       </div>
     } @else {
@@ -557,6 +560,22 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+}
+
+<!-- Modal de Confirmación Global -->
+@if (confirmModalVisible()) {
+  <div class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title" style="margin-bottom: 12px; font-size: 1.1rem;">Confirmar Acción</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; white-space: pre-line;">
+        {{ confirmModalMessage() }}
+      </p>
+      <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn-secondary" (click)="cancelarConfirmacion()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmarAccion()">Confirmar</button>
+      </div>
     </div>
   </div>
 }

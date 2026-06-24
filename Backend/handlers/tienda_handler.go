@@ -136,3 +136,41 @@ func deleteTienda(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{"mensaje": "Tienda desactivada exitosamente."})
 }
+
+// TiendasActivasHandler lista solo las sucursales con estado 'activa'.
+// Accesible para operadores y administradores.
+func TiendasActivasHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Solo se acepta GET en este endpoint."})
+			return
+		}
+
+		rows, err := db.Query(`
+			SELECT id_tienda, nombre, COALESCE(direccion, ''), COALESCE(telefono, ''), estado 
+			FROM configuracion.tiendas 
+			WHERE estado = 'activa' 
+			ORDER BY nombre ASC`)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar las tiendas activas."})
+			return
+		}
+		defer rows.Close()
+
+		var tiendas []Tienda
+		for rows.Next() {
+			var t Tienda
+			if err := rows.Scan(&t.IdTienda, &t.Nombre, &t.Direccion, &t.Telefono, &t.Estado); err == nil {
+				tiendas = append(tiendas, t)
+			}
+		}
+		if tiendas == nil {
+			tiendas = []Tienda{}
+		}
+		json.NewEncoder(w).Encode(tiendas)
+	}
+}
+

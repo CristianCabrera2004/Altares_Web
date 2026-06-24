@@ -1,7 +1,7 @@
 // src/app/shared/layout/layout.component.ts
 // Shell principal con sidebar y router-outlet para las vistas internas.
-import { Component, inject, signal } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, inject, signal, computed } from '@angular/core';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { UpperCasePipe } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -13,11 +13,17 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class LayoutComponent {
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   readonly nombre = signal(this.authService.getNombre() ?? 'Usuario');
   readonly rol = signal(this.authService.getRol() ?? '');
   readonly isAdmin = signal(this.authService.isAdmin());
-  readonly nombreTienda = signal(this.authService.getNombreTienda() ?? 'Todas las tiendas');
+  
+  readonly rawNombreTienda = signal(this.authService.getNombreTienda() ?? 'Todas las tiendas');
+  readonly nombreTienda = computed(() => {
+    return this.rawNombreTienda().replace(/^Los Altares\s*-\s*/i, '');
+  });
+  
   readonly sidebarOpen = signal(true);
 
   // Inicializa el tema desde localStorage para persistir entre recargas
@@ -30,6 +36,26 @@ export class LayoutComponent {
     if (typeof document !== 'undefined' && this.isLightMode()) {
       document.body.classList.add('light-mode');
     }
+  }
+
+  getPageTitle(): string {
+    const url = this.router.url;
+    const map: Record<string, string> = {
+      '/dashboard': 'Dashboard',
+      '/cuaderno': 'Facturación',
+      '/inventario': 'Inventario',
+      '/devoluciones': 'Devoluciones',
+      '/bajas': 'Bajas por Merma',
+      '/reportes': 'Reportes',
+      '/clientes': 'Clientes',
+      '/deudores': 'Deudores',
+      '/predicciones': 'Predicciones',
+      '/transferencias': 'Transferencias',
+      '/usuarios': 'Usuarios',
+      '/usuarios/auditoria': 'Auditoría',
+      '/tiendas': 'Tiendas',
+    };
+    return map[url] ?? 'Los Altares';
   }
 
   toggleSidebar(): void {

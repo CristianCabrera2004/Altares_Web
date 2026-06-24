@@ -16,6 +16,8 @@ import { HttpClient } from '@angular/common/http';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, filter } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 interface Usuario {
   id_usuario: number;
@@ -55,6 +57,12 @@ export class UsuariosComponent implements OnInit {
   readonly mostrarForm  = signal(false);
   readonly guardando    = signal(false);
 
+  // Modal de Confirmación
+  readonly confirmModalVisible = signal(false);
+  readonly confirmModalMessage = signal('');
+  private confirmAction: (() => void) | null = null;
+  readonly emailExiste  = signal(false); // Estado para validar email duplicado
+
   // Señales de 2FA para el usuario activo
   readonly twoFactorEnabled = signal(false);
   readonly show2faSetup     = signal(false);
@@ -62,6 +70,11 @@ export class UsuariosComponent implements OnInit {
   readonly totpQrUri        = signal('');
   readonly totpCode         = signal('');
   readonly loading2fa       = signal(false);
+
+  // Señales para desactivación de 2FA (formulario inline con código + contraseña)
+  readonly showDisable2faForm = signal(false);
+  readonly disable2faCode     = signal('');
+  readonly disable2faPassword = signal('');
 
   // Tiendas
   readonly tiendas      = signal<Tienda[]>([]);
@@ -85,6 +98,22 @@ export class UsuariosComponent implements OnInit {
     this.cargarUsuarios();
     this.cargarTiendas();
     this.cargarPerfil();
+    this.setupEmailValidation();
+  }
+
+  setupEmailValidation(): void {
+    this.form.get('email')?.valueChanges.pipe(
+      debounceTime(500),
+      distinctUntilChanged(),
+      filter(val => !!val && this.form.get('email')!.valid),
+      switchMap(email => 
+        this.http.get<{existe: boolean}>(`${this.api}/verificar-email?email=${encodeURIComponent(email!)}`).pipe(
+          catchError(() => of({ existe: false }))
+        )
+      )
+    ).subscribe(res => {
+      this.emailExiste.set(res.existe);
+    });
   }
 
   cargarPerfil(): void {
@@ -138,22 +167,34 @@ export class UsuariosComponent implements OnInit {
     });
   }
 
+  // ─── Desactivación de 2FA (requiere código TOTP + contraseña) ─────────────
+  mostrarFormDesactivar(): void {
+    this.showDisable2faForm.update(v => !v);
+    this.disable2faCode.set('');
+    this.disable2faPassword.set('');
+    this.errorMsg.set('');
+  }
+
   desactivar2fa(): void {
-    const code = prompt("Ingrese su código 2FA de 6 dígitos para desactivar la autenticación de dos factores:");
-    if (!code) return;
+    const code = this.disable2faCode().trim();
+    const password = this.disable2faPassword();
+    if (!code || code.length !== 6 || !password) return;
 
     this.loading2fa.set(true);
     this.errorMsg.set('');
     this.successMsg.set('');
 
-    this.authService.disable2fa(code).subscribe({
+    this.authService.disable2fa(code, password).subscribe({
       next: (res) => {
         this.successMsg.set(`✓ ${res.mensaje}`);
         this.twoFactorEnabled.set(false);
+        this.showDisable2faForm.set(false);
+        this.disable2faCode.set('');
+        this.disable2faPassword.set('');
         this.loading2fa.set(false);
       },
       error: (err) => {
-        this.errorMsg.set(err?.error?.error ?? 'Código incorrecto. No se pudo desactivar 2FA.');
+        this.errorMsg.set(err?.error?.error ?? 'Error al desactivar 2FA. Verifique el código y la contraseña.');
         this.loading2fa.set(false);
       }
     });
@@ -184,7 +225,7 @@ export class UsuariosComponent implements OnInit {
 
   // ─── Crear Usuario ────────────────────────────────────────────────────────
   crearUsuario(): void {
-    if (this.form.invalid || this.guardando()) return;
+    if (this.form.invalid || this.guardando() || this.emailExiste()) return;
     this.guardando.set(true);
     this.errorMsg.set('');
     this.successMsg.set('');
@@ -244,20 +285,35 @@ export class UsuariosComponent implements OnInit {
   // ─── Toggle Estado (Activar/Desactivar) ──────────────────────────────────
   toggleEstado(u: Usuario): void {
     const nuevoEstado = u.estado === 'activo' ? 'inactivo' : 'activo';
-    const confirmar = `¿${nuevoEstado === 'inactivo' ? 'Desactivar' : 'Reactivar'} al usuario "${u.nombre}"?`;
-    if (!confirm(confirmar)) return;
-    this.errorMsg.set('');
-    this.http.put<{ mensaje: string }>(`${this.api}?id=${u.id_usuario}`, { estado: nuevoEstado }).subscribe({
-      next: (res) => {
-        this.successMsg.set(`✓ ${res.mensaje}`);
-        this.cargarUsuarios();
-      },
-      error: (err) => {
-        this.errorMsg.set(err?.error?.error ?? 'Error al cambiar el estado.');
-      }
-    });
+    this.confirmModalMessage.set(`¿${nuevoEstado === 'inactivo' ? 'Desactivar' : 'Reactivar'} al usuario "${u.nombre}"?`);
+    this.confirmAction = () => {
+      this.errorMsg.set('');
+      this.http.put<{ mensaje: string }>(`${this.api}?id=${u.id_usuario}`, { estado: nuevoEstado }).subscribe({
+        next: (res) => {
+          this.successMsg.set(`✓ ${res.mensaje}`);
+          this.cargarUsuarios();
+          this.confirmModalVisible.set(false);
+        },
+        error: (err) => {
+          this.errorMsg.set(err?.error?.error ?? 'Error al cambiar el estado.');
+          this.confirmModalVisible.set(false);
+        }
+      });
+    };
+    this.confirmModalVisible.set(true);
   }
 
+  // ─── Acciones del Modal de Confirmación ─────────────────────────────────────
+  confirmarAccion(): void {
+    if (this.confirmAction) {
+      this.confirmAction();
+    }
+  }
+
+  cancelarConfirmacion(): void {
+    this.confirmModalVisible.set(false);
+    this.confirmAction = null;
+  }
   // ─── Helpers ──────────────────────────────────────────────────────────────
   rolLabel(rol: string): string {
     return rol === 'admin_libreria' ? 'Administrador' : 'Operador';

@@ -58,7 +58,10 @@ CREATE TABLE seguridad.usuarios (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ultima_sesion TIMESTAMP,
     two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    two_factor_secret VARCHAR(100) DEFAULT NULL
+    two_factor_secret VARCHAR(100) DEFAULT NULL,
+    email_verificado BOOLEAN NOT NULL DEFAULT FALSE,
+    codigo_verificacion VARCHAR(6) DEFAULT NULL,
+    codigo_verificacion_expira TIMESTAMP DEFAULT NULL
 );
 
 CREATE TABLE seguridad.sesiones (
@@ -182,6 +185,25 @@ CREATE TABLE inventario.movimientos_stock (
     stock_resultante INT NOT NULL,
     referencia_id INT,
     fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE inventario.transferencias (
+    id_transferencia SERIAL PRIMARY KEY,
+    id_tienda_origen INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
+    id_tienda_destino INT NOT NULL REFERENCES configuracion.tiendas(id_tienda),
+    id_usuario INT NOT NULL REFERENCES seguridad.usuarios(id_usuario),
+    fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    observacion TEXT,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente',
+    requiere_confirmacion_destino BOOLEAN NOT NULL DEFAULT FALSE,
+    parcial BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE inventario.detalle_transferencias (
+    id_detalle_transferencia SERIAL PRIMARY KEY,
+    id_transferencia INT NOT NULL REFERENCES inventario.transferencias(id_transferencia) ON DELETE CASCADE,
+    id_producto INT NOT NULL REFERENCES inventario.productos(id_producto),
+    cantidad INT NOT NULL
 );
 
 -- ==========================================
@@ -345,13 +367,14 @@ INSERT INTO configuracion.tiendas (nombre, direccion) VALUES
     ('Los Altares - Sucursal 2', 'Dirección Sucursal 2');
 
 -- Administrador global (sin tienda fija → acceso a ambas)
-INSERT INTO seguridad.usuarios (nombre, email, contrasena_hash, rol, id_tienda)
+INSERT INTO seguridad.usuarios (nombre, email, contrasena_hash, rol, id_tienda, email_verificado)
 VALUES (
-    'Administrador Principal',
-    'admin@losaltares.com',
-    crypt('Admin123!', gen_salt('bf', 10)),
+    'Cristian Cabrera',
+    'cristianalejandrocabreraestrad@gmail.com',
+    crypt('102044CACEDracai', gen_salt('bf', 10)),
     'admin_libreria',
-    NULL
+    NULL,
+    TRUE
 );
 
 INSERT INTO operaciones.tipo_factura (nombre, descripcion)

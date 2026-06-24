@@ -173,9 +173,6 @@
                 <td>
                   <span class="stock-badge" [class.no-stock]="p.stock_actual === 0" [class.low-stock]="p.stock_actual > 0 && p.stock_actual <= p.stock_alerta_min">
                     {{ p.stock_actual }}
-                    @if (p.stock_actual > 0 && p.stock_actual <= p.stock_alerta_min) {
-                      <span class="stock-alert-lbl">(Bajo)</span>
-                    }
                   </span>
                 </td>
                 <td class="proy-value">{{ p.cantidad_proyectada }} uds</td>

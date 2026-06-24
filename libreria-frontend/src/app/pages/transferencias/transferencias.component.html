@@ -1,0 +1,529 @@
+<!-- src/app/pages/transferencias/transferencias.component.html -->
+<div class="page-container">
+
+  <!-- Cabecera de Página -->
+  <header class="page-header">
+    <div class="header-info">
+      <h1>Transferencias de Productos</h1>
+      <p>Gestión de movimientos de stock inter-sucursales y logs de auditoría</p>
+    </div>
+    <div class="header-actions">
+      @if (!isAdmin()) {
+        <div class="tabs-container">
+          <button [class.active]="tabActiva() === 'crear'" (click)="setTab('crear')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nueva Transferencia
+          </button>
+          <button [class.active]="tabActiva() === 'historial'" (click)="setTab('historial')" style="position: relative;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Ver Historial
+            @if (totalNotificaciones() > 0) {
+              <span class="notif-badge">{{ totalNotificaciones() }}</span>
+            }
+          </button>
+        </div>
+      }
+    </div>
+  </header>
+
+  <!-- Alertas de estado flotantes (Toasts) -->
+  <div class="toast-container">
+    @if (successMsg()) {
+      <div class="toast toast-success animate-slide-in">
+        <div class="toast-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="toast-text">{{ successMsg() }}</div>
+      </div>
+    }
+    @if (errorMsg()) {
+      <div class="toast toast-error animate-slide-in">
+        <div class="toast-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="toast-text">{{ errorMsg() }}</div>
+      </div>
+    }
+  </div>
+
+  <!-- TAB: NUEVA TRANSFERENCIA -->
+  @if (tabActiva() === 'crear') {
+    <div class="card glass-card animate-slide">
+      <div class="card-header">
+        <h2>Registrar Transferencia</h2>
+        <p>Selecciona la tienda destino y los productos a enviar</p>
+      </div>
+
+      @if (!isAdmin()) {
+        <div class="operation-toggle">
+          <button type="button" 
+                  [class.active]="tipoOperacion() === 'solicitar'" 
+                  (click)="aplicarTipoOperacion('solicitar')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Solicitar Stock (Traer a mi tienda)
+          </button>
+          <button type="button" 
+                  [class.active]="tipoOperacion() === 'enviar'" 
+                  (click)="aplicarTipoOperacion('enviar')">
+            Enviar Stock (Despachar a otra tienda)
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="realizarTransferencia()" class="transfer-form">
+        <div class="form-grid">
+          <!-- Tienda Origen (Seleccionable por operador y admin) -->
+          <div class="form-group">
+            <label for="tienda-origen">Tienda Origen (Sucursal Proveedora)</label>
+            <select id="tienda-origen" formControlName="id_tienda_origen" class="form-control">
+              <option [value]="null">-- Seleccione Tienda Origen --</option>
+              @for (t of tiendasOrigen(); track t.id_tienda) {
+                <option [value]="t.id_tienda">{{ t.nombre }}</option>
+              }
+            </select>
+            @if (form.get('id_tienda_origen')?.touched && form.get('id_tienda_origen')?.invalid) {
+              <span class="field-error">La sucursal de origen es obligatoria</span>
+            }
+          </div>
+
+          <!-- Tienda Destino (Solo editable por admin, read-only para operador) -->
+          <div class="form-group">
+            <label for="tienda-destino">Tienda Destino (Recibe)</label>
+            @if (isAdmin()) {
+              <select id="tienda-destino" formControlName="id_tienda_destino" class="form-control">
+                <option [value]="null">-- Seleccione Tienda Destino --</option>
+                @for (t of tiendasDestino(); track t.id_tienda) {
+                  <option [value]="t.id_tienda">{{ t.nombre }}</option>
+                }
+              </select>
+              @if (form.get('id_tienda_destino')?.touched && form.get('id_tienda_destino')?.invalid) {
+                <span class="field-error">La sucursal de destino es obligatoria</span>
+              }
+            } @else {
+              <input type="text" id="tienda-destino" [value]="nombreTiendaUsuario()" class="form-control read-only" readonly>
+            }
+          </div>
+        </div>
+
+        <!-- Buscador de productos (Se habilita cuando hay origen seleccionado) -->
+        @if (!isAdmin() || form.get('id_tienda_origen')?.value) {
+          <div class="product-selector-section">
+            <div class="form-group autocomplete-container">
+              <label for="search-product">Buscar Productos</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input 
+                  type="text" 
+                  id="search-product"
+                  placeholder="Buscar por nombre o código de barras..."
+                  [value]="busquedaProducto()"
+                  (input)="onBusquedaProductoInput($any($event.target).value)"
+                  (blur)="ocultarSugerencias()"
+                  class="form-control search-input"
+                  autocomplete="off"
+                >
+              </div>
+
+              <!-- Listado de sugerencias -->
+              @if (mostrarSugerencias() && sugerencias().length > 0) {
+                <ul class="suggestions-list">
+                  @for (p of sugerencias(); track p.id_producto) {
+                    <li (mousedown)="seleccionarProducto(p)">
+                      <div class="suggestion-info">
+                        <span class="suggestion-name">{{ p.nombre }}</span>
+                        @if (p.codigo_barras) {
+                          <span class="suggestion-barcode">EAN: {{ p.codigo_barras }}</span>
+                        }
+                      </div>
+                      <div class="suggestion-stock" [class.low-stock]="p.stock_actual <= 5">
+                        Stock: {{ p.stock_actual }} u
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="placeholder-box text-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+              <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+            <p>Seleccione una tienda de origen para cargar el inventario disponible</p>
+          </div>
+        }
+
+        <!-- Tabla de productos a transferir (Draft) -->
+        @if (itemsATransferir().length > 0) {
+          <div class="table-container draft-table">
+            <h3>Productos seleccionados</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th class="text-center">Stock Disponible</th>
+                  <th class="text-center" style="width: 150px;">Cantidad a Transferir</th>
+                  <th class="text-center" style="width: 80px;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of itemsATransferir(); track item.producto.id_producto; let idx = $index) {
+                  <tr>
+                    <td>
+                      <div class="product-cell">
+                        <span class="prod-name">{{ item.producto.nombre }}</span>
+                        @if (item.producto.codigo_barras) {
+                          <span class="prod-barcode">EAN: {{ item.producto.codigo_barras }}</span>
+                        }
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <span class="stock-badge">{{ item.producto.stock_actual }} u</span>
+                    </td>
+                    <td class="text-center">
+                      <input 
+                        type="number" 
+                        [value]="item.cantidad" 
+                        min="1" 
+                        [max]="item.producto.stock_actual"
+                        (change)="actualizarCantidad(idx, $any($event.target).value)"
+                        class="form-control quantity-input text-center"
+                      >
+                    </td>
+                    <td class="text-center">
+                      <button type="button" class="btn-delete" (click)="removerItem(idx)" title="Eliminar de la lista">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- Campo Observación -->
+        <div class="form-group mt-3">
+          <label for="observacion">Observaciones (Opcional)</label>
+          <textarea 
+            id="observacion" 
+            formControlName="observacion" 
+            rows="3" 
+            placeholder="Añada detalles o motivos sobre la transferencia..."
+            class="form-control text-area"
+          ></textarea>
+        </div>
+
+        <!-- Botón Enviar -->
+        <div class="form-actions mt-4">
+          <button 
+            type="submit" 
+            class="btn-primary" 
+            [disabled]="form.invalid || itemsATransferir().length === 0 || guardando()"
+          >
+            @if (guardando()) {
+              <span class="spinner"></span> Procesando...
+            } @else {
+              Realizar Transferencia
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  <!-- TAB: HISTORIAL DE TRANSFERENCIAS -->
+  @if (tabActiva() === 'historial') {
+    <div class="card glass-card animate-slide">
+      
+      <!-- Filtros del historial -->
+      <div class="historial-filters">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Buscar por sucursal, operador, observación o producto..."
+            [value]="busquedaFiltro()"
+            (input)="busquedaFiltro.set($any($event.target).value)"
+            class="form-control"
+          >
+        </div>
+
+        @if (!isAdmin()) {
+          <div class="sub-filter-buttons">
+            <button [class.active]="filtroHistorial() === 'todas'" (click)="setFiltroHistorial('todas')">Todas</button>
+            <button [class.active]="filtroHistorial() === 'enviadas'" (click)="setFiltroHistorial('enviadas')">Enviadas</button>
+            <button [class.active]="filtroHistorial() === 'recibidas'" (click)="setFiltroHistorial('recibidas')">Recibidas</button>
+          </div>
+        }
+
+        @if (isAdmin()) {
+          <div class="admin-filter-group">
+            <select (change)="setFiltroOrigen($any($event.target).value)" class="form-control compact-select">
+              <option value="">-- Origen (Todas) --</option>
+              @for (t of tiendas(); track t.id_tienda) {
+                <option [value]="t.id_tienda">{{ t.nombre }}</option>
+              }
+            </select>
+
+            <select (change)="setFiltroDestino($any($event.target).value)" class="form-control compact-select">
+              <option value="">-- Destino (Todas) --</option>
+              @for (t of tiendas(); track t.id_tienda) {
+                <option [value]="t.id_tienda">{{ t.nombre }}</option>
+              }
+            </select>
+          </div>
+        }
+      </div>
+
+      <!-- Tabla del historial -->
+      @if (cargando()) {
+        <div class="table-container">
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+          <div class="skeleton skeleton-row"></div>
+        </div>
+      } @else if (historialFiltrado().length === 0) {
+        <div class="empty-state-box">
+          <svg viewBox="0 0 80 80" fill="none" class="empty-icon">
+            <circle cx="40" cy="40" r="38" stroke="var(--border-strong)" stroke-width="2" stroke-dasharray="4 4"/>
+            <path d="M25 50 L40 30 L55 50 Z" stroke="var(--border-strong)" stroke-width="2" fill="none" stroke-linejoin="round"/>
+            <circle cx="40" cy="55" r="3" fill="var(--border-strong)"/>
+          </svg>
+          <p class="empty-title">Sin registros</p>
+          <p class="empty-desc">No se encontraron registros de transferencias con los filtros seleccionados.</p>
+        </div>
+      } @else {
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Folio</th>
+                <th>Fecha</th>
+                <th>Origen</th>
+                <th>Destino</th>
+                <th>Operador</th>
+                <th>Observación</th>
+                <th>Estado</th>
+                <th class="text-center">Productos</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of historialFiltrado(); track t.id_transferencia) {
+                <tr [class.incoming-transfer]="!isAdmin() && t.id_tienda_destino === tiendaUsuario()" 
+                    [class.outgoing-transfer]="!isAdmin() && t.id_tienda_origen === tiendaUsuario()">
+                  <td><strong>#{{ t.id_transferencia }}</strong></td>
+                  <td>{{ formatFecha(t.fecha) }}</td>
+                  <td>{{ t.tienda_origen_nombre }}</td>
+                  <td>{{ t.tienda_destino_nombre }}</td>
+                  <td>{{ t.usuario_nombre }}</td>
+                  <td class="observation-cell" [title]="t.observacion">{{ t.observacion || '—' }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="{
+                      'badge-pending': t.estado === 'Pendiente',
+                      'badge-progress': t.estado === 'En Progreso',
+                      'badge-success': t.estado === 'Recibida',
+                      'badge-danger': t.estado === 'Cancelada'
+                    }">
+                      {{ t.estado }}
+                      @if (t.estado === 'Pendiente' && t.requiere_confirmacion_destino) {
+                        <span style="font-size: 10px; display: block;">(Conf. Destino)</span>
+                      }
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge badge-info">{{ t.productos.length }} productos</span>
+                  </td>
+                  <td class="text-center">
+                    <button class="btn-secondary compact" (click)="verDetalles(t)" title="Ver productos">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      Ver
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- MODAL DE DETALLES -->
+@if (mostrarModalDetalles() && transferenciaSeleccionada()) {
+  <div class="modal-backdrop" (click)="cerrarModalDetalles()">
+    <div class="modal-card animate-zoom" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Detalle de Transferencia #{{ transferenciaSeleccionada()?.id_transferencia }}</h2>
+          <div class="modal-meta-row" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+            <span class="modal-meta">Fecha: {{ formatFecha(transferenciaSeleccionada()?.fecha ?? '') }}</span>
+            <span class="badge" [ngClass]="{
+              'badge-pending': transferenciaSeleccionada()?.estado === 'Pendiente',
+              'badge-progress': transferenciaSeleccionada()?.estado === 'En Progreso',
+              'badge-success': transferenciaSeleccionada()?.estado === 'Recibida',
+              'badge-danger': transferenciaSeleccionada()?.estado === 'Cancelada'
+            }">
+              {{ transferenciaSeleccionada()?.estado }}
+              @if (transferenciaSeleccionada()?.estado === 'Pendiente' && transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+                <span>(Requiere Confirmación)</span>
+              }
+            </span>
+          </div>
+        </div>
+        <button class="modal-close-btn" (click)="cerrarModalDetalles()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-meta-grid">
+          <div>
+            <strong>Tienda Origen:</strong>
+            <p>{{ transferenciaSeleccionada()?.tienda_origen_nombre }}</p>
+          </div>
+          <div>
+            <strong>Tienda Destino:</strong>
+            <p>{{ transferenciaSeleccionada()?.tienda_destino_nombre }}</p>
+          </div>
+          <div>
+            <strong>Operador:</strong>
+            <p>{{ transferenciaSeleccionada()?.usuario_nombre }}</p>
+          </div>
+        </div>
+
+        @if (transferenciaSeleccionada()?.observacion) {
+          <div class="modal-observacion">
+            <strong>Observación:</strong>
+            <p>{{ transferenciaSeleccionada()?.observacion }}</p>
+          </div>
+        }
+
+        <!-- Alertas de estado interactivo -->
+        @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_destino === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'Pendiente' && transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+          <div class="alert alert-danger animate-fade mt-3" style="display: flex; gap: 8px; align-items: center; background-color: rgba(220,53,69,0.1); color: #dc3545; padding: 12px; border-radius: 8px; border: 1px solid rgba(220,53,69,0.2);">
+            <span class="alert-icon">⚠️</span>
+            <div class="alert-text">
+              <strong>Propuesta de Despacho Parcial:</strong> La sucursal origen modificó cantidades o no dispone del stock completo. Por favor acepte o rechace esta entrega modificada.
+            </div>
+          </div>
+        }
+        @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_origen === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'Pendiente' && !transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+          <div class="alert alert-info animate-fade mt-3" style="display: flex; gap: 8px; align-items: center; background-color: rgba(0,123,255,0.1); color: #007bff; padding: 12px; border-radius: 8px; border: 1px solid rgba(0,123,255,0.2);">
+            <span class="alert-icon">📥</span>
+            <div class="alert-text">
+              <strong>Pedido Recibido:</strong> Verifique el stock, ajuste las cantidades si es necesario o elimine productos de la lista, luego haga clic en "Aceptar y Enviar".
+            </div>
+          </div>
+        }
+
+        <div class="modal-products-table mt-3">
+          <h3>Productos Solicitados</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th class="text-center" style="width: 145px;">Stock en Origen</th>
+                <th class="text-center" style="width: 150px;">Cantidad</th>
+                @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_origen === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'Pendiente' && !transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+                  <th class="text-center" style="width: 80px;">Acciones</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Si el usuario logueado es el origen y el pedido está pendiente, mostramos tabla editable -->
+              @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_origen === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'Pendiente' && !transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+                @for (p of productosEdicion(); track p.id_producto; let idx = $index) {
+                  <tr>
+                    <td>{{ p.nombre_producto }}</td>
+                    <td class="text-center">
+                      <span class="badge" [class.badge-danger]="(p.stock_origen ?? 0) <= 0" [class.badge-success]="(p.stock_origen ?? 0) > 0" style="background-color: #f1f3f5; color: #495057;">
+                        {{ p.stock_origen ?? 0 }} disponibles
+                      </span>
+                    </td>
+                    <td class="text-center">
+                      <input 
+                        type="number" 
+                        [value]="p.cantidad" 
+                        min="0" 
+                        [max]="p.stock_origen ?? 99999"
+                        (change)="actualizarCantidadEdicion(idx, $any($event.target).value)"
+                        class="form-control quantity-input compact text-center"
+                        style="width: 80px; margin: 0 auto;"
+                      >
+                    </td>
+                    <td class="text-center">
+                      <button type="button" class="btn-delete" (click)="removerItemEdicion(idx)" title="Eliminar del despacho">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              } @else {
+                <!-- Vista estática normal -->
+                @for (p of transferenciaSeleccionada()?.productos; track p.id_producto) {
+                  <tr>
+                    <td>{{ p.nombre_producto }}</td>
+                    <td class="text-center">
+                      <span class="badge badge-info" style="background-color: #e9ecef; color: #495057;">{{ p.stock_origen ?? 0 }} disponibles</span>
+                    </td>
+                    <td class="text-center"><strong>{{ p.cantidad }} u</strong></td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; gap: 8px; justify-content: flex-end; padding: 15px;">
+        <!-- Botones para B: Origen acepta/rechaza/modifica -->
+        @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_origen === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'Pendiente' && !transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+          <button class="btn-primary" (click)="responderPedido(transferenciaSeleccionada()!, 'aceptar', productosEdicion())" [disabled]="guardando() || productosEdicion().length === 0">
+            Aceptar y Enviar
+          </button>
+          <button class="btn-danger" (click)="responderPedido(transferenciaSeleccionada()!, 'rechazar')" [disabled]="guardando()">
+            Rechazar Pedido
+          </button>
+        }
+
+        <!-- Botones para A: Confirmar propuesta parcial de B -->
+        @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_destino === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'Pendiente' && transferenciaSeleccionada()?.requiere_confirmacion_destino) {
+          <button class="btn-primary" (click)="confirmarParcial(transferenciaSeleccionada()!, 'aceptar')" [disabled]="guardando()">
+            Aceptar Transferencia Parcial
+          </button>
+          <button class="btn-danger" (click)="confirmarParcial(transferenciaSeleccionada()!, 'rechazar')" [disabled]="guardando()">
+            Rechazar y Cancelar
+          </button>
+        }
+
+        <!-- Botón para A: Recibir cuando está En Progreso -->
+        @if (!isAdmin() && transferenciaSeleccionada()?.id_tienda_destino === tiendaUsuario() && transferenciaSeleccionada()?.estado === 'En Progreso') {
+          <button class="btn-primary" (click)="recibirTransferencia(transferenciaSeleccionada()!)" [disabled]="guardando()">
+            Confirmar Recepción
+          </button>
+        }
+
+        <button class="btn-secondary" (click)="cerrarModalDetalles()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}

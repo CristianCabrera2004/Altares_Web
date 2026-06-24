@@ -9,38 +9,16 @@
 // CA 5: Modal de verificación con arqueo de caja antes de confirmar.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { CuadernoService, ProductoCatalogo, RespuestaCuaderno } from '../../core/services/cuaderno.service';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// ── Interfaces ───────────────────────────────────────────────────────────────
-// Espeja el struct Producto del backend (incluye tasa_iva del JOIN con categorias)
-export interface ProductoCatalogo {
-  id_producto:      number;
-  nombre:           string;
-  id_categoria:     number;
-  nombre_categoria: string;
-  tasa_iva:         number;  // 0 ó 15 (HU-01 CA 3)
-  stock_actual:     number;
-  stock_alerta_min: number;
-  precio_venta:     number;  // en centavos
-  estado:           string;
-}
-
 // Una línea del cuaderno en el estado local del frontend
 interface ItemCuaderno {
   producto: ProductoCatalogo;
   cantidad: number;
-}
-
-// Respuesta al guardar el cuaderno
-interface RespuestaCuaderno {
-  mensaje:        string;
-  id_venta:       number;
-  total:          number;
-  items_cargados: number;
 }
 
 @Component({
@@ -50,7 +28,7 @@ interface RespuestaCuaderno {
   styleUrl: './cuaderno.component.css'
 })
 export class CuadernoComponent implements OnInit {
-  private readonly http        = inject(HttpClient);
+  private readonly cuadernoService = inject(CuadernoService);
   private readonly authService = inject(AuthService);
 
   // ── Estado del catálogo ─────────────────────────────────────────────────
@@ -86,10 +64,20 @@ export class CuadernoComponent implements OnInit {
   readonly clienteTelefono  = signal('');
   readonly clienteCorreo    = signal('');
 
+  // ── Estado de búsqueda de cliente ──────────────────────────────────────────
+  readonly buscandoCliente   = signal(false);
+  readonly clienteEncontrado = signal(false);
+  readonly clienteNuevoMsg   = signal('');
+
   // ── Fecha para el encabezado ─────────────────────────────────────────────
   readonly fechaHoy = new Date().toLocaleDateString('es-EC', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
+
+  // ── Modal de Confirmación ────────────────────────────────────────────────
+  readonly confirmModalVisible = signal(false);
+  readonly confirmModalMessage = signal('');
+  private confirmAction: (() => void) | null = null;
 
   // ── Computed: resultados de búsqueda (CA 1) ──────────────────────────────
   // Filtra por nombre (contains) o por id_producto (exacto).
@@ -161,11 +149,52 @@ export class CuadernoComponent implements OnInit {
     this.cargarCatalogo();
   }
 
+  // ── Búsqueda de cliente por cédula ────────────────────────────────────────
+  private timeoutBusqueda: any;
+
+  buscarClientePorCedula(): void {
+    const ci = this.clienteIdentificacion().trim();
+    
+    // Solo buscar si tiene longitud válida (10 para cédula, 13 para RUC)
+    if (ci.length !== 10 && ci.length !== 13) {
+      this.clienteEncontrado.set(false);
+      return;
+    }
+    
+    clearTimeout(this.timeoutBusqueda);
+    this.timeoutBusqueda = setTimeout(() => {
+      this.buscandoCliente.set(true);
+      this.clienteEncontrado.set(false);
+      this.clienteNuevoMsg.set('');
+
+      this.cuadernoService.buscarCliente(ci).subscribe({
+        next: (clientes) => {
+          const exacto = clientes.find(c => c.cedula_ruc === ci);
+          if (exacto) {
+            this.clienteNombre.set(exacto.nombre);
+            this.clienteDireccion.set(exacto.direccion || '');
+            this.clienteTelefono.set(exacto.telefono || '');
+            this.clienteCorreo.set(exacto.email || '');
+            this.clienteEncontrado.set(true);
+          } else {
+            // No existe, limpiar campos para que el usuario los llene
+            this.clienteEncontrado.set(false);
+          }
+          this.buscandoCliente.set(false);
+        },
+        error: () => {
+          this.buscandoCliente.set(false);
+          this.clienteEncontrado.set(false);
+        }
+      });
+    }, 400);
+  }
+
   // ── Carga del catálogo activo ────────────────────────────────────────────
   cargarCatalogo(): void {
     this.cargandoCatalogo.set(true);
     this.errorCatalogo.set('');
-    this.http.get<ProductoCatalogo[]>(`${environment.apiUrl}/productos`).subscribe({
+    this.cuadernoService.getProductosActivos().subscribe({
       next: data => {
         this.catalogo.set(data);
         this.cargandoCatalogo.set(false);
@@ -225,7 +254,7 @@ export class CuadernoComponent implements OnInit {
     }
 
     // 2. Si no hay coincidencia local, busca por código de barras en el backend
-    this.http.get<ProductoCatalogo>(`${environment.apiUrl}/productos/buscar?codigo=${encodeURIComponent(t)}`).subscribe({
+    this.cuadernoService.buscarProductoPorCodigo(t).subscribe({
       next: (producto) => {
         this.agregarItem(producto);
       },
@@ -259,8 +288,24 @@ export class CuadernoComponent implements OnInit {
 
   limpiarCuaderno(): void {
     if (this.items().length === 0) return;
-    if (!confirm('¿Limpiar todo el cuaderno? Los ítems no guardados se perderán.')) return;
-    this.items.set([]);
+    this.confirmModalMessage.set('¿Limpiar todo el cuaderno? Los ítems no guardados se perderán.');
+    this.confirmAction = () => {
+      this.items.set([]);
+      this.confirmModalVisible.set(false);
+    };
+    this.confirmModalVisible.set(true);
+  }
+
+  // ─── Acciones del Modal de Confirmación ─────────────────────────────────────
+  confirmarAccion(): void {
+    if (this.confirmAction) {
+      this.confirmAction();
+    }
+  }
+
+  cancelarConfirmacion(): void {
+    this.confirmModalVisible.set(false);
+    this.confirmAction = null;
   }
 
   // ── Helpers de cálculo ───────────────────────────────────────────────────
@@ -318,7 +363,7 @@ export class CuadernoComponent implements OnInit {
     };
 
     // 1. Registrar la venta en el backend
-    this.http.post<RespuestaCuaderno>(`${environment.apiUrl}/ventas/cuaderno`, payload).subscribe({
+    this.cuadernoService.guardarCuaderno(payload).subscribe({
       next: (ventaRes) => {
         const idVenta = ventaRes.id_venta;
 
@@ -329,15 +374,44 @@ export class CuadernoComponent implements OnInit {
         } else {
           // Factura con datos. Buscar si existe el cliente o crearlo
           const ruc = this.clienteIdentificacion().trim();
-          this.http.get<any[]>(`${environment.apiUrl}/clientes/buscar?q=${encodeURIComponent(ruc)}`).subscribe({
+          this.cuadernoService.buscarCliente(ruc).subscribe({
             next: (clientes) => {
               const exactClient = clientes.find(c => c.cedula_ruc === ruc);
               if (exactClient) {
-                // Cliente existe, usar su ID
-                this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                // Cliente existe. Verificar si hay nuevos datos (ej. correo)
+                const formNombre = this.clienteNombre() || exactClient.nombre;
+                const formDireccion = this.clienteDireccion() || exactClient.direccion || 'Dirección de la Tienda';
+                const formTelefono = this.clienteTelefono() || exactClient.telefono || 'N/A';
+                const formEmail = this.clienteCorreo() || exactClient.email || '';
+
+                const necesitaActualizar = 
+                  (formNombre !== exactClient.nombre) ||
+                  (this.clienteDireccion() && formDireccion !== exactClient.direccion) ||
+                  (this.clienteTelefono() && formTelefono !== exactClient.telefono) ||
+                  (this.clienteCorreo() && formEmail !== exactClient.email);
+
+                if (necesitaActualizar) {
+                  this.cuadernoService.actualizarCliente(exactClient.id_cliente, {
+                    cedula_ruc: ruc,
+                    nombre: formNombre,
+                    direccion: formDireccion,
+                    telefono: formTelefono,
+                    email: formEmail
+                  }).subscribe({
+                    next: () => {
+                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                    },
+                    error: (err) => {
+                      console.warn("No se pudo actualizar la info del cliente", err);
+                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                    }
+                  });
+                } else {
+                  this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                }
               } else {
                 // Cliente no existe, crearlo
-                this.http.post<any>(`${environment.apiUrl}/clientes`, {
+                this.cuadernoService.crearCliente({
                   cedula_ruc: ruc,
                   nombre: this.clienteNombre(),
                   direccion: this.clienteDireccion() || 'Dirección de la Tienda',
@@ -345,6 +419,8 @@ export class CuadernoComponent implements OnInit {
                   email: this.clienteCorreo() || ''
                 }).subscribe({
                   next: (newClientRes) => {
+                    this.clienteNuevoMsg.set(`Nuevo cliente "${this.clienteNombre()}" registrado automáticamente.`);
+                    setTimeout(() => this.clienteNuevoMsg.set(''), 5000);
                     this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
                   },
                   error: (err) => {
@@ -356,7 +432,7 @@ export class CuadernoComponent implements OnInit {
             },
             error: () => {
               // Si falla la búsqueda, intentar crear el cliente directamente
-              this.http.post<any>(`${environment.apiUrl}/clientes`, {
+              this.cuadernoService.crearCliente({
                 cedula_ruc: ruc,
                 nombre: this.clienteNombre(),
                 direccion: this.clienteDireccion() || 'Dirección de la Tienda',
@@ -364,6 +440,8 @@ export class CuadernoComponent implements OnInit {
                 email: this.clienteCorreo() || ''
               }).subscribe({
                 next: (newClientRes) => {
+                  this.clienteNuevoMsg.set(`Nuevo cliente "${this.clienteNombre()}" registrado automáticamente.`);
+                  setTimeout(() => this.clienteNuevoMsg.set(''), 5000);
                   this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
                 },
                 error: (err) => {
@@ -405,7 +483,7 @@ export class CuadernoComponent implements OnInit {
       pdf_base64: pdfBase64 || undefined
     };
 
-    this.http.post<any>(`${environment.apiUrl}/facturas`, payload).subscribe({
+    this.cuadernoService.crearFactura(payload).subscribe({
       next: () => {
         this.resumen.set({
           id_venta: idVenta,
@@ -507,5 +585,7 @@ export class CuadernoComponent implements OnInit {
     this.clienteDireccion.set('');
     this.clienteTelefono.set('');
     this.clienteCorreo.set('');
+    this.clienteEncontrado.set(false);
+    this.clienteNuevoMsg.set('');
   }
 }

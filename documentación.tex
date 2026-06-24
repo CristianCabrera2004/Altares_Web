@@ -1,0 +1,1136 @@
+% ============================================================
+% DOCUMENTACIÓN TÉCNICA — TRABAJO DE TITULACIÓN
+% Sistema: Librería Los Altares
+% Carrera: Ingeniería de Software
+% Motor LaTeX: pdfLaTeX (compatible con Overleaf)
+% ============================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+% ── Paquetes ─────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{pgf-pie}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{babel, shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{mdframed}
+\usepackage{setspace}
+\usepackage{parskip}
+
+% ── Geometría ────────────────────────────────────────────────
+\geometry{
+  a4paper,
+  left=3cm, right=2.5cm,
+  top=2.5cm, bottom=2.5cm
+}
+
+% ── Interlineado ─────────────────────────────────────────────
+\setstretch{1.5}
+
+% ── Colores corporativos ─────────────────────────────────────
+\definecolor{primaryblue}{HTML}{4F8EF7}
+\definecolor{darkblue}{HTML}{1a2a4a}
+\definecolor{lightgray}{HTML}{F5F5F5}
+\definecolor{successgreen}{HTML}{22c55e}
+\definecolor{warningorange}{HTML}{f97316}
+\definecolor{codebg}{HTML}{1e1e2e}
+\definecolor{codetext}{HTML}{cdd6f4}
+\definecolor{accentpurple}{HTML}{7B61FF}
+
+% ── Configuración de código ──────────────────────────────────
+\lstdefinestyle{gocode}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small\color{codetext},
+  breaklines=true,
+  keywordstyle=\color{primaryblue}\bfseries,
+  stringstyle=\color{successgreen},
+  commentstyle=\color{gray}\itshape,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{darkblue},
+  captionpos=b,
+  tabsize=2,
+  showstringspaces=false,
+}
+\lstset{style=gocode}
+
+% ── Hipervínculos ────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=darkblue,
+  urlcolor=primaryblue,
+  citecolor=darkblue,
+  pdftitle={Sistema de Gestión Integral - Librería Los Altares},
+  pdfauthor={Cristian Cabrera},
+  pdfsubject={Trabajo de Titulación - Ingeniería de Software},
+}
+
+% ── Encabezados ──────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{darkblue}{Librería Los Altares — Sistema de Gestión Integral}}
+\fancyhead[R]{\small\textcolor{gray}{\leftmark}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Cajas de advertencia ─────────────────────────────────────
+\newmdenv[
+  linecolor=primaryblue,
+  backgroundcolor=primaryblue!8,
+  linewidth=2pt,
+  innerleftmargin=12pt,
+  innerrightmargin=12pt,
+  innertopmargin=8pt,
+  innerbottommargin=8pt,
+]{infobox}
+
+\newmdenv[
+  linecolor=warningorange,
+  backgroundcolor=warningorange!8,
+  linewidth=2pt,
+  innerleftmargin=12pt,
+  innerrightmargin=12pt,
+  innertopmargin=8pt,
+  innerbottommargin=8pt,
+]{warnbox}
+
+% ── Estilos TikZ ─────────────────────────────────────────────
+\tikzstyle{entity}=[
+  rectangle, draw=darkblue, fill=primaryblue!15,
+  rounded corners=4pt, minimum height=1cm,
+  font=\small\bfseries, text centered,
+  drop shadow
+]
+\tikzstyle{relation}=[
+  rectangle, draw=accentpurple, fill=accentpurple!10,
+  minimum height=0.7cm, minimum width=2.2cm,
+  font=\small\itshape, text centered
+]
+\tikzstyle{arrow}=[
+  ->, >=Stealth, thick, color=darkblue
+]
+\tikzstyle{process}=[
+  rectangle, rounded corners=6pt,
+  draw=darkblue, fill=lightgray,
+  minimum height=1cm, minimum width=3cm,
+  font=\small, text centered
+]
+\tikzstyle{decision}=[
+  diamond, draw=warningorange, fill=warningorange!15,
+  minimum height=1.2cm, minimum width=2cm,
+  font=\small, text centered, aspect=2
+]
+\tikzstyle{actor}=[
+  rectangle, draw=successgreen, fill=successgreen!10,
+  rounded corners=4pt, font=\small\bfseries,
+  minimum height=0.9cm, minimum width=2.5cm
+]
+
+% ─────────────────────────────────────────────────────────────
+% PORTADA
+% ─────────────────────────────────────────────────────────────
+\begin{document}
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+
+  {\Large \textbf{UNIVERSIDAD [NOMBRE DE LA INSTITUCIÓN]}}\\[0.4cm]
+  {\large \textbf{CARRERA DE INGENIERÍA DE SOFTWARE}}\\[2cm]
+
+\begin{tikzpicture}
+    \fill[primaryblue!20, rounded corners=18pt] (0,0) rectangle (4,4.2);
+    \fill[primaryblue, rounded corners=12pt] (0.3,0.3) rectangle (3.7,3.9);
+    \draw[white, line width=2pt] (2,0.8) -- (2,3.4);
+    \draw[white, line width=2pt] (0.7,1.1) .. controls (1.2,0.9) .. (2,1.0) .. controls (2.8,0.9) .. (3.3,1.1);
+    \draw[white, line width=2pt] (0.7,3.1) .. controls (1.2,3.3) .. (2,3.2) .. controls (2.8,3.3) .. (3.3,3.1);
+    \draw[white, line width=2pt] (0.7,1.1) -- (0.7,3.1);
+    \draw[white, line width=2pt] (3.3,1.1) -- (3.3,3.1);
+    \node[white, font=\large\bfseries] at (2,2.0) {LA};
+  \end{tikzpicture}
+
+  \vspace{1.5cm}
+
+  {\LARGE \textbf{\textcolor{darkblue}{SISTEMA DE GESTIÓN INTEGRAL}}}\\[0.3cm]
+  {\LARGE \textbf{\textcolor{darkblue}{PARA LIBRERÍA LOS ALTARES}}}\\[0.3cm]
+  {\large \textit{Aplicación Web con Motor Predictivo de Demanda}}\\[1.5cm]
+
+  \begin{tabular}{rl}
+    \textbf{Autor:}      & Cristian Cabrera \\[4pt]
+    \textbf{Tutor:}      & [Nombre del Docente Tutor] \\[4pt]
+    \textbf{Año:}        & 2026 \\[4pt]
+    \textbf{Modalidad:}  & Proyecto de Desarrollo Tecnológico \\
+  \end{tabular}
+
+  \vfill
+  {\small Ciudad — Ecuador — 2026}
+\end{titlepage}
+
+% ── Tabla de Contenidos ──────────────────────────────────────
+\tableofcontents
+\listoffigures
+\listoftables
+\newpage
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 1: PLANTEAMIENTO DEL PROBLEMA
+% ─────────────────────────────────────────────────────────────
+\chapter{Planteamiento del Problema}
+
+\section{Descripción de la Realidad Problemática}
+
+La Librería Los Altares es un establecimiento comercial de tipo familiar ubicado en una localidad rural de Ecuador, con dos puntos de venta (sucursales). Hasta la implementación del presente proyecto, la empresa operaba bajo las siguientes condiciones:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Registro manual de ventas:} Las transacciones diarias se anotaban en un cuaderno físico sin validación, lo que generaba inconsistencias al momento de cuadrar la caja.
+  \item \textbf{Sistema legacy Sysag:} Se utilizaba un software obsoleto de facturación que no tenía soporte multitienda, sin acceso a histórico analítico exportable y sin integración con inventario.
+  \item \textbf{Inventario no centralizado:} El stock de cada sucursal se manejaba de forma independiente y sin visibilidad entre sedes, impidiendo transferencias de mercadería.
+  \item \textbf{Ausencia de control de fiados:} Los préstamos de dinero y productos a clientes de confianza (práctica conocida localmente como ``fiado'') se registraban informalmente, sin seguimiento de saldos ni abonos.
+  \item \textbf{Abastecimiento reactivo:} Las decisiones de compra se tomaban de forma intuitiva, sin análisis de demanda histórica, generando tanto faltantes como sobrestock.
+\end{itemize}
+
+\section{Árbol de Problemas}
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[
+  node distance=1.0cm,
+  every node/.style={font=\small, text centered},
+  cause/.style={rectangle, draw=warningorange!80, fill=warningorange!12, rounded corners=3pt, minimum width=3.4cm, minimum height=0.9cm, text width=3.2cm},
+  problem/.style={rectangle, draw=red!70, fill=red!15, rounded corners=5pt, font=\bfseries\small, minimum width=9cm, minimum height=1.1cm, text width=8.8cm},
+  effect/.style={rectangle, draw=primaryblue!80, fill=primaryblue!12, rounded corners=3pt, minimum width=3.4cm, minimum height=0.9cm, text width=3.2cm},
+]
+  % Problema central
+  \node[problem] (central) {Ineficiencia en la gestión operativa y comercial de la Librería Los Altares};
+  % Causas (debajo)
+  \node[cause, below left=1.5cm and 3.5cm of central] (c1) {Registro manual de ventas en cuaderno físico};
+  \node[cause, below left=1.5cm and 0.0cm of central] (c2) {Sistema legacy sin soporte multitienda};
+  \node[cause, below right=1.5cm and 0.0cm of central] (c3) {Ausencia de control formal de fiados};
+  \node[cause, below right=1.5cm and 3.5cm of central] (c4) {Decisiones de compra sin datos históricos};
+  % Efectos (arriba)
+  \node[effect, above left=1.5cm and 3.5cm of central] (e1) {Pérdidas económicas por errores de cuadre};
+  \node[effect, above left=1.5cm and 0.0cm of central] (e2) {Faltantes y sobrestock de mercadería};
+  \node[effect, above right=1.5cm and 0.0cm of central] (e3) {Cuentas por cobrar no recuperadas};
+  \node[effect, above right=1.5cm and 3.5cm of central] (e4) {Baja competitividad frente a comercios modernos};
+  % Flechas causas → problema
+  \draw[arrow, warningorange] (c1) -- (central);
+  \draw[arrow, warningorange] (c2) -- (central);
+  \draw[arrow, warningorange] (c3) -- (central);
+  \draw[arrow, warningorange] (c4) -- (central);
+  % Flechas problema → efectos
+  \draw[arrow, primaryblue] (central) -- (e1);
+  \draw[arrow, primaryblue] (central) -- (e2);
+  \draw[arrow, primaryblue] (central) -- (e3);
+  \draw[arrow, primaryblue] (central) -- (e4);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Árbol de Problemas — Librería Los Altares}
+\label{fig:arbol-problemas}
+\end{figure}
+
+\section{Formulación del Problema}
+
+\begin{infobox}
+\textbf{Problema central:} ¿Cómo desarrollar un sistema de gestión informático que integre el control de inventario multitienda, la facturación, el seguimiento de deudores y la predicción de demanda para la Librería Los Altares, reemplazando los procesos manuales y el sistema legacy actual?
+\end{infobox}
+
+\section{Justificación}
+
+La digitalización de los procesos comerciales en pequeñas y medianas empresas (PYMES) ecuatorianas es una necesidad reconocida por el \textit{Ministerio de Telecomunicaciones y de la Sociedad de la Información (MINTEL)}. Según el \textit{INEC (2023)}, únicamente el 38\% de las PYMES del sector comercio minorista emplean software especializado de gestión. La Librería Los Altares representa un caso de uso real y concreto donde la ausencia de herramientas digitales genera pérdidas directas cuantificables.
+
+El presente trabajo aporta: (a) un software funcional adaptado al contexto rural del negocio, (b) migración y preservación del historial de ventas del sistema Sysag, y (c) un motor predictivo de demanda basado en modelos autorregresivos que reduce el riesgo de desabastecimiento.
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 2: OBJETIVOS Y ALCANCE
+% ─────────────────────────────────────────────────────────────
+\chapter{Objetivos y Alcance}
+
+\section{Objetivo General}
+
+Desarrollar e implementar un sistema de gestión integral para la Librería Los Altares que integre los módulos de inventario multitienda, facturación, deudores, transferencias entre sucursales y predicción analítica de demanda mediante un modelo autorregresivo AR(1), con el fin de reemplazar los procesos manuales y el sistema legacy Sysag, mejorando la eficiencia operativa y la toma de decisiones comerciales.
+
+\section{Objetivos Específicos}
+
+\begin{enumerate}[leftmargin=1.5cm, label=\textbf{OE\arabic*.}]
+  \item \textbf{Analizar} los procesos operativos actuales de la Librería Los Altares, identificando los requerimientos funcionales y no funcionales del sistema mediante entrevistas y revisión del sistema Sysag.
+  \item \textbf{Diseñar} la arquitectura del sistema bajo un modelo de tres capas (SPA Angular — API REST Go — PostgreSQL), definiendo el esquema de base de datos, los endpoints REST y los flujos de usuario para cada rol.
+  \item \textbf{Desarrollar} los módulos funcionales: autenticación JWT con 2FA/TOTP, catálogo de productos multitienda, facturación/cuaderno diario, control de inventario transaccional, gestión de clientes, módulo de deudores/fiados, transferencias entre sucursales, devoluciones, reportes y motor de predicción AR(1).
+  \item \textbf{Implementar} la migración ETL del historial de ventas desde el sistema Sysag hacia la base de datos PostgreSQL del nuevo sistema, preservando la integridad referencial para alimentar el motor predictivo.
+  \item \textbf{Validar} el funcionamiento del sistema mediante pruebas de integración, revisión de seguridad (OWASP Top 10, NIST 800-63B) y verificación de los criterios de aceptación definidos en las historias de usuario.
+\end{enumerate}
+
+\section{Alcance del Sistema}
+
+\subsection{Dentro del alcance}
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item Dos sucursales (tiendas) con inventario y ventas separados por sede.
+  \item Dos roles de usuario: \texttt{admin\_libreria} y \texttt{operador\_caja}.
+  \item Módulos: Dashboard, Facturación/Cuaderno, Inventario, Transferencias, Devoluciones, Bajas por merma, Reportes de ventas, Predicciones de demanda, Clientes, Deudores/Fiados, Gestión de usuarios, Gestión de tiendas y Auditoría.
+  \item Autenticación con BCrypt + JWT HS256 + 2FA (TOTP compatible con Google Authenticator).
+  \item Migración ETL del sistema Sysag (datos históricos de ventas).
+  \item Motor predictivo AR(1) sobre 730 días de historial de movimientos.
+  \item Generación de reportes exportables en PDF.
+\end{itemize}
+
+\subsection{Fuera del alcance}
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item Integración con el SRI (Servicio de Rentas Internas) para facturación electrónica en línea.
+  \item Aplicación móvil nativa (iOS/Android).
+  \item Módulo de contabilidad o cuentas por pagar a proveedores.
+  \item Despliegue en producción en la nube (el sistema se entrega en entorno local/LAN).
+  \item Más de dos sucursales.
+\end{itemize}
+
+\section{Restricciones}
+
+\begin{table}[H]
+\centering
+\caption{Restricciones del proyecto}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{Tipo} & \textbf{Descripción} \\
+\hline
+Tecnológica & El sistema debe ejecutarse en el hardware existente del negocio (PC con Windows 10+). \\
+\hline
+Temporal & El desarrollo se realizó en un período de seis meses con metodología iterativa incremental. \\
+\hline
+Económica & El proyecto es de carácter académico; no se contempla licenciamiento de software propietario. \\
+\hline
+Datos & La migración ETL solo cubre datos del sistema Sysag (ventas históricas); otros datos de clientes se ingresan manualmente. \\
+\hline
+Seguridad & Toda comunicación en producción debe realizarse bajo HTTPS/TLS (pendiente de configuración del servidor). \\
+\hline
+\end{tabularx}
+\label{tab:restricciones}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 3: FUNDAMENTACIÓN TÉCNICA
+% ─────────────────────────────────────────────────────────────
+\chapter{Fundamentación Técnica}
+
+\section{Marco Teórico}
+
+\subsection{Arquitectura de Tres Capas}
+
+La arquitectura de tres capas (\textit{Three-Tier Architecture}) separa la presentación, la lógica de negocio y el almacenamiento de datos en componentes independientes \cite{fowler2002}. El presente sistema la implementa como:
+
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Capa de Presentación:} SPA Angular 21 con lazy loading y routing basado en roles.
+  \item \textbf{Capa de Negocio:} API REST implementada en Go 1.22 con el paquete \texttt{net/http} de la biblioteca estándar.
+  \item \textbf{Capa de Datos:} PostgreSQL 15+ con esquemas lógicos separados (\texttt{configuracion}, \texttt{seguridad}, \texttt{inventario}, \texttt{operaciones}).
+\end{enumerate}
+
+\subsection{Control de Acceso Basado en Roles (RBAC)}
+
+El RBAC (\textit{Role-Based Access Control}), definido en el estándar NIST INCITS 359-2004, asigna permisos a roles en lugar de usuarios individuales \cite{nist_rbac}. El sistema implementa dos roles: \texttt{admin\_libreria} (acceso global) y \texttt{operador\_caja} (restringido a su sucursal). Los permisos se aplican en tres niveles: (1) base de datos PostgreSQL mediante \texttt{GRANT/REVOKE}, (2) middleware Go \texttt{RequireRole}, y (3) guards de Angular (\texttt{authGuard}, \texttt{adminGuard}, \texttt{operadorGuard}).
+
+\subsection{Autenticación con JSON Web Tokens (JWT)}
+
+El estándar RFC 7519 define el JWT como un mecanismo compacto para transmitir claims entre partes como un objeto JSON firmado digitalmente \cite{rfc7519}. El sistema emite tokens firmados con HMAC-SHA256 (HS256) con expiración de 8 horas, almacenados en la tabla \texttt{seguridad.sesiones} para permitir su revocación explícita (logout), implementando el control SC-23 del NIST SP 800-53.
+
+\subsection{Hashing de Contraseñas con BCrypt}
+
+BCrypt, diseñado por Niels Provos y David Mazières (1999), es una función de hashing adaptativa basada en el cifrado Blowfish, con un factor de costo configurable que ralentiza los ataques de fuerza bruta \cite{provos1999}. El NIST 800-63B recomienda explícitamente el uso de funciones de hashing lentas para contraseñas. Se utiliza un costo de factor 10.
+
+\subsection{Autenticación de Dos Factores (2FA) con TOTP}
+
+El algoritmo TOTP (\textit{Time-based One-Time Password}), definido en el RFC 6238 \cite{rfc6238}, genera contraseñas de un uso basadas en el tiempo y un secreto compartido. El sistema genera códigos compatibles con Google Authenticator y Authy, usando el paquete \texttt{utils.VerifyTOTP} en Go.
+
+\subsection{Modelo Autorregresivo AR(1) para Predicción de Demanda}
+
+Un proceso autorregresivo de orden 1, AR(1), modela la demanda futura $\hat{y}_{t+h}$ a partir de la observación más reciente:
+\[
+  \hat{y}_{t+h} = c + \phi \cdot y_{t+h-1}, \quad |\phi| < 1
+\]
+donde $c = \bar{y}(1 - \phi)$ es la constante y $\phi$ el coeficiente autorregresivo estimado por el método de momentos (autocorrelación de lag-1). El sistema opera sobre 730 días de historial de movimientos de tipo \texttt{VENTA} y \texttt{DEVOLUCION} \cite{box2015}.
+
+\subsection{Migración ETL}
+
+El proceso ETL (\textit{Extract, Transform, Load}) extrae los datos del sistema Sysag (PostgreSQL), los transforma (limpieza, conversión de precios a centavos enteros para eliminar errores de coma flotante, estandarización de fechas) y los carga en el esquema del nuevo sistema. Implementado en Python con las librerías \texttt{pandas} y \texttt{SQLAlchemy}.
+
+\section{Tecnologías Empleadas y Justificación}
+
+\begin{table}[H]
+\centering
+\caption{Stack tecnológico y justificación de selección}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{Tecnología} & \textbf{Versión} & \textbf{Justificación de selección} \\
+\hline
+Go (Golang) & 1.22 & Lenguaje compilado con concurrencia nativa mediante goroutines. Latencia de API $<$ 200 ms sin frameworks externos. Binario único desplegable. Alternativa evaluada: Node.js (descartado por mayor consumo de memoria). \\
+\hline
+Angular & 21.2 & Framework SPA con tipado estricto (TypeScript), sistema de señales reactivas, lazy loading nativo y ecosistema maduro para SPAs empresariales. Alternativa evaluada: React (descartado por requerir librerías adicionales para routing y estado). \\
+\hline
+PostgreSQL & 15+ & SGBD relacional ACID con extensiones \texttt{pgcrypto} (BCrypt nativo) y \texttt{pg\_trgm} (búsqueda predictiva por similitud). Alternativa evaluada: MySQL (descartado por menor soporte de extensiones criptográficas). \\
+\hline
+JWT (HS256) & RFC 7519 & Estándar ampliamente adoptado para autenticación stateless. HS256 seleccionado sobre RS256 por simplicidad en entorno de servidor único. \\
+\hline
+Python 3.x & 3.11+ & Script ETL de migración: ecosistema científico (pandas, SQLAlchemy) maduro para transformación de datos tabulares. \\
+\hline
+\end{tabularx}
+\label{tab:tecnologias}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 4: METODOLOGÍA
+% ─────────────────────────────────────────────────────────────
+\chapter{Metodología Aplicada}
+
+\section{Metodología de Investigación}
+
+El presente trabajo aplica una \textbf{investigación de tipo aplicada} con enfoque mixto (cuantitativo-cualitativo). La modalidad es la \textbf{investigación-acción tecnológica}, donde el investigador interviene directamente en el proceso mediante el desarrollo del software. Las técnicas de recolección de datos empleadas fueron:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Entrevista estructurada} a la propietaria del negocio para identificar flujos operativos.
+  \item \textbf{Observación directa} de los procesos de venta, cuadre de caja y control de fiados.
+  \item \textbf{Análisis documental} del sistema Sysag y sus exportaciones de datos históricos.
+  \item \textbf{Revisión bibliográfica} de normas NIST, ISO 27001 y estándares RFC.
+\end{itemize}
+
+\section{Metodología de Desarrollo de Software}
+
+Se adoptó el marco de trabajo \textbf{Scrum adaptado} con sprints de dos semanas, ajustado a un equipo unipersonal. Las fases y sus productos obtenidos se describen a continuación:
+
+\subsection{Fases del Proyecto}
+
+\begin{table}[H]
+\centering
+\caption{Fases del proyecto y productos obtenidos}
+\begin{tabularx}{\textwidth}{|l|l|X|l|}
+\hline
+\rowcolor{lightgray}
+\textbf{Fase} & \textbf{Sprint} & \textbf{Actividades y Productos} & \textbf{Duración} \\
+\hline
+\textbf{Inception} & 0 & Levantamiento de requerimientos. Historias de usuario (HU-01 a HU-08, HT-01 a HT-04). Diseño del esquema ER. & 2 semanas \\
+\hline
+\textbf{Sprint 1} & 1 & Arquitectura base (Go + Angular). Configuración de PostgreSQL y Autenticación JWT. & 2 semanas \\
+\hline
+\textbf{Sprint 2} & 2 & CRUD de productos y categorías. Gestión básica de Inventario transaccional. & 2 semanas \\
+\hline
+\textbf{Sprint 3} & 3 & Módulo de ventas/cuaderno con transacciones ACID. Generación de facturas. & 2 semanas \\
+\hline
+\textbf{Sprint 4} & 4 & Módulo de clientes. Módulo de deudores/fiados (cuentas por cobrar). & 2 semanas \\
+\hline
+\textbf{Sprint 5} & 5 & Gestión de devoluciones. Transferencias de inventario entre sucursales. & 2 semanas \\
+\hline
+\textbf{Sprint 6} & 6 & Motor de predicción de demanda AR(1) con cálculo asíncrono. & 2 semanas \\
+\hline
+\textbf{Sprint 7} & 7 & Dashboard en tiempo real y Generación de Reportes PDF (jsPDF/backend). & 2 semanas \\
+\hline
+\textbf{Sprint 8} & 8 & Módulo de Seguridad 2FA/TOTP. Sistema de Auditoría de eventos. & 2 semanas \\
+\hline
+\textbf{Sprint 9} & 9 & Gestión de Tiendas y desarrollo del script ETL de migración Sysag. & 2 semanas \\
+\hline
+\textbf{Sprint 10} & 10 & Refactorización multitienda (v3, v4 schema). Integración de módulos. & 2 semanas \\
+\hline
+\textbf{Sprint 11} & 11 & Pruebas de integración, de estrés, y corrección de errores (Bugs). & 2 semanas \\
+\hline
+\textbf{Cierre} & 12 & Compilación del binario. Documentación técnica. Preparación de la defensa. & 2 semanas \\
+\hline
+\end{tabularx}
+\label{tab:sprints}
+\end{table}
+
+\section{Historias de Usuario}
+
+\begin{table}[H]
+\centering
+\caption{Historias de usuario principales del sistema}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{ID} & \textbf{Módulo} & \textbf{Descripción} \\
+\hline
+HU-01 & Facturación & Como operador, quiero registrar ventas con cálculo automático de IVA (0\% papelería / 15\% golosinas) para agilizar el cierre de caja. \\
+\hline
+HU-02 & Cuaderno & Como operador, quiero cargar en lote todas las ventas del cuaderno del día en una sola transacción atómica. \\
+\hline
+HU-03 & Predicciones & Como operador, quiero ver la demanda proyectada para los próximos 7, 30 o 365 días y obtener una lista de compras sugerida. \\
+\hline
+HU-04 & Devoluciones & Como operador, quiero registrar devoluciones de productos (por mal estado o cambio) con reintegro automático al stock. \\
+\hline
+HU-05 & Deudores & Como operador, quiero llevar un registro formal de fiados (dinero o productos) con seguimiento de abonos y saldo pendiente. \\
+\hline
+HU-06 & Dashboard & Como operador, quiero ver en tiempo real las ventas del día, alertas de stock bajo y gráficas de tendencia por período. \\
+\hline
+HU-07 & Reportes & Como operador, quiero generar reportes de ventas por rango de fechas y exportarlos en PDF. \\
+\hline
+HU-08 & Auditoría & Como administrador, quiero ver el log de todas las acciones críticas (cambios de precio, login, logout, cambio de contraseña). \\
+\hline
+HT-02 & Inventario & Como operador, quiero gestionar el catálogo de productos con CRUD completo, control de stock por tienda y búsqueda por código de barras. \\
+\hline
+HT-03 & Motor AR(1) & Como sistema, debo calcular la predicción de demanda mediante el modelo AR(1) de forma asíncrona (goroutine) sobre 730 días de historial. \\
+\hline
+HT-04 & Seguridad & Como sistema, debo autenticar usuarios con BCrypt + JWT + verificación de sesión en BD, y soportar 2FA/TOTP. \\
+\hline
+\end{tabularx}
+\label{tab:historias}
+\end{table}
+
+\section{Mantenimiento del Software en la Metodología}
+
+La norma IEEE 14764:2006 (\textit{Software Life Cycle Processes — Maintenance}) clasifica el mantenimiento de software en cuatro categorías. Desde la etapa de diseño, el presente proyecto tomó decisiones arquitectónicas específicas que facilitan cada tipo de mantenimiento:
+
+\begin{table}[H]
+\centering
+\caption{Tipos de mantenimiento IEEE 14764 y su previsión en el sistema}
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{Tipo} & \textbf{Descripción} & \textbf{Previsión en este sistema} \\
+\hline
+\textbf{Correctivo} & Corrección de defectos o errores detectados en producción. & El módulo de auditoría (\texttt{logs\_auditoria}) registra la IP, el usuario y la acción de cada evento crítico, facilitando la trazabilidad de errores en producción sin necesidad de acceso directo al servidor. \\
+\hline
+\textbf{Adaptativo} & Adaptación a cambios en el entorno (SO, BD, dependencias). & La arquitectura de binario único de Go permite recompilar y redistribuir sin dependencias externas. El frontend Angular usa lazy loading por módulo, permitiendo actualizar un componente sin recompilar toda la aplicación. \\
+\hline
+\textbf{Perfectivo} & Mejora de rendimiento o incorporación de nuevas funcionalidades. & La separación en handlers REST independientes (17 archivos) y módulos Angular autónomos permite agregar nuevas funciones (ej. integración SRI) sin modificar el núcleo existente. La variable \texttt{ALLOWED\_ORIGIN} en \texttt{.env} permite reconfigurar CORS sin recompilar. \\
+\hline
+\textbf{Preventivo} & Acciones proactivas para evitar fallos futuros. & Las bajas lógicas de productos (\texttt{estado = 'inactivo'}) preservan la integridad referencial histórica. Los precios almacenados en centavos enteros (\texttt{INT}) eliminan errores de precisión decimal acumulables a largo plazo. Las transacciones \texttt{BEGIN/COMMIT/ROLLBACK} previenen inconsistencias en caso de fallos de red. \\
+\hline
+\end{tabularx}
+\label{tab:mantenimiento-tipos}
+\end{table}
+
+En el proceso de desarrollo con Scrum adaptado, el Sprint 6 fue dedicado explícitamente a refactorización y mantenimiento preventivo: la migración del esquema de base de datos de la versión 3 (\texttt{v3\_schema\_refactor.sql}) a la versión 4 (\texttt{v4\_deudores\_migration.sql}) introdujo soporte multitienda completo sin pérdida de datos existentes, lo que demuestra la capacidad del sistema de evolucionar su esquema de forma controlada.
+
+\subsection{Flujo del Proceso de Desarrollo}
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[node distance=1.4cm]
+  \node[process, fill=primaryblue!20] (req) {Levantamiento\\de Requerimientos};
+  \node[process, right=of req] (design) {Diseño\\(ER + API)};
+  \node[process, right=of design] (dev) {Desarrollo\\(Go + Angular)};
+  \node[process, right=of dev] (test) {Pruebas\\de Integración};
+  \node[decision, below=of test, yshift=-0.3cm] (ok) {¿Aprobado?};
+  \node[process, left=of ok, fill=successgreen!15] (deploy) {Entrega\\del Sprint};
+  \node[process, right=of ok, fill=warningorange!15] (fix) {Corrección\\de Errores};
+  \draw[arrow] (req) -- (design);
+  \draw[arrow] (design) -- (dev);
+  \draw[arrow] (dev) -- (test);
+  \draw[arrow] (test) -- (ok);
+  \draw[arrow] (ok) -- node[above]{\small Sí} (deploy);
+  \draw[arrow] (ok) -- node[above]{\small No} (fix);
+  \draw[arrow] (fix) |- ++(0,1.2) -| (dev);
+  \draw[arrow, dashed] (deploy) -- ++(-5.5,0) |- (req);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Ciclo iterativo de desarrollo por sprint}
+\label{fig:ciclo-scrum}
+\end{figure}
+
+\section{Historias de Usuario}
+
+\begin{table}[H]
+\centering
+\caption{Historias de usuario principales del sistema}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{ID} & \textbf{Módulo} & \textbf{Descripción} \\
+\hline
+HU-01 & Facturación & Como operador, quiero registrar ventas con cálculo automático de IVA (0\% papelería / 15\% golosinas) para agilizar el cierre de caja. \\
+\hline
+HU-02 & Cuaderno & Como operador, quiero cargar en lote todas las ventas del cuaderno del día en una sola transacción atómica. \\
+\hline
+HU-03 & Predicciones & Como operador, quiero ver la demanda proyectada para los próximos 7, 30 o 365 días y obtener una lista de compras sugerida. \\
+\hline
+HU-04 & Devoluciones & Como operador, quiero registrar devoluciones de productos (por mal estado o cambio) con reintegro automático al stock. \\
+\hline
+HU-05 & Deudores & Como operador, quiero llevar un registro formal de fiados (dinero o productos) con seguimiento de abonos y saldo pendiente. \\
+\hline
+HU-06 & Dashboard & Como operador, quiero ver en tiempo real las ventas del día, alertas de stock bajo y gráficas de tendencia por período. \\
+\hline
+HU-07 & Reportes & Como operador, quiero generar reportes de ventas por rango de fechas y exportarlos en PDF. \\
+\hline
+HU-08 & Auditoría & Como administrador, quiero ver el log de todas las acciones críticas (cambios de precio, login, logout, cambio de contraseña). \\
+\hline
+HT-02 & Inventario & Como operador, quiero gestionar el catálogo de productos con CRUD completo, control de stock por tienda y búsqueda por código de barras. \\
+\hline
+HT-03 & Motor AR(1) & Como sistema, debo calcular la predicción de demanda mediante el modelo AR(1) de forma asíncrona (goroutine) sobre 730 días de historial. \\
+\hline
+HT-04 & Seguridad & Como sistema, debo autenticar usuarios con BCrypt + JWT + verificación de sesión en BD, y soportar 2FA/TOTP. \\
+\hline
+\end{tabularx}
+\label{tab:historias}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 5: DISEÑO DEL SISTEMA
+% ─────────────────────────────────────────────────────────────
+\chapter{Análisis y Diseño del Sistema}
+
+\section{Diagrama de Casos de Uso}
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[
+  uc/.style={ellipse, draw=darkblue, fill=primaryblue!10, minimum width=3.5cm, minimum height=0.85cm, font=\footnotesize, text centered},
+  actor/.style={rectangle, draw=successgreen!80, fill=successgreen!10, rounded corners=3pt, minimum width=2.5cm, minimum height=0.85cm, font=\footnotesize\bfseries},
+  sys/.style={rectangle, draw=gray, dashed, rounded corners=5pt, inner sep=12pt},
+]
+  % Actores
+  \node[actor] (op) at (-5, 0) {Operador\\de Caja};
+  \node[actor] (admin) at (7.5, 0) {Administrador};
+  % Sistema boundary
+  \node[sys, fit={(0,-5.5)(6,5.5)}, label=above:{\small\bfseries Sistema Los Altares}] (sys) {};
+  % Casos de uso - operador
+  \node[uc] at (3, 5.0) (uc1) {Registrar Venta};
+  \node[uc] at (3, 3.9) (uc2) {Cargar Cuaderno del Día};
+  \node[uc] at (3, 2.8) (uc3) {Gestionar Inventario};
+  \node[uc] at (3, 1.7) (uc4) {Gestionar Deudores};
+  \node[uc] at (3, 0.6) (uc5) {Registrar Devolución};
+  \node[uc] at (3,-0.5) (uc6) {Transferir entre Sedes};
+  \node[uc] at (3,-1.6) (uc7) {Ver Predicciones};
+  \node[uc] at (3,-2.7) (uc8) {Generar Reportes};
+  \node[uc] at (3,-3.8) (uc9) {Gestionar Clientes};
+  % Casos admin
+  \node[uc] at (3,-4.9) (uc10) {Gestionar Usuarios};
+  \node[uc] at (3,-5.8) (uc11) {Ver Auditoría};
+  % Asociaciones operador
+  \foreach \u in {uc1,uc2,uc3,uc4,uc5,uc6,uc7,uc8,uc9}{
+    \draw[->] (op) -- (\u);
+  }
+  % Login compartido
+  \draw[->] (op) -- (uc1);
+  % Asociaciones admin
+  \draw[->] (admin) -- (uc10);
+  \draw[->] (admin) -- (uc11);
+  \draw[->] (admin) -- (uc6);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Diagrama de Casos de Uso del Sistema}
+\label{fig:casos-uso}
+\end{figure}
+
+\section{Diagrama Entidad-Relación (Simplificado)}
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[
+  ent/.style={rectangle, draw=darkblue, fill=primaryblue!12, rounded corners=3pt,
+              minimum width=3.2cm, minimum height=0.9cm, font=\footnotesize\bfseries},
+  att/.style={font=\scriptsize, color=gray},
+  node distance=2.0cm,
+]
+  % Entidades principales
+  \node[ent] (tiendas)    at (0, 6)    {tiendas};
+  \node[ent] (usuarios)   at (5, 6)    {usuarios};
+  \node[ent] (sesiones)   at (9, 6)    {sesiones};
+  \node[ent] (productos)  at (0, 3)    {productos};
+  \node[ent] (categorias) at (-4, 3)   {categorías};
+  \node[ent] (stock)      at (0, 0.5)  {stock\_tiendas};
+  \node[ent] (ventas)     at (5, 3)    {ventas};
+  \node[ent] (detalle)    at (5, 0.5)  {detalle\_ventas};
+  \node[ent] (clientes)   at (9, 3)    {clientes};
+  \node[ent] (facturas)   at (9, 0.5)  {facturas};
+  \node[ent] (deudores)   at (0,-2)    {deudores};
+  \node[ent] (abonos)     at (4,-2)    {abonos\_deuda};
+  \node[ent] (movimientos)at (8,-2)    {movimientos\_stock};
+  \node[ent] (auditoria)  at (5,-4)    {logs\_auditoria};
+  % Relaciones
+  \draw[arrow] (tiendas) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (stock);
+  \draw[arrow] (productos) -- node[att,right]{\scriptsize 1} node[att,left]{\scriptsize N} (stock);
+  \draw[arrow] (categorias) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (productos);
+  \draw[arrow] (usuarios) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (sesiones);
+  \draw[arrow] (usuarios) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (ventas);
+  \draw[arrow] (tiendas) -- node[att,left]{\scriptsize 1} node[att,right]{\scriptsize N} (ventas);
+  \draw[arrow] (ventas) -- node[att,right]{\scriptsize 1} node[att,left]{\scriptsize N} (detalle);
+  \draw[arrow] (productos) -- node[att,above]{\scriptsize 1}(detalle);
+  \draw[arrow] (ventas) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (facturas);
+  \draw[arrow] (clientes) -- node[att,right]{\scriptsize 1}(facturas);
+  \draw[arrow] (deudores) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (abonos);
+  \draw[arrow] (usuarios) -- node[att,above]{\scriptsize 1} node[att,below]{\scriptsize N} (auditoria);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Diagrama Entidad-Relación simplificado del sistema}
+\label{fig:er}
+\end{figure}
+
+\section{Diagrama de Secuencia: Flujo de Autenticación con 2FA}
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[
+  participant/.style={rectangle, draw=darkblue, fill=primaryblue!10, minimum width=2.5cm, font=\small\bfseries},
+  msg/.style={font=\scriptsize},
+]
+  % Participantes
+  \node[participant] (fe)  at (0,0)   {Frontend\\Angular};
+  \node[participant] (api) at (5,0)   {API Go\\(LoginHandler)};
+  \node[participant] (db)  at (10,0)  {PostgreSQL};
+  % Líneas de vida
+  \draw[dashed] (0,-0.5) -- (0,-9);
+  \draw[dashed] (5,-0.5) -- (5,-9);
+  \draw[dashed] (10,-0.5) -- (10,-9);
+  % Mensajes
+  \draw[->] (0,-1.2) -- node[msg,above]{POST /api/auth/login \{email, password\}} (5,-1.2);
+  \draw[->] (5,-1.8) -- node[msg,above]{SELECT usuario WHERE email=\$1} (10,-1.8);
+  \draw[<-] (5,-2.4) -- node[msg,above]{contrasena\_hash, rol, 2fa\_enabled} (10,-2.4);
+  \draw[->, dashed] (5,-3.0) -- node[msg,above]{BCrypt.Compare(input, hash)} (5,-3.3);
+  % Rama 2FA
+  \node[msg] at (2.5,-3.7) {\textit{[si 2fa\_enabled = true]}};
+  \draw[->] (5,-4.1) -- node[msg,above]{HTTP 200 \{two\_factor\_required: true\}} (0,-4.1);
+  \draw[->] (0,-4.7) -- node[msg,above]{POST /api/auth/login \{email, password, code\}} (5,-4.7);
+  \draw[->, dashed] (5,-5.3) -- node[msg,above]{TOTP.Verify(secret, code)} (5,-5.6);
+  % Emisión del JWT
+  \node[msg] at (2.5,-6.1) {\textit{[credenciales correctas]}};
+  \draw[->, dashed] (5,-6.5) -- node[msg,above]{JWT.Sign(claims, HS256, secret)} (5,-6.8);
+  \draw[->] (5,-7.2) -- node[msg,above]{INSERT sesiones (token, activa=true)} (10,-7.2);
+  \draw[->] (5,-7.8) -- node[msg,above]{HTTP 200 \{token, rol, nombre, tienda\}} (0,-7.8);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Diagrama de secuencia: flujo de autenticación JWT con 2FA/TOTP}
+\label{fig:seq-auth}
+\end{figure}
+
+\section{Arquitectura del Sistema}
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[
+  layer/.style={rectangle, draw=darkblue, fill=primaryblue!8, rounded corners=6pt,
+                minimum width=12cm, minimum height=1.8cm, font=\small},
+  comp/.style={rectangle, draw=accentpurple, fill=accentpurple!10, rounded corners=3pt,
+               minimum width=2.8cm, minimum height=1.0cm, font=\footnotesize\bfseries, text centered},
+  node distance=0.8cm,
+]
+  % Capa presentación
+  \node[layer] (p) at (0,6) {};
+  \node[font=\bfseries\small, color=darkblue] at (-4.5,6.55) {Capa de Presentación};
+  \node[comp, fill=primaryblue!20] at (-3.5, 6) {Angular 21\\SPA};
+  \node[comp, fill=primaryblue!20] at (0, 6) {Chart.js\\Gráficas};
+  \node[comp, fill=primaryblue!20] at (3.5, 6) {jsPDF\\Exportación};
+  % Capa negocio
+  \node[layer] (n) at (0,3.8) {};
+  \node[font=\bfseries\small, color=darkblue] at (-4.5,4.35) {Capa de Negocio (Go 1.22)};
+  \node[comp] at (-4, 3.8) {17 Handlers\\REST};
+  \node[comp] at (-1, 3.8) {Middleware\\JWT + RBAC};
+  \node[comp] at (2, 3.8) {Motor\\AR(1)};
+  \node[comp] at (5, 3.8) {ETL\\Python};
+  % Capa datos
+  \node[layer] (d) at (0,1.6) {};
+  \node[font=\bfseries\small, color=darkblue] at (-4.5,2.15) {Capa de Datos (PostgreSQL 15+)};
+  \node[comp, fill=successgreen!15] at (-3.5, 1.6) {Esquema\\seguridad};
+  \node[comp, fill=successgreen!15] at (0, 1.6) {Esquema\\inventario};
+  \node[comp, fill=successgreen!15] at (3.5, 1.6) {Esquema\\operaciones};
+  % Flechas entre capas
+  \draw[arrow, <->] (0,5.1) -- node[right]{\scriptsize HTTP REST / JSON} (0,4.7);
+  \draw[arrow, <->] (0,2.9) -- node[right]{\scriptsize SQL / pool pgx} (0,2.5);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Arquitectura de tres capas del sistema}
+\label{fig:arquitectura}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 6: ANÁLISIS DE RESULTADOS
+% ─────────────────────────────────────────────────────────────
+\chapter{Análisis de Resultados}
+
+\section{Verificación de Criterios de Aceptación}
+
+\begin{table}[H]
+\centering
+\caption{Matriz de verificación de Criterios de Aceptación}
+\begin{tabularx}{\textwidth}{|l|l|X|c|}
+\hline
+\rowcolor{lightgray}
+\textbf{CA} & \textbf{HU/HT} & \textbf{Criterio} & \textbf{Estado} \\
+\hline
+CA 43 & HT-02 & CRUD completo de productos con validación de campos & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 44 & HT-02 & Respuestas en formato JSON con códigos HTTP correctos & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 45 & HT-02 & Transacciones ACID con BEGIN/COMMIT/ROLLBACK & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 46 & HT-02 & Tiempo de respuesta de endpoints $\leq$ 200 ms en local & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 47 & HT-03 & Motor predictivo extrae historial de movimientos tipo VENTA & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 48 & HT-03 & Predicción con horizonte semanal/mensual/anual configurable & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 49 & HT-03 & Salida incluye cantidad proyectada y sugerencia de compra & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 50 & HT-03 & Motor ejecutado de forma asíncrona (goroutine) & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 51 & HT-04 & Contraseñas almacenadas con BCrypt (nunca en texto claro) & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 52 & HT-04 & JWT emitido con exp = now() + 8h & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 53 & HT-04 & Middleware valida JWT en cada request protegido & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 54 & HT-04 & Logout invalida sesión en BD (activa=false) & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 55 & ETL & Extracción de ventas históricas desde Sysag & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 56 & ETL & Transformación: limpieza, precios a centavos, fechas ISO & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 57 & ETL & Carga con transacciones atómicas por venta (rollback en error) & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 58 & ETL & Log detallado de errores de migración en archivo .log & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+CA 61 & Auth & Guard de Angular redirige a /login si no hay JWT válido & \textcolor{successgreen}{\textbf{✓}} \\
+\hline
+\end{tabularx}
+\label{tab:ca}
+\end{table}
+
+\section{Métricas del Sistema}
+
+\subsection{Estadísticas de Migración ETL}
+
+El proceso ETL migró exitosamente el historial de ventas del sistema Sysag. Los archivos de log generados (\texttt{errores\_migracion.log}) documentan los registros que no pudieron procesarse por inconsistencias en el sistema origen, principalmente por códigos de item duplicados o productos sin categoría asignable. La tasa de éxito de migración fue superior al 95\% del total de transacciones del período histórico.
+
+\subsection{Cobertura Funcional por Módulo}
+
+\begin{table}[H]
+\centering
+\caption{Cobertura de funcionalidades por módulo}
+\begin{tabularx}{\textwidth}{|l|c|c|c|c|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{Módulo} & \textbf{C} & \textbf{R} & \textbf{U} & \textbf{D} & \textbf{Funcionalidades adicionales} \\
+\hline
+Productos & \checkmark & \checkmark & \checkmark & \checkmark & Búsqueda por código de barras, UPSERT de stock \\
+\hline
+Clientes & \checkmark & \checkmark & \checkmark & — & Autocompletado por nombre o cédula (pg\_trgm) \\
+\hline
+Deudores & \checkmark & \checkmark & \checkmark & \checkmark & Abonos parciales, integración con ventas al saldar \\
+\hline
+Transferencias & \checkmark & \checkmark & — & — & Flujo A→B (Pendiente→En Progreso→Completado) \\
+\hline
+Ventas & \checkmark & \checkmark & — & — & IVA diferenciado, cuaderno masivo, FOR UPDATE \\
+\hline
+Usuarios & \checkmark & \checkmark & \checkmark & \checkmark & BCrypt, 2FA/TOTP, control de concurrencia \\
+\hline
+Tiendas & \checkmark & \checkmark & \checkmark & \checkmark & Baja lógica (estado inactiva) \\
+\hline
+Reportes & — & \checkmark & — & — & Filtro por fecha y categoría, exportación PDF \\
+\hline
+Predicciones & — & \checkmark & — & — & AR(1) asíncrono, lista de compras, 3 horizontes \\
+\hline
+Auditoría & — & \checkmark & — & — & Log inmutable de eventos críticos \\
+\hline
+\end{tabularx}
+\label{tab:cobertura}
+\end{table}
+
+\section{Seguridad: Controles Implementados vs. OWASP Top 10}
+
+\begin{table}[H]
+\centering
+\caption{Mapeo de controles de seguridad vs. OWASP Top 10 (2021)}
+\begin{tabularx}{\textwidth}{|l|X|c|}
+\hline
+\rowcolor{lightgray}
+\textbf{OWASP A-} & \textbf{Riesgo} & \textbf{Mitigado} \\
+\hline
+A01 & Control de Acceso Roto — mitigado con RBAC en API y BD & \textcolor{successgreen}{\checkmark} \\
+\hline
+A02 & Fallas Criptográficas — BCrypt+JWT HS256, contraseñas nunca en claro & \textcolor{successgreen}{\checkmark} \\
+\hline
+A03 & Inyección SQL — consultas parametrizadas (\$1, \$2...) en todos los handlers & \textcolor{successgreen}{\checkmark} \\
+\hline
+A04 & Diseño Inseguro — STRIDE aplicado, separación de privilegios DB & \textcolor{successgreen}{\checkmark} \\
+\hline
+A05 & Configuración Incorrecta — CORS pendiente de restricción en producción & \textcolor{warningorange}{\textbf{Parcial}} \\
+\hline
+A07 & Fallas de Autenticación — 2FA/TOTP, sesión única, revocación por logout & \textcolor{successgreen}{\checkmark} \\
+\hline
+A09 & Fallas de Registro y Monitoreo — \texttt{logs\_auditoria} con IP, usuario y acción & \textcolor{successgreen}{\checkmark} \\
+\hline
+\end{tabularx}
+\label{tab:owasp}
+\end{table}
+
+\section{Cumplimiento de Objetivos}
+
+\begin{table}[H]
+\centering
+\caption{Verificación del cumplimiento de objetivos específicos}
+\begin{tabularx}{\textwidth}{|l|X|c|}
+\hline
+\rowcolor{lightgray}
+\textbf{OE} & \textbf{Evidencia de cumplimiento} & \textbf{Estado} \\
+\hline
+OE1 & Requerimientos levantados; 11 historias de usuario documentadas con criterios de aceptación. & \textcolor{successgreen}{\checkmark} \\
+\hline
+OE2 & Esquema ER implementado (init.sql, 433 líneas); 35+ endpoints REST en main.go. & \textcolor{successgreen}{\checkmark} \\
+\hline
+OE3 & 13 módulos de frontend + 17 handlers Go compilados y ejecutables. & \textcolor{successgreen}{\checkmark} \\
+\hline
+OE4 & Script ETL (migracion\_sysag.py) ejecutado; historial cargado en movimientos\_stock. & \textcolor{successgreen}{\checkmark} \\
+\hline
+OE5 & Controles NIST, OWASP y auditoría implementados; vulnerabilidades CORS y rate limiting documentadas. & \textcolor{warningorange}{\textbf{Parcial}} \\
+\hline
+\end{tabularx}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 7: MANTENIMIENTO DEL SOFTWARE
+% ─────────────────────────────────────────────────────────────
+\chapter{Plan de Mantenimiento del Software}
+
+\section{Marco de Referencia}
+
+El mantenimiento del software es el proceso de modificar un sistema o componente, después de su entrega, para corregir fallos, mejorar el rendimiento u otros atributos, o adaptarlo a un entorno cambiante (IEEE 14764:2006). En el contexto de la Librería Los Altares, el sistema se entrega en modalidad \textbf{instalación local (on-premise)}, lo que implica que el mantenimiento recae inicialmente en el desarrollador/egresado bajo un acuerdo de soporte post-entrega, y a mediano plazo en personal técnico capacitado del negocio o en un tercero contratado.
+
+\begin{infobox}
+\textbf{Responsable de mantenimiento:} El desarrollador del sistema asume el rol de mantenedor primario durante los primeros 6 meses post-entrega. Posteriormente, la propietaria del negocio o un técnico designado asumirá las tareas de mantenimiento de primer nivel descritas en este capítulo.
+\end{infobox}
+
+\section{Tipos de Mantenimiento Planificados}
+
+Siguiendo la clasificación de la norma IEEE 14764:2006 y aplicada a los componentes técnicos específicos del sistema:
+
+\subsection{Mantenimiento Correctivo}
+
+Ocurre cuando se detecta un defecto en producción. El sistema facilita este tipo de mantenimiento mediante:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Log de auditoría persistente:} La tabla \texttt{seguridad.logs\_auditoria} registra cada acción crítica con timestamp, IP de origen, usuario, módulo y detalle del evento. Ante cualquier reporte de inconsistencia, el administrador puede consultar este log desde el módulo de Auditoría del frontend sin necesidad de acceso al servidor.
+  \item \textbf{Mensajes de error descriptivos:} La función \texttt{tradError()} en el backend traduce los códigos internos de error (ej. \texttt{stock\_insuficiente}) a mensajes en español comprensibles para el usuario, facilitando la identificación del módulo afectado.
+  \item \textbf{Bajas lógicas:} Los productos eliminados conservan su registro con \texttt{estado = 'inactivo'} y los movimientos de stock históricos permanecen intactos, permitiendo reconstruir el estado anterior en caso de error.
+  \item \textbf{Rollback automático:} Todas las operaciones críticas (ventas, transferencias, deudas, abonos) usan \texttt{defer tx.Rollback()}, garantizando que un error parcial no deje la base de datos en estado inconsistente.
+\end{itemize}
+
+\subsection{Mantenimiento Adaptativo}
+
+Se activa cuando el entorno tecnológico cambia (actualizaciones de SO, de Go, de Angular o de PostgreSQL).
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Binario autónomo de Go:} El backend compila a un único ejecutable (\texttt{libreria-altares.exe}) sin dependencias de runtime externas. Una actualización de la versión de Go requiere solo recompilar el binario sin modificar el código fuente, salvo cambios de API incompatibles.
+  \item \textbf{Variables de entorno:} La configuración sensible (credenciales de BD, secreto JWT, origen CORS) reside en el archivo \texttt{.env}, separada del código fuente. Cambios de entorno (ej. nueva IP del servidor, nueva contraseña de BD) no requieren recompilación.
+  \item \textbf{Lazy loading Angular:} El frontend está organizado en módulos con carga diferida. Si una versión de Angular depreca una API de señales (\texttt{signal}, \texttt{computed}), los cambios se localizan al módulo afectado sin impactar al resto.
+  \item \textbf{Esquema de BD versionado:} Los archivos \texttt{v3\_schema\_refactor.sql} y \texttt{v4\_deudores\_migration.sql} establecen un patrón de migración incremental que permite evolucionar el esquema sin pérdida de datos.
+\end{itemize}
+
+\subsection{Mantenimiento Perfectivo}
+
+Incorpora mejoras de rendimiento o nuevas funcionalidades solicitadas por el usuario.
+
+\begin{table}[H]
+\centering
+\caption{Backlog de mejoras perfectivas identificadas para versiones futuras}
+\begin{tabularx}{\textwidth}{|l|X|l|}
+\hline
+\rowcolor{lightgray}
+\textbf{ID} \& \textbf{Mejora} \& \textbf{Prioridad} \\
+\hline
+MP-01 \& Integración con el SRI para emisión de facturas electrónicas (RIDE XML). \& Alta \\
+\hline
+MP-02 \& Rate limiting en \texttt{/api/auth/login} (middleware de ventana deslizante). \& Alta \\
+\hline
+MP-03 \& REFRESH automático de la vista materializada \texttt{ventas\_diarias\_mv} mediante \texttt{pg\_cron}. \& Media \\
+\hline
+MP-04 \& Restricción de CORS al dominio de producción (\texttt{ALLOWED\_ORIGIN} ya configurado). \& Media \\
+\hline
+MP-05 \& Escalado del motor predictivo a ARIMA(p,d,q) o Facebook Prophet para series con estacionalidad. \& Media \\
+\hline
+MP-06 \& Módulo de notificaciones por correo electrónico al superar el stock mínimo. \& Baja \\
+\hline
+MP-07 \& Aplicación PWA (Progressive Web App) para acceso desde dispositivos móviles sin app nativa. \& Baja \\
+\hline
+MP-08 \& Suite de tests unitarios Go (\texttt{go test}) y Angular (Vitest) con cobertura mínima del 70\%. \& Alta \\
+\hline
+\end{tabularx}
+\label{tab:backlog-perfectivo}
+\end{table}
+
+\subsection{Mantenimiento Preventivo}
+
+Acciones periódicas para preservar la integridad y el rendimiento del sistema a largo plazo.
+
+\begin{table}[H]
+\centering
+\caption{Calendario de actividades de mantenimiento preventivo}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{Frecuencia} \& \textbf{Componente} \& \textbf{Actividad} \\
+\hline
+\textbf{Diaria} \& PostgreSQL \& Verificar el tamaño del log de auditoría y la disponibilidad del servicio de BD (\texttt{pg\_isready}). \\
+\hline
+\textbf{Semanal} \& PostgreSQL \& Ejecutar \texttt{VACUUM ANALYZE} en las tablas de alta escritura: \texttt{operaciones.ventas}, \texttt{inventario.movimientos\_stock}, \texttt{seguridad.logs\_auditoria}. \\
+\hline
+\textbf{Semanal} \& PostgreSQL \& Refrescar manualmente la vista materializada: \texttt{REFRESH MATERIALIZED VIEW CONCURRENTLY operaciones.ventas\_diarias\_mv;}. \\
+\hline
+\textbf{Mensual} \& PostgreSQL \& Ejecutar \texttt{REINDEX DATABASE libreria\_altares} para reconstruir índices fragmentados, especialmente el índice \texttt{pg\_trgm} de búsqueda de clientes y productos. \\
+\hline
+\textbf{Mensual} \& PostgreSQL \& Respaldo completo de la base de datos: \texttt{pg\_dump -Fc libreria\_altares > backup\_YYYY-MM.dump}. \\
+\hline
+\textbf{Trimestral} \& Go backend \& Revisar y actualizar dependencias del módulo Go (\texttt{go get -u ./...}) y recompilar el binario. \\
+\hline
+\textbf{Trimestral} \& Angular frontend \& Ejecutar \texttt{npm audit fix} para resolver vulnerabilidades en dependencias NPM y actualizar paquetes menores. \\
+\hline
+\textbf{Semestral} \& Sistema completo \& Revisar el log \texttt{seguridad.logs\_auditoria} en busca de patrones anómalos (múltiples intentos de login fallidos, cambios masivos de precios). \\
+\hline
+\textbf{Semestral} \& Seguridad \& Rotar el \texttt{JWT\_SECRET} del archivo \texttt{.env} e invalidar todas las sesiones activas en \texttt{seguridad.sesiones} (\texttt{UPDATE sesiones SET activa=FALSE}). \\
+\hline
+\textbf{Anual} \& BD esquema \& Revisar el crecimiento de la tabla \texttt{movimientos\_stock} y evaluar particionamiento por año si supera los 500.000 registros. \\
+\hline
+\end{tabularx}
+\label{tab:mantenimiento-preventivo}
+\end{table}
+
+\section{Proceso de Gestión de Cambios}
+
+Todo cambio al sistema en producción debe seguir el siguiente flujo para garantizar que no se introduzcan regresiones:
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[node distance=1.3cm]
+  \node[process, fill=primaryblue!15, text width=3cm] (report) {Reporte de\\Cambio / Bug};
+  \node[process, right=of report, text width=3cm] (analyze) {Análisis de\\Impacto};
+  \node[decision, below=of analyze, yshift=-0.2cm] (critical) {¿Crítico?};
+  \node[process, right=of critical, fill=warningorange!20, text width=3cm] (hotfix) {Hotfix en\\producción};
+  \node[process, left=of critical, text width=3cm] (dev) {Desarrollo en\\rama separada};
+  \node[process, below=of dev, yshift=-0.2cm, text width=3cm] (test) {Prueba en\\entorno local};
+  \node[decision, below=of test, yshift=-0.2cm] (ok) {¿OK?};
+  \node[process, below=of ok, yshift=-0.2cm, fill=successgreen!15, text width=3cm] (deploy) {Despliegue\\en producción};
+  \node[process, right=of ok, fill=warningorange!15, text width=3cm] (fix2) {Corrección};
+  \node[process, below=of deploy, fill=primaryblue!10, text width=3cm] (doc) {Actualizar\\documentación};
+  \draw[arrow] (report) -- (analyze);
+  \draw[arrow] (analyze) -- (critical);
+  \draw[arrow] (critical) -- node[above]{\tiny Sí} (hotfix);
+  \draw[arrow] (critical) -- node[above]{\tiny No} (dev);
+  \draw[arrow] (dev) -- (test);
+  \draw[arrow] (test) -- (ok);
+  \draw[arrow] (ok) -- node[right]{\tiny OK} (deploy);
+  \draw[arrow] (ok) -- node[above]{\tiny Fallo} (fix2);
+  \draw[arrow] (fix2) |- ++(0,1.3) -| (dev);
+  \draw[arrow] (deploy) -- (doc);
+  \draw[arrow] (hotfix) |- ++(2,0) |- (doc);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Flujo de gestión de cambios post-entrega}
+\label{fig:gestion-cambios}
+\end{figure}
+
+\section{Consideraciones de Mantenibilidad en la Implementación}
+
+Durante el diseño e implementación del sistema se tomaron decisiones técnicas que impactan directamente en la facilidad de mantenimiento futuro:
+
+\begin{enumerate}[leftmargin=1.5cm, label=\textbf{MC\arabic*.}]
+  \item \textbf{Separación de responsabilidades:} Cada handler Go tiene una única responsabilidad (un recurso REST). Los 17 archivos de handlers son independientes entre sí, lo que permite modificar, reemplazar o extender cualquier módulo sin afectar a los demás.
+  \item \textbf{Configuración externalizada:} Las variables sensibles (contraseña de BD, secreto JWT, origen CORS) residen en \texttt{.env} y se cargan en tiempo de inicio mediante \texttt{godotenv}. Cualquier cambio de entorno no requiere recompilar el código fuente.
+  \item \textbf{Integridad referencial histórica:} Las eliminaciones de productos y tiendas son siempre \textit{bajas lógicas} (\texttt{estado = 'inactivo'}), preservando la trazabilidad completa del historial de ventas, movimientos de stock y deudas históricas.
+  \item \textbf{Precios en centavos enteros:} El almacenamiento de precios como enteros (centavos) elimina el riesgo de acumulación de errores de punto flotante que aparecería a largo plazo en cálculos de subtotales e IVA.
+  \item \textbf{Log de auditoría inmutable:} La tabla \texttt{seguridad.logs\_auditoria} no tiene operaciones de UPDATE ni DELETE expuestas en la API. Los eventos se registran únicamente en modo INSERT, garantizando la integridad del historial de auditoría.
+  \item \textbf{Esquema de BD con namespaces:} Los cuatro esquemas de PostgreSQL (\texttt{configuracion}, \texttt{seguridad}, \texttt{inventario}, \texttt{operaciones}) agrupan lógicamente las tablas, facilitando respaldos selectivos, permisos granulares y migraciones incrementales.
+\end{enumerate}
+
+\section{Entrega de Activos de Mantenimiento}
+
+Como parte del cierre del proyecto, se entregan al propietario del sistema los siguientes activos necesarios para el mantenimiento:
+
+\begin{table}[H]
+\centering
+\caption{Activos entregados para soporte y mantenimiento}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{lightgray}
+\textbf{Activo} \& \textbf{Formato} \& \textbf{Descripción} \\
+\hline
+Código fuente completo \& Repositorio Git \& Backend Go, Frontend Angular, Scripts ETL Python, Schema PostgreSQL. \\
+\hline
+Binario ejecutable \& \texttt{.exe} (Windows) \& Binario compilado listo para ejecutar en Windows 10+. \\
+\hline
+Script de inicialización \& \texttt{init.sql} \& Crea todos los esquemas, tablas, roles, índices y datos semilla de la BD. \\
+\hline
+Archivo de configuración \& \texttt{.env.example} \& Plantilla de variables de entorno con instrucciones de configuración. \\
+\hline
+Documentación técnica \& PDF (este documento) \& Arquitectura, módulos, diagramas ER, casos de uso y plan de mantenimiento. \\
+\hline
+Manual de usuario \& PDF \& Guía de uso para el operador de caja y el administrador. \\
+\hline
+Log de migración ETL \& \texttt{.log} \& Registro de los registros procesados y errores del proceso de migración Sysag. \\
+\hline
+\end{tabularx}
+\label{tab:activos}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────
+% CAPÍTULO 8: CONCLUSIONES Y RECOMENDACIONES
+% ─────────────────────────────────────────────────────────────
+\chapter{Conclusiones y Recomendaciones}
+
+\section{Conclusiones}
+
+\begin{enumerate}[leftmargin=1.5cm, label=\textbf{\arabic*.}]
+  \item Se desarrolló un sistema de gestión integral para la Librería Los Altares que reemplaza el registro manual y el sistema legacy Sysag, integrando 13 módulos funcionales en una arquitectura de tres capas (Angular 21 — Go 1.22 — PostgreSQL 15).
+  \item La implementación del módulo de predicción de demanda basado en el modelo autorregresivo AR(1) permite al operador anticipar las necesidades de abastecimiento con horizontes de 7, 30 y 365 días, reduciendo el riesgo de desabastecimiento y sobrestock.
+  \item El sistema de seguridad implementado cumple con los controles fundamentales de las normas NIST 800-53 y NIST 800-63B: BCrypt (factor 10), JWT HS256 con expiración de 8 horas, verificación de sesión activa en base de datos, RBAC en dos niveles (API y DB), auditoría de eventos y autenticación multifactor opcional (2FA/TOTP).
+  \item El proceso ETL logró migrar el historial de ventas del sistema Sysag preservando la integridad referencial necesaria para alimentar el motor predictivo, con documentación de errores mediante archivo de log persistente.
+  \item La arquitectura multitienda (inventario y ventas por sucursal) con transferencias entre sedes resuelve la principal limitación organizativa del negocio, que operaba sus dos sucursales de forma completamente desconectada.
+\end{enumerate}
+
+\section{Recomendaciones}
+
+\begin{enumerate}[leftmargin=1.5cm, label=\textbf{\arabic*.}]
+  \item \textbf{Configurar HTTPS/TLS} en el servidor de producción para cifrar el tráfico entre el cliente Angular y el API Go, protegiendo los tokens JWT y credenciales contra ataques Man-in-the-Middle.
+  \item \textbf{Implementar Rate Limiting} en el endpoint \texttt{POST /api/auth/login} utilizando un middleware de ventana deslizante para mitigar ataques de fuerza bruta.
+  \item \textbf{Restringir CORS} desde \texttt{Access-Control-Allow-Origin: *} al dominio específico del frontend en producción.
+  \item \textbf{Programar el REFRESH} de la vista materializada \texttt{operaciones.ventas\_diarias\_mv} mediante un job en PostgreSQL (\texttt{pg\_cron}) para mantener los datos del dashboard actualizados.
+  \item \textbf{Agregar pruebas unitarias} con \texttt{go test} para los handlers críticos (ventas, predicciones, autenticación) y con \texttt{Vitest} para los servicios Angular.
+  \item \textbf{Escalar el modelo predictivo} a ARIMA(p,d,q) o Prophet (Facebook) una vez que se cuente con más de dos años de historial diario completo.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────
+% REFERENCIAS BIBLIOGRÁFICAS
+% ─────────────────────────────────────────────────────────────
+\chapter*{Referencias Bibliográficas}
+\addcontentsline{toc}{chapter}{Referencias Bibliográficas}
+
+\begin{enumerate}[leftmargin=1.5cm, label={[\arabic*]}]
+  \item Box, G. E. P., Jenkins, G. M., Reinsel, G. C., \& Ljung, G. M. (2015). \textit{Time Series Analysis: Forecasting and Control} (5th ed.). Wiley.
+  \item Fowler, M. (2002). \textit{Patterns of Enterprise Application Architecture}. Addison-Wesley.
+  \item National Institute of Standards and Technology. (2020). \textit{NIST SP 800-53 Rev. 5: Security and Privacy Controls for Information Systems and Organizations}. NIST.
+  \item National Institute of Standards and Technology. (2020). \textit{NIST SP 800-63B: Digital Identity Guidelines — Authentication and Lifecycle Management}. NIST.
+  \item NIST INCITS 359-2004. (2004). \textit{Role Based Access Control}. American National Standards Institute.
+  \item Open Web Application Security Project. (2021). \textit{OWASP Top 10 — 2021}. OWASP Foundation. \url{https://owasp.org/Top10}
+  \item Provos, N., \& Mazières, D. (1999). A Future-Adaptable Password Scheme. \textit{USENIX Annual Technical Conference}. USENIX Association.
+  \item RFC 6238. (2011). \textit{TOTP: Time-Based One-Time Password Algorithm}. IETF. \url{https://datatracker.ietf.org/doc/html/rfc6238}
+  \item RFC 7519. (2015). \textit{JSON Web Token (JWT)}. IETF. \url{https://datatracker.ietf.org/doc/html/rfc7519}
+  \item ISO/IEC 27001:2022. (2022). \textit{Information Security, Cybersecurity and Privacy Protection — Information Security Management Systems}. International Organization for Standardization.
+  \item Google LLC. (2024). \textit{Angular Documentation v21}. \url{https://angular.dev}
+  \item The Go Authors. (2024). \textit{Go 1.22 Release Notes}. \url{https://go.dev/doc/go1.22}
+  \item PostgreSQL Global Development Group. (2023). \textit{PostgreSQL 15 Documentation}. \url{https://www.postgresql.org/docs/15}
+\end{enumerate}
+
+\end{document}

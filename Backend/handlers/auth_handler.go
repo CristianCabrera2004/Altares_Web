@@ -7,9 +7,10 @@
 //   POST /api/auth/logout            → Invalida la sesión activa en BD
 //   GET  /api/auth/perfil            → Devuelve el perfil del usuario autenticado
 //   PUT  /api/auth/cambiar-password  → Cambia la contraseña con verificación BCrypt (CA 51)
+//   POST /api/auth/reenviar-codigo   → Reenvía código de verificación de email
 //   GET  /api/auth/2fa/setup         → Genera secreto TOTP temporal para el usuario
 //   POST /api/auth/2fa/enable        → Verifica código y activa 2FA para el usuario
-//   POST /api/auth/2fa/disable       → Desactiva 2FA para el usuario
+//   POST /api/auth/2fa/disable       → Desactiva 2FA (requiere código TOTP + contraseña)
 //
 // Seguridad implementada:
 //   CA 51 → Las contraseñas NUNCA se almacenan en texto plano.
@@ -20,8 +21,11 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -39,9 +43,10 @@ import (
 
 // LoginRequest es el body esperado en POST /api/auth/login.
 type LoginRequest struct {
-	Email         string `json:"email"`
-	Password      string `json:"password"`
-	TwoFactorCode string `json:"two_factor_code,omitempty"`
+	Email            string `json:"email"`
+	Password         string `json:"password"`
+	TwoFactorCode    string `json:"two_factor_code,omitempty"`
+	VerificationCode string `json:"verification_code,omitempty"`
 }
 
 // LoginResponse es la respuesta JSON exitosa del login.
@@ -55,6 +60,9 @@ type LoginResponse struct {
 	ExpiresAt    string `json:"expires_at,omitempty"`
 	// Para el flujo de 2FA interactivo
 	TwoFactorRequired bool `json:"two_factor_required,omitempty"`
+	// Para el flujo de verificación de email en primer login
+	EmailVerificationRequired bool   `json:"email_verification_required,omitempty"`
+	EmailHint                 string `json:"email_hint,omitempty"`
 }
 
 // PerfilResponse devuelve los datos públicos del usuario autenticado.
@@ -96,13 +104,16 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			idTiendaNull     sql.NullInt64
 			twoFactorEnabled bool
 			twoFactorSecret  sql.NullString
+			emailVerificado  bool
 		)
 		err := db.QueryRow(
-			`SELECT id_usuario, nombre, email, contrasena_hash, rol, id_tienda, two_factor_enabled, two_factor_secret
+			`SELECT id_usuario, nombre, email, contrasena_hash, rol, id_tienda,
+			        two_factor_enabled, two_factor_secret, email_verificado
 			 FROM seguridad.usuarios
 			 WHERE email = $1 AND estado = 'activo'`,
 			req.Email,
-		).Scan(&idUsuario, &nombre, &email, &contrasenaHash, &rol, &idTiendaNull, &twoFactorEnabled, &twoFactorSecret)
+		).Scan(&idUsuario, &nombre, &email, &contrasenaHash, &rol, &idTiendaNull,
+			&twoFactorEnabled, &twoFactorSecret, &emailVerificado)
 
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -120,6 +131,84 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Credenciales incorrectas."})
 			return
+		}
+
+		// ── Verificación de Email en Primer Login ──────────────────────────────
+		if !emailVerificado {
+			if req.VerificationCode == "" {
+				// Generar y enviar código de verificación por email
+				// Verificar si ya hay un código vigente
+				var codigoExistente sql.NullString
+				var expiraCodigo sql.NullTime
+				db.QueryRow(
+					`SELECT codigo_verificacion, codigo_verificacion_expira FROM seguridad.usuarios WHERE id_usuario = $1`,
+					idUsuario,
+				).Scan(&codigoExistente, &expiraCodigo)
+
+				// Si no hay código vigente, generar uno nuevo
+				if !codigoExistente.Valid || !expiraCodigo.Valid || time.Now().UTC().After(expiraCodigo.Time) {
+					codigo := generarCodigo6Digitos()
+					expira := time.Now().UTC().Add(24 * time.Hour)
+					db.Exec(
+						`UPDATE seguridad.usuarios SET codigo_verificacion = $1, codigo_verificacion_expira = $2 WHERE id_usuario = $3`,
+						codigo, expira, idUsuario,
+					)
+					// Enviar email con el código
+					enviarCodigoVerificacion(email, nombre, codigo)
+				} else {
+					// Reenviar el código existente que aún no expira
+					enviarCodigoVerificacion(email, nombre, codigoExistente.String)
+				}
+
+				// Generar una pista del email para mostrar en el frontend
+				emailHint := generarEmailHint(email)
+
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(LoginResponse{
+					EmailVerificationRequired: true,
+					EmailHint:                 emailHint,
+				})
+				return
+			}
+
+			// Validar el código de verificación enviado
+			var codigoGuardado sql.NullString
+			var expiraCodigo sql.NullTime
+			db.QueryRow(
+				`SELECT codigo_verificacion, codigo_verificacion_expira FROM seguridad.usuarios WHERE id_usuario = $1`,
+				idUsuario,
+			).Scan(&codigoGuardado, &expiraCodigo)
+
+			if !codigoGuardado.Valid || !expiraCodigo.Valid {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "No se encontró un código de verificación. Intente iniciar sesión nuevamente."})
+				return
+			}
+
+			if time.Now().UTC().After(expiraCodigo.Time) {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "El código de verificación ha expirado. Inicie sesión nuevamente para recibir uno nuevo."})
+				return
+			}
+
+			if req.VerificationCode != codigoGuardado.String {
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Código de verificación incorrecto."})
+				return
+			}
+
+			// Código correcto: marcar email como verificado y limpiar código
+			db.Exec(
+				`UPDATE seguridad.usuarios SET email_verificado = TRUE, codigo_verificacion = NULL, codigo_verificacion_expira = NULL WHERE id_usuario = $1`,
+				idUsuario,
+			)
+
+			// Registrar en auditoría
+			db.Exec(
+				`INSERT INTO seguridad.logs_auditoria (id_usuario, accion, tabla_afectada, ip_origen)
+				 VALUES ($1, 'EMAIL_VERIFICADO', 'usuarios', $2)`,
+				idUsuario, getIP(r),
+			)
 		}
 
 		// IA-2(1): Verificar Autenticación Multifactor si está activa
@@ -540,6 +629,7 @@ func Enable2FAHandler(db *sql.DB) http.HandlerFunc {
 
 // ─── POST /api/auth/2fa/disable ───────────────────────────────────────────────
 // Disable2FAHandler deshabilita 2FA de la cuenta del usuario.
+// Requiere tanto el código TOTP de la app autenticadora como la contraseña de la cuenta.
 func Disable2FAHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -558,7 +648,8 @@ func Disable2FAHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var body struct {
-			Code string `json:"code"`
+			Code     string `json:"code"`
+			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -566,15 +657,22 @@ func Disable2FAHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Obtener secreto actual
+		if body.Code == "" || body.Password == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Se requiere el código 2FA y la contraseña para desactivar."})
+			return
+		}
+
+		// Obtener secreto actual y contraseña hash
 		var (
 			secret           sql.NullString
 			twoFactorEnabled bool
+			contrasenaHash   string
 		)
 		err := db.QueryRow(
-			`SELECT two_factor_secret, two_factor_enabled FROM seguridad.usuarios WHERE id_usuario = $1`,
+			`SELECT two_factor_secret, two_factor_enabled, contrasena_hash FROM seguridad.usuarios WHERE id_usuario = $1`,
 			claims.IdUsuario,
-		).Scan(&secret, &twoFactorEnabled)
+		).Scan(&secret, &twoFactorEnabled, &contrasenaHash)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar estado de 2FA."})
@@ -587,10 +685,17 @@ func Disable2FAHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Validar el código TOTP para desactivar (requisito de seguridad adicional)
-		if body.Code == "" || !secret.Valid || !utils.VerifyTOTP(secret.String, body.Code) {
+		// Verificar la contraseña
+		if err := bcrypt.CompareHashAndPassword([]byte(contrasenaHash), []byte(body.Password)); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Código 2FA incorrecto o expirado. Es obligatorio para deshabilitar."})
+			json.NewEncoder(w).Encode(map[string]string{"error": "La contraseña es incorrecta."})
+			return
+		}
+
+		// Validar el código TOTP
+		if !secret.Valid || !utils.VerifyTOTP(secret.String, body.Code) {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Código 2FA incorrecto o expirado."})
 			return
 		}
 
@@ -620,7 +725,117 @@ func Disable2FAHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// ─── Helper ─────────────────────────────────────────────────────────────────
+// ─── POST /api/auth/reenviar-codigo ──────────────────────────────────────────
+// ReenviarCodigoHandler reenvía el código de verificación de email.
+func ReenviarCodigoHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Solo se acepta POST."})
+			return
+		}
+
+		var body struct {
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El campo 'email' es obligatorio."})
+			return
+		}
+
+		// Buscar usuario no verificado
+		var idUsuario int
+		var nombre string
+		var emailVerificado bool
+		err := db.QueryRow(
+			`SELECT id_usuario, nombre, email_verificado FROM seguridad.usuarios WHERE email = $1 AND estado = 'activo'`,
+			body.Email,
+		).Scan(&idUsuario, &nombre, &emailVerificado)
+
+		if err == sql.ErrNoRows {
+			// No revelar si el email existe o no (seguridad)
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"mensaje": "Si el correo está registrado, se ha enviado un nuevo código."})
+			return
+		}
+
+		if emailVerificado {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"mensaje": "Si el correo está registrado, se ha enviado un nuevo código."})
+			return
+		}
+
+		// Generar nuevo código
+		codigo := generarCodigo6Digitos()
+		expira := time.Now().UTC().Add(24 * time.Hour)
+		db.Exec(
+			`UPDATE seguridad.usuarios SET codigo_verificacion = $1, codigo_verificacion_expira = $2 WHERE id_usuario = $3`,
+			codigo, expira, idUsuario,
+		)
+
+		// Enviar email
+		enviarCodigoVerificacion(body.Email, nombre, codigo)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"mensaje": "Se ha enviado un nuevo código de verificación a tu correo electrónico."})
+	}
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+// generarCodigo6Digitos genera un código numérico aleatorio de 6 dígitos criptográficamente seguro.
+func generarCodigo6Digitos() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		// Fallback poco probable
+		return "123456"
+	}
+	return fmt.Sprintf("%06d", n.Int64())
+}
+
+// generarEmailHint genera una pista del email ocultando parte del usuario.
+// Ej: "admin@losaltares.com" → "ad***@losaltares.com"
+func generarEmailHint(email string) string {
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) != 2 {
+		return "***@***"
+	}
+	user := parts[0]
+	if len(user) <= 2 {
+		return user[:1] + "***@" + parts[1]
+	}
+	return user[:2] + "***@" + parts[1]
+}
+
+// enviarCodigoVerificacion envía el código de verificación de email al usuario.
+func enviarCodigoVerificacion(emailDest, nombre, codigo string) {
+	asunto := "Código de verificación — Librería Los Altares"
+	body := fmt.Sprintf(`
+		<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 30px; background: #f8fafc; border-radius: 12px;">
+			<div style="text-align: center; margin-bottom: 24px;">
+				<div style="width: 50px; height: 50px; background: linear-gradient(135deg, #4F8EF7, #7B61FF); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+					<span style="color: white; font-size: 24px; font-weight: 700;">📚</span>
+				</div>
+				<h2 style="color: #1e293b; margin: 0; font-size: 1.3rem;">Librería Los Altares</h2>
+			</div>
+			<p style="color: #334155; font-size: 0.95rem; margin-bottom: 8px;">Hola <strong>%s</strong>,</p>
+			<p style="color: #475569; font-size: 0.9rem; line-height: 1.5;">Tu código de verificación para acceder al sistema es:</p>
+			<div style="text-align: center; margin: 24px 0;">
+				<div style="display: inline-block; padding: 16px 32px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 2rem; font-weight: 700; letter-spacing: 0.3em; color: #1e293b;">%s</div>
+			</div>
+			<p style="color: #64748b; font-size: 0.82rem; text-align: center;">Este código expira en <strong>24 horas</strong>.</p>
+			<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+			<p style="color: #94a3b8; font-size: 0.75rem; text-align: center;">Si no solicitaste este código, ignora este mensaje.</p>
+		</div>
+	`, nombre, codigo)
+
+	if err := utils.SendEmail(emailDest, asunto, body, "", ""); err != nil {
+		fmt.Printf("⚠️ Error al enviar email de verificación a %s: %v\n", emailDest, err)
+	}
+}
 
 // getIP extrae la dirección IP real del cliente, considerando proxies inversos.
 // Prioriza X-Forwarded-For (Nginx/Apache) > X-Real-IP > RemoteAddr directo.

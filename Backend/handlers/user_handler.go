@@ -246,3 +246,25 @@ func deactivateUser(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	tx.Commit()
 	json.NewEncoder(w).Encode(map[string]string{"mensaje": "Usuario desactivado exitosamente (estado: inactivo)."})
 }
+
+func VerificarEmailHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		email := r.URL.Query().Get("email")
+		if email == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El parámetro email es obligatorio."})
+			return
+		}
+
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM seguridad.usuarios WHERE email = $1", email).Scan(&count)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al verificar el correo electrónico."})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"existe": count > 0})
+	}
+}

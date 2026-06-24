@@ -97,10 +97,10 @@
   color: var(--text-secondary); text-align: left; text-transform: uppercase;
 }
 .data-table tbody tr {
-  border-bottom: 1px solid #1a1d27;
+  border-bottom: 1px solid var(--border-subtle);
   transition: background 0.1s;
 }
-.data-table tbody tr:hover { background: rgba(255,255,255,0.025); }
+.data-table tbody tr:hover { background: rgba(79,142,247,0.04); }
 .data-table tbody tr:last-child { border-bottom: none; }
 .data-table td { padding: 13px 16px; font-size: 0.875rem; color: var(--text-title); vertical-align: middle; }
 
@@ -162,3 +162,172 @@
   border: 1px solid #4F8EF7; border-radius: 6px;
   color: var(--text-main); font-size: 0.8rem; outline: none;
 }
+
+/* ── Barra compacta de 2FA ── */
+.security-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  gap: 12px;
+}
+.security-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+.security-bar-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-title);
+}
+.security-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-sm {
+  padding: 5px 14px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-sm:hover { opacity: 0.85; }
+.btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-setup {
+  background: linear-gradient(135deg, #4F8EF7, #7B61FF);
+  color: white;
+}
+.btn-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+
+/* ── Panel de desactivación de 2FA ── */
+.disable-2fa-panel {
+  background: var(--bg-surface);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.disable-2fa-text {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0 0 14px 0;
+}
+.disable-2fa-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.disable-2fa-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.disable-2fa-field label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+.disable-2fa-field input {
+  padding: 7px 12px;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  outline: none;
+  width: 140px;
+  transition: border-color 0.2s;
+}
+.disable-2fa-field input:focus {
+  border-color: #ef4444;
+}
+.btn-confirm-disable {
+  background: #ef4444 !important;
+  font-size: 0.78rem !important;
+  padding: 7px 16px !important;
+}
+
+/* ── Panel de configuración de 2FA (setup) ── */
+.setup-2fa-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 20px;
+}
+.setup-2fa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+.setup-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.step-label {
+  font-weight: 700;
+  color: #4f8ef7;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.step-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+  max-width: 240px;
+  line-height: 1.4;
+}
+.totp-secret-display {
+  padding: 8px 14px;
+  background: rgba(79, 142, 247, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-title);
+  letter-spacing: 0.1em;
+  user-select: all;
+}
+.totp-input {
+  width: 100px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  padding: 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background-color: var(--border-subtle);
+  color: var(--text-main);
+  outline: none;
+}
+.totp-input:focus {
+  border-color: #4F8EF7;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
