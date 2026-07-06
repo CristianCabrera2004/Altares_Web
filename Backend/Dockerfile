@@ -1,8 +1,10 @@
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
 # Compila el binario Go en una imagen con el toolchain completo
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
+
+ENV GOTOOLCHAIN=auto
 
 # Copiar módulos primero para aprovechar cache de capas Docker
 COPY go.mod go.sum ./
