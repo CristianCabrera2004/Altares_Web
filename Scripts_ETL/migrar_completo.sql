@@ -39,7 +39,7 @@ $$;
 -- ─────────────────────────────────────────────────────────────────────────────
 DROP TABLE IF EXISTS tmp_cruce;
 CREATE TEMP TABLE tmp_cruce AS
-SELECT
+SELECT DISTINCT ON (dest.id_producto)
   dest.id_producto,
   dest.id_categoria,
   origen.cod_item,
@@ -75,19 +75,32 @@ $$;
 -- ═════════════════════════════════════════════════════════════════════════════
 UPDATE inventario.productos dest
 SET
-  stock_actual     = tc.stock_origen,
-  stock_alerta_min = GREATEST(tc.stock_min, 3),
   precio_venta     = CASE WHEN tc.pvp_centavos > 0 THEN tc.pvp_centavos
                           ELSE dest.precio_venta END
 FROM tmp_cruce tc
 WHERE dest.id_producto = tc.id_producto;
 
+-- Actualizar stock en la sucursal principal (id_tienda = 1)
+INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
+SELECT 
+  1, 
+  tc.id_producto, 
+  tc.stock_origen, 
+  GREATEST(tc.stock_min, 3)
+FROM tmp_cruce tc
+ON CONFLICT (id_tienda, id_producto) 
+DO UPDATE SET 
+  stock_actual = EXCLUDED.stock_actual,
+  stock_alerta_min = EXCLUDED.stock_alerta_min;
+
 DO $$
 DECLARE v_con INT; v_tot INT;
 BEGIN
-  SELECT COUNT(*), COUNT(CASE WHEN stock_actual > 0 THEN 1 END)
+  SELECT COUNT(*), COUNT(CASE WHEN st.stock_actual > 0 THEN 1 END)
   INTO v_tot, v_con
-  FROM inventario.productos WHERE estado = 'activo';
+  FROM inventario.productos p
+  LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = 1
+  WHERE p.estado = 'activo';
   RAISE NOTICE '✓ [MÓD 1] Stocks: % productos con stock > 0 de % totales', v_con, v_tot;
 END;
 $$;
@@ -128,9 +141,10 @@ END;
 $$;
 
 INSERT INTO operaciones.ventas
-  (id_usuario, fecha_venta, subtotal, total_iva, total, estado, referencia_externa)
+  (id_usuario, id_tienda, fecha_venta, subtotal, total_iva, total, estado, referencia_externa)
 SELECT
   (SELECT id_usuario FROM seguridad.usuarios WHERE estado = 'activo' ORDER BY id_usuario LIMIT 1),
+  1,
   tv.fecha_nueva::TIMESTAMP + INTERVAL '9 hours',
   tv.total_centavos - tv.iva_centavos,
   tv.iva_centavos,
@@ -223,9 +237,10 @@ WHERE tipo_movimiento = 'VENTA'
 
 -- Insertar desde los detalles migrados (últimos 35 días para cubrir el motor)
 INSERT INTO inventario.movimientos_stock
-  (id_producto, id_usuario, tipo_movimiento, cantidad, stock_resultante, referencia_id, fecha_movimiento)
+  (id_producto, id_tienda, id_usuario, tipo_movimiento, cantidad, stock_resultante, referencia_id, fecha_movimiento)
 SELECT
   dv.id_producto,
+  1,
   v.id_usuario,
   'VENTA',
   -dv.cantidad,
@@ -249,7 +264,9 @@ DECLARE
   v_productos INT;
 BEGIN
   SELECT COUNT(*) INTO v_stock
-  FROM inventario.productos WHERE estado = 'activo' AND stock_actual > 0;
+  FROM inventario.productos p
+  JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto
+  WHERE p.estado = 'activo' AND st.id_tienda = 1 AND st.stock_actual > 0;
 
   SELECT COUNT(*) INTO v_ventas
   FROM operaciones.ventas WHERE referencia_externa LIKE 'MIG-%';

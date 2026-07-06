@@ -227,9 +227,9 @@
           <input
             id="input-codigo-barras"
             type="text"
-            placeholder="Apunta el scanner o escribe el código..."
+            placeholder="Escanea o escribe (separados por coma)..."
             class="barcode-input"
-            [formControl]="$any(form.get('codigo_barras'))"
+            [formControl]="$any(form.get('codigos_barras'))"
             (keydown.enter)="buscarPorCodigo()"
             autocomplete="off"
           />
@@ -534,8 +534,8 @@
         <div class="form-row">
           <!-- Código de Barras -->
           <div class="field-group">
-            <label for="edit-barcode">Código de Barras</label>
-            <input id="edit-barcode" type="text" formControlName="codigo_barras" placeholder="Opcional" />
+            <label for="edit-barcode">Códigos de Barras</label>
+            <input id="edit-barcode" type="text" formControlName="codigos_barras" placeholder="Múltiples separados por coma" />
           </div>
 
           <!-- Estado -->

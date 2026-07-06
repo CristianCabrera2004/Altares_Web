@@ -23,7 +23,7 @@ interface Producto {
   stock_alerta_min: number;
   precio_venta: number;
   estado: string;
-  codigo_barras?: string;
+  codigos_barras?: string[];
 }
 
 interface Categoria {
@@ -80,7 +80,7 @@ export class InventarioComponent implements OnInit {
 
   // ─── Formulario Nuevo Producto ────────────────────────────────────────────
   readonly form = this.fb.group({
-    codigo_barras:   [''],
+    codigos_barras:   [''],
     nombre:          ['', [Validators.required, Validators.minLength(2)]],
     id_categoria:    [null as number | null, Validators.required],
     precio_venta:    [null as number | null, [Validators.required, Validators.min(0)]],
@@ -94,7 +94,7 @@ export class InventarioComponent implements OnInit {
   readonly guardandoEdicion   = signal(false);
 
   readonly formEditar = this.fb.group({
-    codigo_barras:   [''],
+    codigos_barras:   [''],
     nombre:          ['', [Validators.required, Validators.minLength(2)]],
     id_categoria:    [null as number | null, Validators.required],
     precio_venta:    [null as number | null, [Validators.required, Validators.min(0)]],
@@ -164,7 +164,7 @@ export class InventarioComponent implements OnInit {
   // MODAL: INGRESAR PRODUCTO
   // ═══════════════════════════════════════════════════════════
   abrirModalIngreso(): void {
-    this.form.reset({ stock_actual: 0, stock_alerta_min: 5, codigo_barras: '' });
+    this.form.reset({ stock_actual: 0, stock_alerta_min: 5, codigos_barras: '' });
     this.cantidadAgregar.setValue(1);
     this.modoModal.set('crear');
     this.productoEncontrado.set(null);
@@ -175,7 +175,7 @@ export class InventarioComponent implements OnInit {
 
   cerrarModalIngreso(): void {
     this.mostrarModalIngreso.set(false);
-    this.form.reset({ stock_actual: 0, stock_alerta_min: 5, codigo_barras: '' });
+    this.form.reset({ stock_actual: 0, stock_alerta_min: 5, codigos_barras: '' });
     this.cantidadAgregar.setValue(1);
     this.modoModal.set('crear');
     this.productoEncontrado.set(null);
@@ -183,7 +183,7 @@ export class InventarioComponent implements OnInit {
   }
 
   buscarPorCodigo(): void {
-    const codigo = (this.form.get('codigo_barras')?.value ?? '').trim();
+    const codigo = (this.form.get('codigos_barras')?.value ?? '').trim();
     if (!codigo) return;
     this.buscandoCodigo.set(true);
     this.errorMsg.set('');
@@ -205,7 +205,7 @@ export class InventarioComponent implements OnInit {
   }
 
   limpiarCodigo(): void {
-    this.form.get('codigo_barras')?.setValue('');
+    this.form.get('codigos_barras')?.setValue('');
     this.productoEncontrado.set(null);
     this.modoModal.set('crear');
     this.errorMsg.set('');
@@ -223,8 +223,9 @@ export class InventarioComponent implements OnInit {
     this.guardandoIngreso.set(true);
     this.errorMsg.set('');
     const raw = this.form.value;
+    const codigosArray = (raw.codigos_barras ?? '').split(',').map((c: string) => c.trim()).filter((c: string) => c);
     const payload = {
-      codigo_barras:    (raw.codigo_barras ?? '').trim(),
+      codigos_barras:   codigosArray,
       nombre:           raw.nombre,
       id_categoria:     Number(raw.id_categoria),
       precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),
@@ -255,8 +256,9 @@ export class InventarioComponent implements OnInit {
     if (!producto) return;
     this.guardandoIngreso.set(true);
     this.errorMsg.set('');
+    const codigos = producto.codigos_barras && producto.codigos_barras.length > 0 ? producto.codigos_barras : [(this.form.get('codigos_barras')?.value ?? '').trim()];
     const payload = {
-      codigo_barras: producto.codigo_barras ?? this.form.get('codigo_barras')?.value ?? '',
+      codigos_barras: codigos,
       stock_actual:  this.cantidadAgregar.value ?? 1
     };
     this.http.post<ProductoResponse>(this.apiProductos, payload).subscribe({
@@ -282,7 +284,7 @@ export class InventarioComponent implements OnInit {
   abrirModalEditar(p: Producto): void {
     this.productoEditar.set(p);
     this.formEditar.patchValue({
-      codigo_barras:   p.codigo_barras ?? '',
+      codigos_barras:   p.codigos_barras ? p.codigos_barras.join(', ') : '',
       nombre:          p.nombre,
       id_categoria:    p.id_categoria,
       precio_venta:    p.precio_venta / 100,
@@ -312,8 +314,9 @@ export class InventarioComponent implements OnInit {
     this.guardandoEdicion.set(true);
     this.errorMsg.set('');
     const raw = this.formEditar.value;
+    const codigosArray = (raw.codigos_barras ?? '').split(',').map((c: string) => c.trim()).filter((c: string) => c);
     const payload = {
-      codigo_barras:    (raw.codigo_barras ?? '').trim(),
+      codigos_barras:   codigosArray,
       nombre:           raw.nombre,
       id_categoria:     Number(raw.id_categoria),
       precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),

@@ -13,6 +13,7 @@ export interface ProductoCatalogo {
   stock_alerta_min: number;
   precio_venta:     number;
   estado:           string;
+  codigos_barras?:  string[];
 }
 
 export interface RespuestaCuaderno {

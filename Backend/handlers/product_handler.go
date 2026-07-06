@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/lib/pq"
 	"libreria-altares/middleware"
 	"libreria-altares/utils"
 )
@@ -28,16 +29,16 @@ import (
 // precio_venta se maneja en centavos (INT en la BD, igual que en el esquema).
 // tasa_iva proviene del JOIN con inventario.categorias (0 ó 15).
 type Producto struct {
-	IdProducto      int    `json:"id_producto"`
-	Nombre          string `json:"nombre"`
-	IdCategoria     int    `json:"id_categoria"`
-	NombreCategoria string `json:"nombre_categoria,omitempty"`
-	TasaIva         int    `json:"tasa_iva"`           // 0% (papel.) o 15% (HU-01 CA 3)
-	StockActual     int    `json:"stock_actual"`
-	StockAlertaMin  int    `json:"stock_alerta_min"`
-	PrecioVenta     int    `json:"precio_venta"` // centavos
-	Estado          string `json:"estado"`
-	CodigoBarras    string `json:"codigo_barras,omitempty"` // código EAN/UPC ligado al producto
+	IdProducto      int      `json:"id_producto"`
+	Nombre          string   `json:"nombre"`
+	IdCategoria     int      `json:"id_categoria"`
+	NombreCategoria string   `json:"nombre_categoria,omitempty"`
+	TasaIva         int      `json:"tasa_iva"` // 0% (papel.) o 15% (HU-01 CA 3)
+	StockActual     int      `json:"stock_actual"`
+	StockAlertaMin  int      `json:"stock_alerta_min"`
+	PrecioVenta     int      `json:"precio_venta"` // centavos
+	Estado          string   `json:"estado"`
+	CodigosBarras   []string `json:"codigos_barras,omitempty"`
 }
 
 // ProductHandler despacha las peticiones según el método HTTP recibido (CA 43).
@@ -63,7 +64,6 @@ func ProductHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // getTiendaFromRequest has been replaced by GetTiendaIDFromCtxOrDb
-
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
 // getProducts lista todo el catálogo o un producto específico si se pasa ?id=X.
@@ -93,13 +93,14 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		err = db.QueryRow(`
 			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
 			       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
-			       p.precio_venta, p.estado
+			       p.precio_venta, p.estado,
+			       COALESCE((SELECT array_agg(codigo) FROM inventario.codigos_barras WHERE id_producto = p.id_producto), '{}')
 			FROM inventario.productos p
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
 			WHERE p.id_producto = $1`, id, idTienda,
 		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
-			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado)
+			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras))
 
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNotFound)
@@ -121,7 +122,8 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
 		       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
-		       p.precio_venta, p.estado
+		       p.precio_venta, p.estado,
+		       COALESCE((SELECT array_agg(codigo) FROM inventario.codigos_barras WHERE id_producto = p.id_producto), '{}')
 		FROM inventario.productos p
 		JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 		LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $1
@@ -144,7 +146,7 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		var p Producto
 		if err := rows.Scan(
 			&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
-			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado,
+			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras),
 		); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al leer filas del catálogo."})
@@ -154,7 +156,6 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(productos)
 }
-
 
 // ─── POST ────────────────────────────────────────────────────────────────────
 // createProduct verifica primero si el código de barras ya existe:
@@ -171,12 +172,12 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 	// ── VERIFICACIÓN DE CÓDIGO DE BARRAS (Capa Lógica de Negocio) ────────────
-	// Si se envía codigo_barras, buscar si ya está ligado a algún producto.
-	if p.CodigoBarras != "" {
+	// Si se envía codigos_barras, buscar si ya está ligado a algún producto.
+	if len(p.CodigosBarras) > 0 {
 		var idExistente int
 		err := db.QueryRow(
-			`SELECT id_producto FROM inventario.codigos_barras WHERE codigo = $1`,
-			p.CodigoBarras,
+			`SELECT id_producto FROM inventario.codigos_barras WHERE codigo = ANY($1) LIMIT 1`,
+			pq.Array(p.CodigosBarras),
 		).Scan(&idExistente)
 
 		if err == nil {
@@ -229,7 +230,7 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 				json.NewEncoder(w).Encode(map[string]string{"error": "Error al confirmar la transacción."})
 				return
 			}
-			updated.CodigoBarras = p.CodigoBarras
+			updated.CodigosBarras = p.CodigosBarras
 			// HTTP 200: stock actualizado (no es un recurso nuevo)
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"accion":   "stock_incrementado",
@@ -305,15 +306,20 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Liga el código de barras si fue provisto (misma transacción)
-	if p.CodigoBarras != "" {
-		_, err = tx.Exec(
-			`INSERT INTO inventario.codigos_barras (id_producto, codigo) VALUES ($1, $2)`,
-			p.IdProducto, p.CodigoBarras,
-		)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error al registrar el código de barras (puede estar duplicado)."})
-			return
+	if len(p.CodigosBarras) > 0 {
+		for _, codigo := range p.CodigosBarras {
+			if codigo == "" {
+				continue
+			}
+			_, err = tx.Exec(
+				`INSERT INTO inventario.codigos_barras (id_producto, codigo) VALUES ($1, $2)`,
+				p.IdProducto, codigo,
+			)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Error al registrar el código de barras (puede estar duplicado)."})
+				return
+			}
 		}
 	}
 
@@ -356,14 +362,15 @@ func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 		err := db.QueryRow(`
 			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
 			       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
-			       p.precio_venta, p.estado, cb.codigo
+			       p.precio_venta, p.estado,
+			       COALESCE((SELECT array_agg(cb_sub.codigo) FROM inventario.codigos_barras cb_sub WHERE cb_sub.id_producto = p.id_producto), '{}')
 			FROM inventario.codigos_barras cb
 			JOIN inventario.productos p ON cb.id_producto = p.id_producto
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
 			WHERE cb.codigo = $1`, codigo, idTienda,
 		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
-			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, &p.CodigoBarras)
+			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras))
 
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNotFound)
@@ -458,9 +465,9 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	// Actualizar stock de la tienda (UPSERT)
 	_, err = tx.Exec(`
 		INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1, $2, 0, $4)
 		ON CONFLICT (id_tienda, id_producto)
-		DO UPDATE SET stock_actual = $3, stock_alerta_min = $4`,
+		DO UPDATE SET stock_alerta_min = $4`,
 		idTienda, id, p.StockActual, p.StockAlertaMin)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -469,28 +476,35 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Manejo del código de barras
-	if p.CodigoBarras != "" {
-		// Verificar que el código no pertenezca a OTRO producto
-		var idExistente int
-		errCb := tx.QueryRow(`SELECT id_producto FROM inventario.codigos_barras WHERE codigo = $1`, p.CodigoBarras).Scan(&idExistente)
-		if errCb == nil && idExistente != id {
+	if len(p.CodigosBarras) > 0 {
+		var countOtros int
+		errCb := tx.QueryRow(`
+			SELECT COUNT(*) FROM inventario.codigos_barras 
+			WHERE codigo = ANY($1) AND id_producto != $2
+		`, pq.Array(p.CodigosBarras), id).Scan(&countOtros)
+
+		if errCb == nil && countOtros > 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "El código de barras proporcionado ya pertenece a otro producto."})
+			json.NewEncoder(w).Encode(map[string]string{"error": "Uno o más códigos de barras proporcionados ya pertenecen a otro producto."})
 			return
 		}
 
-		// Borramos los anteriores (si los hay) y lo insertamos/actualizamos
 		_, err = tx.Exec(`DELETE FROM inventario.codigos_barras WHERE id_producto = $1`, id)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar los códigos de barras."})
 			return
 		}
-		_, err = tx.Exec(`INSERT INTO inventario.codigos_barras (id_producto, codigo) VALUES ($1, $2)`, id, p.CodigoBarras)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error al guardar el nuevo código de barras."})
-			return
+		for _, codigo := range p.CodigosBarras {
+			if codigo == "" {
+				continue
+			}
+			_, err = tx.Exec(`INSERT INTO inventario.codigos_barras (id_producto, codigo) VALUES ($1, $2)`, id, codigo)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Error al guardar el nuevo código de barras."})
+				return
+			}
 		}
 	} else {
 		// Si se envía vacío, significa que se quitó el código de barras

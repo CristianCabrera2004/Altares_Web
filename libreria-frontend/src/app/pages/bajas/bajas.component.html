@@ -90,7 +90,7 @@
                     <div class="sug-info">
                       <span class="sug-nombre">{{ p.nombre }}</span>
                       <span class="sug-meta">
-                        @if (p.codigo_barras) { <span class="sug-codigo">{{ p.codigo_barras }}</span> }
+                        @if (p.codigos_barras && p.codigos_barras.length > 0) { <span class="sug-codigo">{{ p.codigos_barras.join(', ') }}</span> }
                         <span class="sug-stock" [class.sug-stock-zero]="p.stock_actual === 0">Stock: {{ p.stock_actual }}</span>
                       </span>
                     </div>

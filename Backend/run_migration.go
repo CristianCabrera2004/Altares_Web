@@ -39,5 +39,15 @@ DROP SCHEMA IF EXISTS operaciones CASCADE;`
 		log.Fatalf("Error ejecutando init.sql: %v", err)
 	}
 
+	// Ejecutar migración v4
+	v4Bytes, err := os.ReadFile("../Scripts_ETL/v4_deudores_migration.sql")
+	if err != nil {
+		log.Fatalf("Error leyendo v4_deudores_migration.sql: %v", err)
+	}
+	_, err = db.Exec(string(v4Bytes))
+	if err != nil {
+		log.Fatalf("Error ejecutando v4_deudores_migration.sql: %v", err)
+	}
+
 	fmt.Println("Migración SQL ejecutada con éxito! Base de datos recreada.")
 }

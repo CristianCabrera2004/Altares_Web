@@ -138,8 +138,8 @@
                     <li (mousedown)="seleccionarProducto(p)">
                       <div class="suggestion-info">
                         <span class="suggestion-name">{{ p.nombre }}</span>
-                        @if (p.codigo_barras) {
-                          <span class="suggestion-barcode">EAN: {{ p.codigo_barras }}</span>
+                        @if (p.codigos_barras && p.codigos_barras.length > 0) {
+                          <span class="suggestion-barcode">EAN: {{ p.codigos_barras.join(', ') }}</span>
                         }
                       </div>
                       <div class="suggestion-stock" [class.low-stock]="p.stock_actual <= 5">
@@ -180,8 +180,8 @@
                     <td>
                       <div class="product-cell">
                         <span class="prod-name">{{ item.producto.nombre }}</span>
-                        @if (item.producto.codigo_barras) {
-                          <span class="prod-barcode">EAN: {{ item.producto.codigo_barras }}</span>
+                        @if (item.producto.codigos_barras && item.producto.codigos_barras.length > 0) {
+                          <span class="prod-barcode">EAN: {{ item.producto.codigos_barras.join(', ') }}</span>
                         }
                       </div>
                     </td>

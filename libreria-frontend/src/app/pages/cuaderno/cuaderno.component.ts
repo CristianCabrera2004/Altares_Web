@@ -103,8 +103,8 @@ export class CuadernoComponent implements OnInit {
     const campo = this.sortField();
     const dir = this.sortDir();
     lista = [...lista].sort((a, b) => {
-      let va: string | number = a[campo];
-      let vb: string | number = b[campo];
+      let va: any = (a as any)[campo];
+      let vb: any = (b as any)[campo];
       if (typeof va === 'string') va = va.toLowerCase();
       if (typeof vb === 'string') vb = vb.toLowerCase();
       if (va < vb) return dir === 'asc' ? -1 : 1;
