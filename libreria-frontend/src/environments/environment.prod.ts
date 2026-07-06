@@ -1,5 +1,7 @@
 // src/environments/environment.prod.ts
+// URL del backend desplegado en Fly.io
+// App name definido en Backend/fly.toml → app = 'libreria-altares-api'
 export const environment = {
   production: true,
-  apiUrl: '/api'  // Producción: proxy inverso Nginx sirve /api al backend
+  apiUrl: 'https://libreria-altares-api.fly.dev/api'
 };
