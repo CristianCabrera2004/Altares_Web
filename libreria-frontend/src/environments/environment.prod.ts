@@ -1,7 +1,7 @@
 // src/environments/environment.prod.ts
 // URL del backend desplegado en Fly.io
-// App name definido en Backend/fly.toml → app = 'libreria-altares-api'
+// App: backend-cinder-shape-4030 → https://fly.io/apps/backend-cinder-shape-4030
 export const environment = {
   production: true,
-  apiUrl: 'https://libreria-altares-api.fly.dev/api'
+  apiUrl: 'https://backend-cinder-shape-4030.fly.dev/api'
 };
