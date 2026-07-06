@@ -49,7 +49,7 @@ func main() {
 
 	// ── HT-04: Endpoints de Autenticación (CA 51, 52, 53, 54) ─────────────────
 	// POST /api/auth/login            → BCrypt verify + JWT HS256 8h (CA 51, 52)
-	mux.HandleFunc("/api/auth/login", onlyMethod(http.MethodPost, handlers.LoginHandler(db)))
+	mux.HandleFunc("/api/auth/login", middleware.RateLimit(onlyMethod(http.MethodPost, handlers.LoginHandler(db))))
 
 	// POST /api/auth/reenviar-codigo  → Reenvía código de verificación de email (público)
 	mux.HandleFunc("/api/auth/reenviar-codigo", onlyMethod(http.MethodPost, handlers.ReenviarCodigoHandler(db)))
@@ -192,6 +192,12 @@ func onlyMethod(method string, h http.HandlerFunc) http.HandlerFunc {
 // En producción, configurar: ALLOWED_ORIGIN=https://tu-dominio.com
 func corsMiddleware(next http.Handler) http.Handler {
 	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	appEnv := os.Getenv("APP_ENV")
+
+	if appEnv == "production" && (allowedOrigin == "" || allowedOrigin == "*") {
+		log.Fatal("🚨 FATAL: En producción (APP_ENV=production) DEBES configurar un ALLOWED_ORIGIN específico. El servidor se detendrá por seguridad.")
+	}
+
 	if allowedOrigin == "" {
 		allowedOrigin = "*" // solo para desarrollo
 		log.Println("⚠️  CORS: ALLOWED_ORIGIN no configurado, usando '*' (solo válido en desarrollo)")

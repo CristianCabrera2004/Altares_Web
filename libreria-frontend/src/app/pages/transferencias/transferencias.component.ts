@@ -23,7 +23,7 @@ interface Producto {
   stock_actual: number;
   precio_venta: number;
   estado: string;
-  codigo_barras?: string;
+  codigos_barras?: string[];
 }
 
 interface TransferenciaProductoDetalle {
@@ -155,7 +155,7 @@ export class TransferenciasComponent implements OnInit {
     return this.productos().filter(p =>
       !idsAgregados.has(p.id_producto) &&
       p.estado === 'activo' &&
-      (p.nombre.toLowerCase().includes(q) || (p.codigo_barras ?? '').toLowerCase().includes(q))
+      (p.nombre.toLowerCase().includes(q) || (p.codigos_barras ? p.codigos_barras.join(', ').toLowerCase() : '').includes(q))
     ).slice(0, 8);
   });
 

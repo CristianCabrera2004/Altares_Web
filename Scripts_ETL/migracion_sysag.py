@@ -141,8 +141,8 @@ def cargar_datos(df):
                     VALUES (%s, %s)
                 """, (nuevo_id, cod_item))
                 
-                # Inicializar stock en ambas tiendas
-                for id_tienda in [1, 2]:
+                # Inicializar stock en tienda principal
+                for id_tienda in [1]:
                     cursor.execute("""
                         INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
                         VALUES (%s, %s, 0, 5)

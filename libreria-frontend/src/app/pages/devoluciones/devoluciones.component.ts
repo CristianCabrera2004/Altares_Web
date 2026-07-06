@@ -16,7 +16,7 @@ interface Producto {
   nombre: string;
   stock_actual: number;
   precio_venta: number;
-  codigo_barras?: string;
+  codigos_barras?: string[];
 }
 
 interface Devolucion {
@@ -86,7 +86,7 @@ export class DevolucionesComponent implements OnInit {
     if (q.length < 1) return [];
     return this.productos().filter(p =>
       p.nombre.toLowerCase().includes(q) ||
-      (p.codigo_barras ?? '').toLowerCase().includes(q)
+      (p.codigos_barras ? p.codigos_barras.join(', ').toLowerCase() : '').includes(q)
     ).slice(0, 8);
   });
 
@@ -95,7 +95,7 @@ export class DevolucionesComponent implements OnInit {
     if (q.length < 1) return [];
     return this.productos().filter(p =>
       p.nombre.toLowerCase().includes(q) ||
-      (p.codigo_barras ?? '').toLowerCase().includes(q)
+      (p.codigos_barras ? p.codigos_barras.join(', ').toLowerCase() : '').includes(q)
     ).slice(0, 8);
   });
 

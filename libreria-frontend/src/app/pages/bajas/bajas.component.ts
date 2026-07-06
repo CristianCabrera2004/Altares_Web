@@ -15,7 +15,7 @@ interface Producto {
   id_producto: number;
   nombre: string;
   stock_actual: number;
-  codigo_barras?: string;
+  codigos_barras?: string[];
 }
 
 interface MovimientoBaja {
@@ -73,7 +73,7 @@ export class BajasComponent implements OnInit {
     if (q.length < 1) return [];
     return this.productos().filter(p =>
       p.nombre.toLowerCase().includes(q) ||
-      (p.codigo_barras ?? '').toLowerCase().includes(q)
+      (p.codigos_barras ? p.codigos_barras.join(', ').toLowerCase() : '').includes(q)
     ).slice(0, 8);
   });
 

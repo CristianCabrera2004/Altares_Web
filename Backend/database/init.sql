@@ -363,8 +363,7 @@ GRANT admin_libreria TO app_backend_go;
 
 -- Crear las dos tiendas
 INSERT INTO configuracion.tiendas (nombre, direccion) VALUES
-    ('Los Altares - Sucursal Principal', 'Dirección Sucursal Principal'),
-    ('Los Altares - Sucursal 2', 'Dirección Sucursal 2');
+    ('Los Altares - Sucursal Principal', 'Dirección Sucursal Principal');
 
 -- Administrador global (sin tienda fija → acceso a ambas)
 INSERT INTO seguridad.usuarios (nombre, email, contrasena_hash, rol, id_tienda, email_verificado)
