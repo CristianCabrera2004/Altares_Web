@@ -197,6 +197,126 @@
   </div>
 }
 
+<!-- ── MODAL: Código de Barras Desconocido ── -->
+@if (barcodeDesconocido()) {
+  <div class="modal-overlay" (click)="cerrarModalBarcode()">
+    <div class="modal-card" style="max-width: 500px;" (click)="$event.stopPropagation()">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 15px; margin-bottom: 15px;">
+        <div class="modal-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 7V4h16v3M4 17v3h16v-3M7 10l2 4M15 10l-2 4M11 10v4"/>
+          </svg>
+        </div>
+        <div>
+          <h2 style="color: #ef4444;">Código No Registrado</h2>
+          <p style="font-size: 0.95rem;">Código: <strong>{{ barcodeDesconocido() }}</strong> no existe en la base de datos.</p>
+        </div>
+      </div>
+
+      @if (modoBarcode() === 'opciones') {
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+          <button class="btn-primary" style="justify-content: center; padding: 12px;" (click)="modoBarcode.set('crear')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Registrar Nuevo Producto
+          </button>
+          <button class="btn-ghost" style="justify-content: center; padding: 12px; border: 1px solid var(--border-subtle);" (click)="modoBarcode.set('enlazar')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Enlazar a Producto Existente
+          </button>
+        </div>
+      }
+
+      @if (modoBarcode() === 'enlazar') {
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 1rem; margin-bottom: 10px;">Enlazar Código de Barras</h3>
+          <input type="text" placeholder="Buscar producto existente..." 
+                 class="search-input" style="width: 100%; margin-bottom: 10px;"
+                 [value]="terminoEnlace()"
+                 (input)="terminoEnlace.set($any($event.target).value)" />
+          
+          <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 8px;">
+            @for (p of resultadosEnlace(); track p.id_producto) {
+              <div style="padding: 10px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
+                   (click)="confirmarEnlace(p.id_producto)">
+                <div>
+                  <div style="font-weight: 500;">{{ p.nombre }}</div>
+                  <div style="font-size: 0.8rem; color: #a0a8bb;">Cat: {{ p.nombre_categoria }} | Precio: {{ currency(p.precio_venta) }}</div>
+                </div>
+                <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" [disabled]="enlazando()">
+                  Enlazar
+                </button>
+              </div>
+            }
+            @if (terminoEnlace() && resultadosEnlace().length === 0) {
+              <div style="padding: 10px; text-align: center; color: #a0a8bb; font-size: 0.9rem;">No se encontraron productos.</div>
+            }
+          </div>
+        </div>
+      }
+
+      @if (modoBarcode() === 'crear') {
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 1rem; margin-bottom: 15px;">Registro Rápido de Producto</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <label style="display: block; font-size: 0.85rem; color: var(--text-title); margin-bottom: 4px;">Nombre del Producto</label>
+              <input type="text" class="search-input" style="width: 100%;" 
+                     [value]="nuevoProducto().nombre"
+                     (input)="nuevoProducto.update(n => ({...n, nombre: $any($event.target).value}))" />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="display: block; font-size: 0.85rem; color: var(--text-title); margin-bottom: 4px;">Categoría</label>
+                <select class="search-input" style="width: 100%; height: 38px; background: var(--bg-surface);"
+                        [value]="nuevoProducto().id_categoria"
+                        (change)="nuevoProducto.update(n => ({...n, id_categoria: +$any($event.target).value}))">
+                  <option value="1">Papelería y Suministros (0% IVA)</option>
+                  <option value="2">Libros (0% IVA)</option>
+                  <option value="3">Tecnología y Accesorios (15% IVA)</option>
+                  <option value="4">Servicios (15% IVA)</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.85rem; color: var(--text-title); margin-bottom: 4px;">Precio de Venta ($)</label>
+                <input type="number" step="0.01" min="0" class="search-input" style="width: 100%;"
+                       [value]="nuevoProducto().precio_venta"
+                       (input)="nuevoProducto.update(n => ({...n, precio_venta: +$any($event.target).value}))" />
+              </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #a0a8bb;">
+              * El código de barras <strong>{{ barcodeDesconocido() }}</strong> se asignará automáticamente. El stock inicial será 0.
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (errorEnlace()) {
+        <div class="modal-error" style="margin-bottom: 15px;">{{ errorEnlace() }}</div>
+      }
+
+      <div class="modal-actions" style="border-top: 1px solid var(--border-subtle); padding-top: 15px; margin-top: 0;">
+        @if (modoBarcode() !== 'opciones') {
+          <button class="btn-ghost" style="margin-right: auto;" (click)="modoBarcode.set('opciones')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
+            Volver
+          </button>
+        }
+        <button class="btn-ghost" (click)="cerrarModalBarcode()">Cancelar</button>
+        
+        @if (modoBarcode() === 'crear') {
+          <button class="btn-confirm" [disabled]="creandoProducto() || !nuevoProducto().nombre || nuevoProducto().precio_venta <= 0" (click)="confirmarCreacionRapida()">
+            @if (creandoProducto()) {
+              <span class="spinner-sm"></span> Guardando...
+            } @else {
+              Crear y Agregar
+            }
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
 <!-- ── PÁGINA PRINCIPAL ── -->
 <div class="page">
 

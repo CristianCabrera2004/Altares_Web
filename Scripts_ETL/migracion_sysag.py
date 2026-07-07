@@ -13,21 +13,21 @@ logging.basicConfig(
 )
 
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
-# Sysag Origen (de donde extraemos)
+# Sysag Origen (de donde extraemos) — PostgreSQL LOCAL sin cambios
 SYSAG_DB_USER = 'postgres'
 SYSAG_DB_PASS = 'cace2004'  
 SYSAG_DB_HOST = 'localhost'
 SYSAG_DB_PORT = '5432'
 SYSAG_DB_NAME = 'Tesis_DB'
 
-# Altares Destino (donde insertamos) 
-# Si estás usando la misma base de datos para todo, déjalo igual.
-# Si creaste "libreria_los_altares", pon ese nombre.
-DEST_DB_USER = 'postgres'
-DEST_DB_PASS = 'cace2004'
-DEST_DB_HOST = 'localhost'
-DEST_DB_PORT = '5432'
-DEST_DB_NAME = 'libreria_los_altares_V2' 
+# Altares Destino — BD en la NUBE (Fly.io) via tunnel 'fly proxy 5433:5432 --app altares-db'
+# IMPORTANTE: Antes de correr este script, ejecuta en otra terminal:
+#   fly proxy 5433:5432 --app altares-db
+DEST_DB_USER = 'backend_cinder_shape_4030'
+DEST_DB_PASS = 'SIQJEop2oAAUbcs'
+DEST_DB_HOST = 'localhost'  # El proxy de fly escucha en localhost
+DEST_DB_PORT = '5433'       # Puerto local del tunnel (5432 -> 5433 para no conflicto)
+DEST_DB_NAME = 'backend_cinder_shape_4030'
 
 sysag_conn_str = f'postgresql+psycopg2://{SYSAG_DB_USER}:{SYSAG_DB_PASS}@{SYSAG_DB_HOST}:{SYSAG_DB_PORT}/{SYSAG_DB_NAME}'
 

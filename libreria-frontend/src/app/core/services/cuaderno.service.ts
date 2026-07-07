@@ -57,4 +57,12 @@ export class CuadernoService {
   crearFactura(payload: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/facturas`, payload);
   }
+
+  enlazarCodigoBarras(idProducto: number, codigo: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/productos/${idProducto}/codigos-barras`, { codigo });
+  }
+
+  crearProducto(producto: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/productos`, producto);
+  }
 }
