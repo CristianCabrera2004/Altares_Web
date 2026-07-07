@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/lib/pq"
 	"libreria-altares/middleware"
@@ -591,4 +592,88 @@ func deleteProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"mensaje": "Producto dado de baja exitosamente (estado: inactivo). Los registros históricos se conservan.",
 	})
+}
+
+// ─── POST /api/productos/{id}/codigos-barras ────────────────────────────────
+// LinkBarcodeHandler permite enlazar rápidamente un código de barras nuevo a un
+// producto existente, verificando que no esté siendo usado por otro.
+func LinkBarcodeHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// 1. Obtener id del path
+		pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		// El path esperado es: api/productos/{id}/codigos-barras
+		if len(pathParts) < 4 {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Ruta inválida."})
+			return
+		}
+		idStr := pathParts[2]
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El ID del producto debe ser un número."})
+			return
+		}
+
+		// 2. Decodificar el body
+		var req struct {
+			Codigo string `json:"codigo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Cuerpo de petición inválido."})
+			return
+		}
+
+		codigo := strings.TrimSpace(req.Codigo)
+		if codigo == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El código de barras no puede estar vacío."})
+			return
+		}
+
+		// 3. Verificar si el código ya existe
+		var existe int
+		err = db.QueryRow(`SELECT id_producto FROM inventario.codigos_barras WHERE codigo = $1`, codigo).Scan(&existe)
+		if err == nil {
+			if existe == id {
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(map[string]string{"mensaje": "El código ya estaba enlazado a este producto."})
+				return
+			}
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El código de barras ya está asignado a otro producto."})
+			return
+		} else if err != sql.ErrNoRows {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al verificar el código de barras."})
+			return
+		}
+
+		// 4. Verificar que el producto exista
+		var estado string
+		err = db.QueryRow(`SELECT estado FROM inventario.productos WHERE id_producto = $1`, id).Scan(&estado)
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Producto no encontrado."})
+			return
+		} else if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al verificar el producto."})
+			return
+		}
+
+		// 5. Insertar el código de barras
+		_, err = db.Exec(`INSERT INTO inventario.codigos_barras (id_producto, codigo) VALUES ($1, $2)`, id, codigo)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al enlazar el código de barras."})
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"mensaje": "Código de barras enlazado exitosamente."})
+	}
 }

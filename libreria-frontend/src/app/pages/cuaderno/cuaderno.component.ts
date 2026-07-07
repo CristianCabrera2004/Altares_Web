@@ -55,6 +55,15 @@ export class CuadernoComponent implements OnInit {
   readonly guardadoExitoso  = signal(false);
   readonly resumen          = signal<{ id_venta: number; total: number; items: number } | null>(null);
 
+  // ── Códigos de Barras Desconocidos ───────────────────────────────────────
+  readonly barcodeDesconocido = signal('');
+  readonly modoBarcode = signal<'opciones' | 'enlazar' | 'crear'>('opciones');
+  readonly terminoEnlace = signal('');
+  readonly enlazando = signal(false);
+  readonly errorEnlace = signal('');
+  readonly nuevoProducto = signal({ nombre: '', id_categoria: 1, precio_venta: 0 });
+  readonly creandoProducto = signal(false);
+
   // ── Datos de Facturación ─────────────────────────────────────────────────
   readonly tipoCliente      = signal<'final' | 'datos'>('final');
   readonly tipoFactura      = signal<'fisica' | 'digital'>('fisica');
@@ -114,6 +123,15 @@ export class CuadernoComponent implements OnInit {
 
     // Sin filtros: primeros 20; con filtro: hasta 50
     return lista.slice(0, (t || stock !== 'todos') ? 50 : 20);
+  });
+
+  // Computed: catálogo filtrado para enlazar código de barras
+  readonly resultadosEnlace = computed<ProductoCatalogo[]>(() => {
+    const t = this.terminoEnlace().trim().toLowerCase();
+    if (!t) return [];
+    return this.catalogo()
+      .filter(p => p.nombre.toLowerCase().includes(t) || p.id_producto.toString() === t)
+      .slice(0, 10); // Máximo 10 resultados rápidos
   });
 
   // IDs que ya están en el cuaderno (para marcar visualmente en los resultados)
@@ -259,8 +277,79 @@ export class CuadernoComponent implements OnInit {
         this.agregarItem(producto);
       },
       error: () => {
-        this.errorCatalogo.set(`Producto no encontrado para el código: ${t}`);
-        setTimeout(() => this.errorCatalogo.set(''), 4000);
+        // Abrir modal de código desconocido
+        this.barcodeDesconocido.set(t);
+        this.modoBarcode.set('opciones');
+        this.terminoEnlace.set('');
+        this.errorEnlace.set('');
+      }
+    });
+  }
+
+  // ─── Funciones para Código de Barras Desconocido ──────────────────────────
+  cerrarModalBarcode(): void {
+    this.barcodeDesconocido.set('');
+    this.termino.set(''); // Limpiar el input principal
+  }
+
+  confirmarEnlace(idProducto: number): void {
+    const codigo = this.barcodeDesconocido();
+    if (!codigo) return;
+
+    this.enlazando.set(true);
+    this.errorEnlace.set('');
+    this.cuadernoService.enlazarCodigoBarras(idProducto, codigo).subscribe({
+      next: () => {
+        this.enlazando.set(false);
+        // Recargar catálogo para tener el código en memoria
+        this.cargarCatalogo();
+        // Agregar el producto al carrito automáticamente
+        const p = this.catalogo().find(x => x.id_producto === idProducto);
+        if (p) this.agregarItem(p);
+        this.cerrarModalBarcode();
+      },
+      error: (err) => {
+        this.enlazando.set(false);
+        this.errorEnlace.set(err?.error?.error || 'Error al enlazar código.');
+      }
+    });
+  }
+
+  confirmarCreacionRapida(): void {
+    const p = this.nuevoProducto();
+    const codigo = this.barcodeDesconocido();
+    if (!p.nombre || p.precio_venta <= 0) {
+      this.errorEnlace.set('Completa el nombre y un precio válido.');
+      return;
+    }
+
+    this.creandoProducto.set(true);
+    this.errorEnlace.set('');
+    
+    // Preparar payload de creación
+    const payload = {
+      nombre: p.nombre,
+      id_categoria: p.id_categoria,
+      precio_venta: Math.round(p.precio_venta * 100), // a centavos
+      stock_alerta_min: 0,
+      estado: 'activo',
+      codigos_barras: [codigo]
+    };
+
+    this.cuadernoService.crearProducto(payload).subscribe({
+      next: (res) => {
+        this.creandoProducto.set(false);
+        this.cargarCatalogo();
+        if (res.producto) {
+          this.agregarItem(res.producto);
+        }
+        this.cerrarModalBarcode();
+        // Reset form
+        this.nuevoProducto.set({ nombre: '', id_categoria: 1, precio_venta: 0 });
+      },
+      error: (err) => {
+        this.creandoProducto.set(false);
+        this.errorEnlace.set(err?.error?.error || 'Error al crear producto.');
       }
     });
   }
