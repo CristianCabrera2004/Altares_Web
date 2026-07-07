@@ -139,21 +139,24 @@ export class CuadernoComponent implements OnInit {
     () => new Set(this.items().map(i => i.producto.id_producto))
   );
 
-  // ── Computed: totales con IVA diferenciado (CA 3) ───────────────────────
+  // ── Computed: totales con IVA extraído del precio (CA 3) ───────────────────────
   readonly totales = computed(() => {
     let base0  = 0;  // base de ítems con tasa_iva = 0 (papelería)
-    let base15 = 0;  // base de ítems con tasa_iva = 15
+    let total15 = 0; // total con iva de ítems con tasa_iva = 15
     for (const item of this.items()) {
-      const lineBase = item.producto.precio_venta * item.cantidad;
+      const lineTotal = item.producto.precio_venta * item.cantidad;
       if (item.producto.tasa_iva === 0) {
-        base0  += lineBase;
+        base0  += lineTotal;
       } else {
-        base15 += lineBase;
+        total15 += lineTotal;
       }
     }
-    // Redondeo bancario en centavos
-    const iva15  = Math.round(base15 * 15 / 100);
-    const total  = base0 + base15 + iva15;
+    
+    // El precio de venta ya incluye el IVA, así que extraemos el IVA del total
+    const base15 = Math.round(total15 / 1.15);
+    const iva15  = total15 - base15;
+    const total  = base0 + total15;
+    
     return { base0, base15, iva15, total, cantidadItems: this.items().length };
   });
 
@@ -399,10 +402,9 @@ export class CuadernoComponent implements OnInit {
 
   // ── Helpers de cálculo ───────────────────────────────────────────────────
 
-  /** Total de una línea incluyendo el IVA correspondiente. */
+  /** Total de una línea incluyendo el IVA correspondiente. (El precio de venta ya incluye IVA) */
   totalLinea(item: ItemCuaderno): number {
-    const base = item.producto.precio_venta * item.cantidad;
-    return base + Math.round(base * item.producto.tasa_iva / 100);
+    return item.producto.precio_venta * item.cantidad;
   }
 
   /** Formatea centavos a string de moneda. */
@@ -624,8 +626,13 @@ export class CuadernoComponent implements OnInit {
 
     const tableData = itemsFactura.map(item => {
       const totalLinea = this.totalLinea(item);
-      const lineaBase = item.producto.precio_venta * item.cantidad;
-      const ivaLinea = totalLinea - lineaBase;
+      
+      let lineaBase = totalLinea;
+      let ivaLinea = 0;
+      if (item.producto.tasa_iva > 0) {
+        lineaBase = Math.round(totalLinea / (1 + item.producto.tasa_iva / 100));
+        ivaLinea = totalLinea - lineaBase;
+      }
       
       subtotal += lineaBase;
       totalIva += ivaLinea;
