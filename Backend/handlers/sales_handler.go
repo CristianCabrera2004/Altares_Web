@@ -187,13 +187,21 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
 	var subtotalBase int // suma de precios sin IVA
 	var totalIva     int // suma de IVA calculado
+	var totalConIva  int // suma total
+
 	for _, item := range items {
-		lineBase := item.PrecioUnitario * item.Cantidad
-		lineIva  := int(math.Round(float64(lineBase) * float64(item.IvaAplicado) / 100.0))
-		subtotalBase += lineBase
+		lineTotalConIva := item.PrecioUnitario * item.Cantidad
+		totalConIva += lineTotalConIva
+
+		var lineIva int
+		if item.IvaAplicado > 0 {
+			lineBase := int(math.Round(float64(lineTotalConIva) / (1.0 + float64(item.IvaAplicado)/100.0)))
+			lineIva = lineTotalConIva - lineBase
+		}
+		
+		subtotalBase += (lineTotalConIva - lineIva)
 		totalIva     += lineIva
 	}
-	totalConIva := subtotalBase + totalIva
 
 	// Paso 1 — Insertar la cabecera de la venta
 	var idVenta int
@@ -228,9 +236,8 @@ func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []Detalle
 			return 0, 0, fmt.Errorf("stock_insuficiente")
 		}
 
-		lineBase    := item.PrecioUnitario * item.Cantidad
-		lineIva     := int(math.Round(float64(lineBase) * float64(item.IvaAplicado) / 100.0))
-		lineTotalConIva := lineBase + lineIva
+		lineTotalConIva := item.PrecioUnitario * item.Cantidad
+
 		nuevoStock  := stockActual - item.Cantidad
 
 		// Paso 2c — Insertar línea de detalle

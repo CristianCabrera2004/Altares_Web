@@ -94,7 +94,6 @@ export class InventarioComponent implements OnInit {
   readonly guardandoEdicion   = signal(false);
 
   readonly formEditar = this.fb.group({
-    codigos_barras:   [''],
     nombre:          ['', [Validators.required, Validators.minLength(2)]],
     id_categoria:    [null as number | null, Validators.required],
     precio_venta:    [null as number | null, [Validators.required, Validators.min(0)]],
@@ -102,6 +101,10 @@ export class InventarioComponent implements OnInit {
     stock_alerta_min:[5,  [Validators.required, Validators.min(0)]],
     estado:          ['activo', Validators.required]
   });
+
+  // Estado para la edición dinámica de códigos de barras
+  readonly nuevoCodigoEdicion = signal('');
+  readonly guardandoCodigoEdicion = signal(false);
 
   // ─── Productos filtrados y ordenados ─────────────────────────────────────
   readonly productosFiltrados = computed(() => {
@@ -115,7 +118,8 @@ export class InventarioComponent implements OnInit {
     // Filtrar por búsqueda de texto
     if (q) lista = lista.filter(p =>
       p.nombre.toLowerCase().includes(q) ||
-      p.nombre_categoria.toLowerCase().includes(q)
+      p.nombre_categoria.toLowerCase().includes(q) ||
+      (p.codigos_barras && p.codigos_barras.some(c => c.includes(q)))
     );
 
     // Filtrar por categoría
@@ -282,9 +286,9 @@ export class InventarioComponent implements OnInit {
 
   // ═══════════════════════════════════════════════════════════
   abrirModalEditar(p: Producto): void {
-    this.productoEditar.set(p);
+    // Clonamos el producto para que los arrays no mute en la lista principal antes de guardar
+    this.productoEditar.set(JSON.parse(JSON.stringify(p)));
     this.formEditar.patchValue({
-      codigos_barras:   p.codigos_barras ? p.codigos_barras.join(', ') : '',
       nombre:          p.nombre,
       id_categoria:    p.id_categoria,
       precio_venta:    p.precio_venta / 100,
@@ -293,6 +297,7 @@ export class InventarioComponent implements OnInit {
       estado:          p.estado
     });
     this.errorMsg.set('');
+    this.nuevoCodigoEdicion.set('');
     this.mostrarModalEditar.set(true);
   }
 
@@ -314,7 +319,11 @@ export class InventarioComponent implements OnInit {
     this.guardandoEdicion.set(true);
     this.errorMsg.set('');
     const raw = this.formEditar.value;
-    const codigosArray = (raw.codigos_barras ?? '').split(',').map((c: string) => c.trim()).filter((c: string) => c);
+    
+    // Al guardar, enviamos los códigos actuales (que ya fueron guardados instantáneamente) 
+    // solo por compatibilidad con la API PUT de actualizar producto global.
+    const codigosArray = p.codigos_barras || [];
+    
     const payload = {
       codigos_barras:   codigosArray,
       nombre:           raw.nombre,
@@ -336,6 +345,63 @@ export class InventarioComponent implements OnInit {
       error: (err) => {
         this.errorMsg.set(err?.error?.error ?? 'Error al actualizar el producto.');
         this.guardandoEdicion.set(false);
+      }
+    });
+  }
+
+  // ─── Gestión dinámica de Códigos de Barras en Modal Edición ─────────────
+  agregarCodigoBarraEnEdicion(): void {
+    const codigo = this.nuevoCodigoEdicion().trim();
+    const p = this.productoEditar();
+    if (!codigo || !p || this.guardandoCodigoEdicion()) return;
+
+    this.guardandoCodigoEdicion.set(true);
+    this.errorMsg.set('');
+    
+    this.http.post(`${this.apiProductos}/${p.id_producto}/codigos-barras`, { codigo }).subscribe({
+      next: () => {
+        this.guardandoCodigoEdicion.set(false);
+        this.nuevoCodigoEdicion.set('');
+        // Actualizar UI localmente
+        this.productoEditar.update(prod => {
+          if (!prod) return prod;
+          const current = prod.codigos_barras || [];
+          if (!current.includes(codigo)) {
+            prod.codigos_barras = [...current, codigo];
+          }
+          return { ...prod };
+        });
+        // También actualizar el catálogo principal para que se refleje inmediatamente en el grid
+        this.cargarProductos(); 
+      },
+      error: (err) => {
+        this.errorMsg.set(err?.error?.error ?? 'Error al añadir código de barras.');
+        this.guardandoCodigoEdicion.set(false);
+      }
+    });
+  }
+
+  eliminarCodigoBarraEnEdicion(codigo: string): void {
+    const p = this.productoEditar();
+    if (!p || this.guardandoCodigoEdicion()) return;
+
+    this.guardandoCodigoEdicion.set(true);
+    this.errorMsg.set('');
+    
+    this.http.delete(`${this.apiProductos}/${p.id_producto}/codigos-barras?codigo=${encodeURIComponent(codigo)}`).subscribe({
+      next: () => {
+        this.guardandoCodigoEdicion.set(false);
+        // Actualizar UI localmente
+        this.productoEditar.update(prod => {
+          if (!prod) return prod;
+          prod.codigos_barras = (prod.codigos_barras || []).filter(c => c !== codigo);
+          return { ...prod };
+        });
+        this.cargarProductos();
+      },
+      error: (err) => {
+        this.errorMsg.set(err?.error?.error ?? 'Error al eliminar código de barras.');
+        this.guardandoCodigoEdicion.set(false);
       }
     });
   }

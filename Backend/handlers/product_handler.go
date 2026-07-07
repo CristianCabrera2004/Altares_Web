@@ -466,9 +466,9 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	// Actualizar stock de la tienda (UPSERT)
 	_, err = tx.Exec(`
 		INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
-		VALUES ($1, $2, 0, $4)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id_tienda, id_producto)
-		DO UPDATE SET stock_alerta_min = $4`,
+		DO UPDATE SET stock_actual = $3, stock_alerta_min = $4`,
 		idTienda, id, p.StockActual, p.StockAlertaMin)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -675,5 +675,55 @@ func LinkBarcodeHandler(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{"mensaje": "Código de barras enlazado exitosamente."})
+	}
+}
+
+// ─── DELETE /api/productos/{id}/codigos-barras?codigo={codigo} ───────────
+// UnlinkBarcodeHandler permite desvincular un código de barras de un producto.
+func UnlinkBarcodeHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// 1. Obtener id del path
+		pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(pathParts) < 4 {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Ruta inválida."})
+			return
+		}
+		idStr := pathParts[2]
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El ID del producto debe ser un número."})
+			return
+		}
+
+		// 2. Obtener el código de barras
+		codigo := r.URL.Query().Get("codigo")
+		codigo = strings.TrimSpace(codigo)
+		if codigo == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El parámetro ?codigo es obligatorio."})
+			return
+		}
+
+		// 3. Eliminar el registro
+		result, err := db.Exec(`DELETE FROM inventario.codigos_barras WHERE id_producto = $1 AND codigo = $2`, id, codigo)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error interno al desvincular el código de barras."})
+			return
+		}
+
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "No se encontró el código de barras asignado a este producto."})
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"mensaje": "Código de barras desvinculado exitosamente."})
 	}
 }
