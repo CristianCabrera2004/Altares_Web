@@ -466,10 +466,10 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	// Actualizar stock de la tienda (UPSERT)
 	_, err = tx.Exec(`
 		INSERT INTO inventario.stock_tiendas (id_tienda, id_producto, stock_actual, stock_alerta_min)
-		VALUES ($1, $2, 0, $4)
+		VALUES ($1, $2, 0, $3)
 		ON CONFLICT (id_tienda, id_producto)
-		DO UPDATE SET stock_alerta_min = $4`,
-		idTienda, id, p.StockActual, p.StockAlertaMin)
+		DO UPDATE SET stock_alerta_min = $3`,
+		idTienda, id, p.StockAlertaMin)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al actualizar el stock de la tienda."})
