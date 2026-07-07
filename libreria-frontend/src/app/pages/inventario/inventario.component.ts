@@ -115,7 +115,8 @@ export class InventarioComponent implements OnInit {
     // Filtrar por búsqueda de texto
     if (q) lista = lista.filter(p =>
       p.nombre.toLowerCase().includes(q) ||
-      p.nombre_categoria.toLowerCase().includes(q)
+      p.nombre_categoria.toLowerCase().includes(q) ||
+      (p.codigos_barras && p.codigos_barras.some(c => c.includes(q)))
     );
 
     // Filtrar por categoría
