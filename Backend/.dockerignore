@@ -1,0 +1,24 @@
+# Archivos excluidos del contexto Docker (no se envían al daemon)
+
+# Variables de entorno (los secrets van por fly secrets set)
+.env
+.env.*
+
+# Binarios compilados localmente (Windows)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Control de versiones
+.git/
+.gitignore
+
+# Archivos de test y migración
+*_test.go
+run_migration.go
+scratch_db.go
+
+# Logs
+*.log
