@@ -84,6 +84,7 @@ export class InventarioComponent implements OnInit {
     nombre:          ['', [Validators.required, Validators.minLength(2)]],
     id_categoria:    [null as number | null, Validators.required],
     precio_venta:    [null as number | null, [Validators.required, Validators.min(0)]],
+    tipo_iva:        ['grabado', Validators.required],
     stock_actual:    [0,  [Validators.required, Validators.min(0)]],
     stock_alerta_min:[5,  [Validators.required, Validators.min(0)]]
   });
@@ -97,6 +98,7 @@ export class InventarioComponent implements OnInit {
     nombre:          ['', [Validators.required, Validators.minLength(2)]],
     id_categoria:    [null as number | null, Validators.required],
     precio_venta:    [null as number | null, [Validators.required, Validators.min(0)]],
+    tipo_iva:        ['grabado', Validators.required],
     stock_actual:    [0,  [Validators.required, Validators.min(0)]],
     stock_alerta_min:[5,  [Validators.required, Validators.min(0)]],
     estado:          ['activo', Validators.required]
@@ -233,6 +235,7 @@ export class InventarioComponent implements OnInit {
       nombre:           raw.nombre,
       id_categoria:     Number(raw.id_categoria),
       precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),
+      tipo_iva:         raw.tipo_iva ?? '0%',
       stock_actual:     raw.stock_actual ?? 0,
       stock_alerta_min: raw.stock_alerta_min ?? 5
     };
@@ -292,6 +295,7 @@ export class InventarioComponent implements OnInit {
       nombre:          p.nombre,
       id_categoria:    p.id_categoria,
       precio_venta:    p.precio_venta / 100,
+      tipo_iva:        p.tipo_iva,
       stock_actual:    p.stock_actual,
       stock_alerta_min: p.stock_alerta_min,
       estado:          p.estado
@@ -329,6 +333,7 @@ export class InventarioComponent implements OnInit {
       nombre:           raw.nombre,
       id_categoria:     Number(raw.id_categoria),
       precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),
+      tipo_iva:         raw.tipo_iva ?? 'grabado',
       stock_actual:     raw.stock_actual ?? 0,
       stock_alerta_min: raw.stock_alerta_min ?? 5,
       estado:           raw.estado ?? 'activo'

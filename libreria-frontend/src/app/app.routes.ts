@@ -117,6 +117,13 @@ export const routes: Routes = [
         title: 'Gestión de Usuarios · Los Altares'
       },
       {
+        path: 'ajustes',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/ajustes/ajustes.component').then(m => m.AjustesComponent),
+        title: 'Ajustes del Sistema · Los Altares'
+      },
+      {
         path: 'tiendas',
         canActivate: [adminGuard],
         loadComponent: () =>

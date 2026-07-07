@@ -9,6 +9,7 @@ export interface ProductoCatalogo {
   id_categoria:     number;
   nombre_categoria: string;
   tasa_iva:         number;
+  tipo_iva:         string;
   stock_actual:     number;
   stock_alerta_min: number;
   precio_venta:     number;
