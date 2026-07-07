@@ -78,9 +78,14 @@ func main() {
 
 	// POST /api/productos/{id}/codigos-barras (enlace rápido)
 	mux.HandleFunc("/api/productos/", func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/codigos-barras") && r.Method == http.MethodPost {
-			middleware.RequireRole(db, "operador_caja")(handlers.LinkBarcodeHandler(db))(w, r)
-			return
+		if strings.HasSuffix(r.URL.Path, "/codigos-barras") {
+			if r.Method == http.MethodPost {
+				middleware.RequireRole(db, "operador_caja")(handlers.LinkBarcodeHandler(db))(w, r)
+				return
+			} else if r.Method == http.MethodDelete {
+				middleware.RequireRole(db, "operador_caja")(handlers.UnlinkBarcodeHandler(db))(w, r)
+				return
+			}
 		}
 		// Fallback para si alguien llama a /api/productos/ de alguna manera (aunque el mux de Go prefiere el exact match)
 		middleware.RequireRole(db, "operador_caja")(handlers.ProductHandler(db))(w, r)
