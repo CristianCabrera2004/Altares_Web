@@ -103,7 +103,18 @@ func main() {
 	mux.HandleFunc("/api/inventario/transferencias/recibir", middleware.RequireRole(db, "operador_caja")(handlers.RecibirTransferenciaHandler(db)))
 	mux.HandleFunc("/api/inventario/transferencias", middleware.RequireRole(db, "operador_caja")(handlers.TransferenciasHandler(db)))
 
-	// ─── HU-04: Devoluciones ──────────────────────────────────────────────────
+	// ── HT-07: Configuración de Sistema ──────────────────────────────────────────
+	mux.HandleFunc("/api/configuracion", middleware.RequireRole(db, "admin_libreria")(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handlers.GetConfigHandler(db)(w, r)
+		} else if r.Method == http.MethodPut {
+			handlers.PutConfigHandler(db)(w, r)
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// ── HT-10: Auditoría ───────────────────────────────────────────────────────
 	mux.HandleFunc("/api/devoluciones", middleware.RequireRole(db, "operador_caja")(handlers.DevolucionHandler(db)))
 
 	// ─── HT-02: Ventas y Cuaderno Transaccional ───────────────────────────────

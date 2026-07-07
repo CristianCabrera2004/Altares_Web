@@ -513,7 +513,11 @@
                     <span class="iva-badge-sm"
                       [class.iva-0]="item.producto.tasa_iva === 0"
                       [class.iva-15]="item.producto.tasa_iva > 0">
-                      {{ item.producto.tasa_iva }}%
+                      @if (item.producto.tipo_iva === 'sin_iva') {
+                        Sin IVA
+                      } @else {
+                        {{ item.producto.tasa_iva }}%
+                      }
                     </span>
                   </td>
 

@@ -1,0 +1,61 @@
+<div class="header">
+  <div class="header-left">
+    <h1>Ajustes del Sistema</h1>
+    <p>Configuraciones globales de la plataforma</p>
+  </div>
+</div>
+
+<div class="content-panel">
+  @if (cargando) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Cargando configuraciones...</p>
+    </div>
+  } @else {
+    @if (error) {
+      <div class="alert-banner error">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{{ error }}</span>
+      </div>
+    }
+
+    @if (mensaje) {
+      <div class="alert-banner success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span>{{ mensaje }}</span>
+      </div>
+    }
+
+    <div class="settings-grid">
+      <div class="setting-card">
+        <div class="setting-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <div class="setting-content">
+          <h3>Impuesto al Valor Agregado (IVA)</h3>
+          <p>Tasa porcentual que se aplicará a todos los productos marcados como "IVA Grabado".</p>
+          
+          <div class="setting-form">
+            <div class="input-group">
+              <input type="number" [(ngModel)]="ivaGrabado" min="0" max="100" class="input-field" placeholder="15">
+              <span class="input-suffix">%</span>
+            </div>
+            <button class="btn-primary" (click)="guardarIva()" [disabled]="guardando">
+              @if (guardando) {
+                <div class="spinner-small"></div> Guardando...
+              } @else {
+                Guardar Cambios
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>

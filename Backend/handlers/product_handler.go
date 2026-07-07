@@ -34,12 +34,13 @@ type Producto struct {
 	Nombre          string   `json:"nombre"`
 	IdCategoria     int      `json:"id_categoria"`
 	NombreCategoria string   `json:"nombre_categoria,omitempty"`
-	TasaIva         int      `json:"tasa_iva"` // 0% (papel.) o 15% (HU-01 CA 3)
+	TasaIva         int      `json:"tasa_iva"`         // 0% (papel.) o 15% (HU-01 CA 3)
 	StockActual     int      `json:"stock_actual"`
-	StockAlertaMin  int      `json:"stock_alerta_min"`
-	PrecioVenta     int      `json:"precio_venta"` // centavos
-	Estado          string   `json:"estado"`
-	CodigosBarras   []string `json:"codigos_barras,omitempty"`
+	StockAlertaMin  int      `json:"stock_alerta_min"` // Stock mínimo alerta de tienda
+	PrecioVenta     int      `json:"precio_venta"`     // Int en centavos (HU-01 CA 2)
+	Estado          string   `json:"estado"`           // "activo", "inactivo"
+	CodigosBarras   []string `json:"codigos_barras"`   // Lista de códigos (HU-01 CA 1)
+	TipoIva         string   `json:"tipo_iva"`         // "0%", "grabado", "sin_iva"
 }
 
 // ProductHandler despacha las peticiones según el método HTTP recibido (CA 43).
@@ -92,7 +93,8 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 		var p Producto
 		err = db.QueryRow(`
-			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
+			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, p.tipo_iva,
+			       CASE WHEN p.tipo_iva = 'grabado' THEN (SELECT valor::INT FROM configuracion.parametros WHERE clave='tasa_iva_grabado') ELSE 0 END as tasa_iva,
 			       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
 			       p.precio_venta, p.estado,
 			       COALESCE((SELECT array_agg(codigo) FROM inventario.codigos_barras WHERE id_producto = p.id_producto), '{}')
@@ -100,7 +102,7 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
 			WHERE p.id_producto = $1`, id, idTienda,
-		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
+		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TipoIva, &p.TasaIva,
 			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras))
 
 		if err == sql.ErrNoRows {
@@ -121,10 +123,15 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	// Soporte de ?stock_bajo=true para filtrar solo productos con stock <= stock_alerta_min
 	stockBajoFilter := r.URL.Query().Get("stock_bajo") == "true"
 	query := `
-		SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
+		SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, p.tipo_iva,
+		       CASE WHEN p.tipo_iva = 'grabado' THEN (SELECT valor::INT FROM configuracion.parametros WHERE clave='tasa_iva_grabado') ELSE 0 END as tasa_iva,
 		       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
 		       p.precio_venta, p.estado,
-		       COALESCE((SELECT array_agg(codigo) FROM inventario.codigos_barras WHERE id_producto = p.id_producto), '{}')
+		       COALESCE((
+		         SELECT array_agg(codigo) 
+		         FROM inventario.codigos_barras 
+		         WHERE id_producto = p.id_producto
+		       ), '{}')
 		FROM inventario.productos p
 		JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 		LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $1
@@ -145,8 +152,7 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	productos := []Producto{}
 	for rows.Next() {
 		var p Producto
-		if err := rows.Scan(
-			&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
+		if err := rows.Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TipoIva, &p.TasaIva,
 			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras),
 		); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -283,11 +289,15 @@ func createProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
+	if p.TipoIva == "" {
+		p.TipoIva = "0%"
+	}
+
 	err = tx.QueryRow(`
-		INSERT INTO inventario.productos (nombre, id_categoria, precio_venta, estado)
-		VALUES ($1, $2, $3, 'activo')
+		INSERT INTO inventario.productos (nombre, id_categoria, precio_venta, estado, tipo_iva)
+		VALUES ($1, $2, $3, 'activo', $4)
 		RETURNING id_producto`,
-		p.Nombre, p.IdCategoria, p.PrecioVenta,
+		p.Nombre, p.IdCategoria, p.PrecioVenta, p.TipoIva,
 	).Scan(&p.IdProducto)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -361,7 +371,8 @@ func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 
 		var p Producto
 		err := db.QueryRow(`
-			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, c.tasa_iva,
+			SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, p.tipo_iva,
+			       CASE WHEN p.tipo_iva = 'grabado' THEN (SELECT valor::INT FROM configuracion.parametros WHERE clave='tasa_iva_grabado') ELSE 0 END as tasa_iva,
 			       COALESCE(st.stock_actual, 0), COALESCE(st.stock_alerta_min, 5),
 			       p.precio_venta, p.estado,
 			       COALESCE((SELECT array_agg(cb_sub.codigo) FROM inventario.codigos_barras cb_sub WHERE cb_sub.id_producto = p.id_producto), '{}')
@@ -370,7 +381,7 @@ func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
 			WHERE cb.codigo = $1`, codigo, idTienda,
-		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TasaIva,
+		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TipoIva, &p.TasaIva,
 			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras))
 
 		if err == sql.ErrNoRows {
@@ -443,12 +454,16 @@ func updateProduct(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	// Actualizar catálogo global (nombre, categoría, precio, estado)
+	if p.TipoIva == "" {
+		p.TipoIva = "0%"
+	}
+
+	// Actualizar catálogo global (nombre, categoría, precio, estado, tipo_iva)
 	result, err := tx.Exec(`
 		UPDATE inventario.productos
-		SET nombre = $1, id_categoria = $2, precio_venta = $3, estado = $4
-		WHERE id_producto = $5`,
-		p.Nombre, p.IdCategoria, p.PrecioVenta, p.Estado, id,
+		SET nombre = $1, id_categoria = $2, precio_venta = $3, estado = $4, tipo_iva = $5
+		WHERE id_producto = $6`,
+		p.Nombre, p.IdCategoria, p.PrecioVenta, p.Estado, p.TipoIva, id,
 	)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
