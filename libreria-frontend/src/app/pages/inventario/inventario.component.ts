@@ -11,6 +11,7 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 
 interface Producto {
@@ -48,6 +49,7 @@ interface ProductoResponse {
 export class InventarioComponent implements OnInit {
   private readonly http   = inject(HttpClient);
   private readonly fb     = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   private readonly apiProductos  = `${environment.apiUrl}/productos`;
   private readonly apiBuscar     = `${environment.apiUrl}/productos/buscar`;
@@ -141,6 +143,14 @@ export class InventarioComponent implements OnInit {
 
     return lista;
   });
+
+  setBusqueda(txt: string) {
+    this.busqueda.set(txt.toLowerCase());
+  }
+
+  irATransferencias() {
+    this.router.navigate(['/transferencias']);
+  }
 
   ngOnInit(): void {
     this.cargarProductos();
