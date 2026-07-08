@@ -48,7 +48,7 @@ export class ReportesComponent implements OnInit {
     
     this.reportesService.getVentas(this.startDate(), this.endDate(), this.categoria()).subscribe({
       next: (data) => {
-        this.items.set(data);
+        this.items.set(data || []);
         this.loading.set(false);
       },
       error: (err) => {

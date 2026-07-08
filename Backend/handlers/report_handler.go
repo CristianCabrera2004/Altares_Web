@@ -82,7 +82,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var items []ReporteItem
+		var items = []ReporteItem{}
 		for rows.Next() {
 			var i ReporteItem
 			if err := rows.Scan(&i.FechaVenta, &i.IdProducto, &i.Producto, &i.Categoria, &i.Cantidad, &i.PrecioUnitario, &i.Total); err != nil {

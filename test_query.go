@@ -17,15 +17,9 @@ func main() {
 
 	query2 := `
 		SELECT 
-			TO_CHAR(v.fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha_v,
-			p.nombre,
-			SUM(d.cantidad) as cantidad
-		FROM operaciones.detalle_ventas d
-		JOIN operaciones.ventas v ON d.id_venta = v.id_venta
-		JOIN inventario.productos p ON d.id_producto = p.id_producto
-		WHERE v.id_usuario = 4
-		GROUP BY TO_CHAR(v.fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD'), p.nombre
-		ORDER BY fecha_v DESC
+			'2026-07-08 00:31:37'::timestamp as t_raw,
+			('2026-07-08 00:31:37'::timestamp AT TIME ZONE 'UTC') as t_utc,
+			('2026-07-08 00:31:37'::timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') as t_gye
 	`
 	rows, err := db.Query(query2)
 	if err != nil {
@@ -36,6 +30,6 @@ func main() {
 	for rows.Next() {
 		var f1, f2, f3 string
 		rows.Scan(&f1, &f2, &f3)
-		fmt.Printf("Date: %s | Prod: %s | Cant: %s\n", f1, f2, f3)
+		fmt.Printf("Raw: %s | UTC: %s | GYE: %s\n", f1, f2, f3)
 	}
 }
