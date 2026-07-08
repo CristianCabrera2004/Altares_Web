@@ -147,6 +147,10 @@ export class ReportesComponent implements OnInit {
 
   formatDate(isoString: string): string {
     if (!isoString) return '';
+    if (isoString.length === 10) {
+      const [year, month, day] = isoString.split('-');
+      return `${day}/${month}/${year}`;
+    }
     const date = new Date(isoString);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');

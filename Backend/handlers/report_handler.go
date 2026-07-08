@@ -47,7 +47,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		args := []interface{}{startDate, endDate, idTienda}
 		query := `
 			SELECT 
-				TO_CHAR(v.fecha_venta, 'YYYY-MM-DD') as fecha_v,
+				TO_CHAR(v.fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha_v,
 				p.id_producto,
 				p.nombre as producto,
 				c.nombre as categoria,
@@ -58,7 +58,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
-			WHERE DATE(v.fecha_venta) >= $1 AND DATE(v.fecha_venta) <= $2
+			WHERE DATE(v.fecha_venta AT TIME ZONE 'America/Guayaquil') >= $1 AND DATE(v.fecha_venta AT TIME ZONE 'America/Guayaquil') <= $2
 			AND v.id_tienda = $3
 			AND v.estado = 'completada'
 		`
@@ -69,7 +69,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		query += `
-			GROUP BY TO_CHAR(v.fecha_venta, 'YYYY-MM-DD'), p.id_producto, p.nombre, c.nombre, d.precio_unitario
+			GROUP BY TO_CHAR(v.fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD'), p.id_producto, p.nombre, c.nombre, d.precio_unitario
 			ORDER BY fecha_v DESC, total DESC
 			LIMIT 50000
 		`
@@ -121,25 +121,25 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 
 		switch periodo {
 		case "7":
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '6 days'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD')"
-		case "30": // Mes: agrupa por mes de los últimos 12 meses
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '11 months'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM')"
-		case "365": // Año: agrupa por año de los últimos 5 años
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '4 years'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY')"
-		case "0": // General: agrupa por año sin límite de fecha
+			whereClause = "AND fecha_venta AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '6 days'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD')"
+		case "30":
+			whereClause = "AND fecha_venta AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '11 months'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM')"
+		case "365":
+			whereClause = "AND fecha_venta AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '4 years'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY')"
+		case "0":
 			whereClause = ""
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY')"
-		default: // "15" (15 días)
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '14 days'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD')"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY')"
+		default:
+			whereClause = "AND fecha_venta AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '14 days'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD')"
 		}
 
 		query := fmt.Sprintf(`

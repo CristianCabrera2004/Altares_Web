@@ -61,7 +61,7 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 			FROM operaciones.detalle_ventas d
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
-			WHERE DATE(v.fecha_venta) = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
+			WHERE DATE(v.fecha_venta AT TIME ZONE 'America/Guayaquil') = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
 			GROUP BY p.nombre, d.precio_unitario, d.iva_aplicado
 		`
 
