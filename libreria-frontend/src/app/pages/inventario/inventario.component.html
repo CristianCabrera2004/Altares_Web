@@ -8,6 +8,32 @@
       <p class="page-subtitle">Catálogo de productos activos · {{ productosFiltrados().length }} productos</p>
     </div>
     <div style="display: flex; gap: 12px; align-items: center;">
+      <div style="background: rgba(79, 142, 247, 0.1); border: 1px solid rgba(79, 142, 247, 0.2); padding: 8px 12px; border-radius: 8px; margin-right: 8px;">
+        <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: block; line-height: 1;">Valor en Inventario</span>
+        <span style="font-size: 1.1rem; color: #4F8EF7; font-weight: 700;">{{ currency(totalDineroInventario()) }}</span>
+      </div>
+      
+      <button class="btn-secondary" (click)="exportarPDF()" title="Exportar a PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 6px;">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        PDF
+      </button>
+
+      <button class="btn-secondary" (click)="exportarExcel()" title="Exportar a Excel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 6px;">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="8" y1="13" x2="16" y2="17"/>
+          <line x1="16" y1="13" x2="8" y2="17"/>
+        </svg>
+        Excel
+      </button>
+
       <button class="btn-secondary" (click)="irATransferencias()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 6px;">
           <polyline points="17 1 21 5 17 9"/>
@@ -15,7 +41,7 @@
           <polyline points="7 23 3 19 7 15"/>
           <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
         </svg>
-        Transferencias
+        Bandeja Transferencias
       </button>
       <button id="btn-nuevo-producto" class="btn-primary" (click)="abrirModalIngreso()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 6px;">
@@ -173,6 +199,14 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                  </button>
+                  <button class="icon-btn transfer" (click)="abrirModalTransferencia(p)" title="Transferir" style="color: #a78bfa;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="17 1 21 5 17 9"/>
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                      <polyline points="7 23 3 19 7 15"/>
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
                     </svg>
                   </button>
                   <button class="icon-btn deactivate" (click)="darDeBaja(p)" title="Desactivar del catálogo">
@@ -646,6 +680,72 @@
       <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
         <button class="btn-secondary" (click)="cancelarConfirmacion()">Cancelar</button>
         <button class="btn-primary" (click)="confirmarAccion()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── MODAL: Transferencia Rápida ── -->
+@if (modalTransferVisible()) {
+  <div class="modal-backdrop">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header" style="display: flex; gap: 12px; margin-bottom: 20px;">
+        <div class="modal-icon" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <polyline points="17 1 21 5 17 9"/>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+        </div>
+        <div>
+          <h2 style="margin: 0 0 4px; font-size: 1.1rem; color: var(--text-heading);">Transferir Producto</h2>
+          <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);"><strong>{{ prodTransfer()?.nombre }}</strong></p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-title); font-size: 0.9rem;">
+          <input type="radio" name="tipoTransfer" value="enviar" [checked]="tipoTransfer() === 'enviar'" (change)="tipoTransfer.set('enviar')" style="accent-color: #a78bfa;">
+          Enviar (Sale de mi stock)
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-title); font-size: 0.9rem;">
+          <input type="radio" name="tipoTransfer" value="solicitar" [checked]="tipoTransfer() === 'solicitar'" (change)="tipoTransfer.set('solicitar')" style="accent-color: #a78bfa;">
+          Solicitar (Pedir stock)
+        </label>
+      </div>
+
+      <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Tienda {{ tipoTransfer() === 'enviar' ? 'Destino' : 'Origen' }}</label>
+          <select class="form-input" [value]="transferTienda()" (change)="transferTienda.set(+$any($event.target).value)" style="padding: 10px; background: var(--bg-base); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text-main); font-size: 0.9rem;">
+            <option [value]="null">Selecciona una sucursal...</option>
+            @for (t of tiendas(); track t.id_tienda) {
+              <option [value]="t.id_tienda">{{ t.nombre }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Cantidad (Stock actual: {{ prodTransfer()?.stock_actual }})</label>
+          <input type="number" class="form-input" [formControl]="transferQty" style="padding: 10px; background: var(--bg-base); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text-main); font-size: 0.9rem;" />
+        </div>
+      </div>
+
+      <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px;">
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Observación (Opcional)</label>
+        <textarea class="form-input" rows="2" [value]="transferObs()" (input)="transferObs.set($any($event.target).value)" style="padding: 10px; background: var(--bg-base); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text-main); font-size: 0.9rem; resize: vertical;"></textarea>
+      </div>
+
+      <div class="modal-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button type="button" class="btn-secondary" (click)="cerrarModalTransferencia()" [disabled]="guardando()">Cancelar</button>
+        <button type="button" class="btn-primary" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6);" (click)="guardarTransferencia()" [disabled]="guardando() || transferQty.invalid || !transferTienda()">
+          @if (guardando()) {
+            <span class="spinner-sm"></span> Procesando...
+          } @else {
+            Confirmar
+          }
+        </button>
       </div>
     </div>
   </div>

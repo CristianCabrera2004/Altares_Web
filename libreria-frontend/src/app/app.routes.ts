@@ -59,6 +59,13 @@ export const routes: Routes = [
         title: 'Inventario · Los Altares'
       },
       {
+        path: 'ingresos',
+        canActivate: [operadorGuard],
+        loadComponent: () =>
+          import('./pages/ingresos/ingresos.component').then(m => m.IngresosComponent),
+        title: 'Ingreso Múltiple · Los Altares'
+      },
+      {
         path: 'devoluciones',
         canActivate: [operadorGuard],
         loadComponent: () =>
