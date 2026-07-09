@@ -163,6 +163,23 @@ export class InventarioComponent implements OnInit {
     return lista;
   });
 
+  // ─── Paginación Virtual / Scroll Infinito ──────────────────────────────
+  readonly displayedCount = signal(50);
+
+  readonly productosMostrados = computed(() => {
+    return this.productosFiltrados().slice(0, this.displayedCount());
+  });
+
+  onTableScroll(event: Event) {
+    const target = event.target as HTMLElement;
+    // Si estamos a 100px del final, cargamos más
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 100) {
+      if (this.displayedCount() < this.productosFiltrados().length) {
+        this.displayedCount.update(c => c + 50);
+      }
+    }
+  }
+
   readonly totalDineroInventario = computed(() => {
     return this.productosFiltrados().reduce((sum, p) => sum + (p.stock_actual > 0 ? (p.precio_venta * p.stock_actual) : 0), 0);
   });
@@ -564,9 +581,13 @@ export class InventarioComponent implements OnInit {
     return 'ok';
   }
 
-  setBusqueda(value: string): void { this.busqueda.set(value); }
+  setBusqueda(value: string): void {
+    this.displayedCount.set(50);
+    this.busqueda.set(value);
+  }
 
   setSort(campo: 'nombre' | 'precio_venta' | 'stock_actual'): void {
+    this.displayedCount.set(50);
     if (this.sortField() === campo) {
       // Mismo campo → invertir dirección
       this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
@@ -577,6 +598,7 @@ export class InventarioComponent implements OnInit {
   }
 
   setFiltroCat(valor: string): void {
+    this.displayedCount.set(50);
     this.filtroCat.set(valor === '' ? null : Number(valor));
   }
 

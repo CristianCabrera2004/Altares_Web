@@ -140,7 +140,7 @@
         }
       </div>
     } @else {
-      <div class="table-wrapper">
+      <div class="table-wrapper" (scroll)="onTableScroll($event)" style="max-height: calc(100vh - 250px); overflow-y: auto;">
         <table class="data-table">
           <thead>
             <tr>
@@ -159,7 +159,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (p of productosFiltrados(); track p.id_producto) {
+            @for (p of productosMostrados(); track p.id_producto) {
               <tr>
                 <td class="product-cell">
                   <div class="product-icon">{{ p.nombre[0].toUpperCase() }}</div>
