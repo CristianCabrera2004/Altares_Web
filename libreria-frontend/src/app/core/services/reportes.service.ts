@@ -50,8 +50,12 @@ export class ReportesService {
     return this.http.get<ReporteItem[]>(`${environment.apiUrl}/reportes/ventas`, { params });
   }
 
-  getFacturas(): Observable<FacturaResponse[]> {
-    return this.http.get<FacturaResponse[]>(`${environment.apiUrl}/facturas`);
+  getFacturas(fecha?: string): Observable<FacturaResponse[]> {
+    let url = `${environment.apiUrl}/facturas`;
+    if (fecha) {
+      url += `?fecha=${fecha}`;
+    }
+    return this.http.get<FacturaResponse[]>(url);
   }
 
   getFacturaById(idFactura: number): Observable<FacturaResponse> {

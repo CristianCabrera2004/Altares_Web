@@ -32,6 +32,8 @@ export class ReportesComponent implements OnInit {
   readonly loadingPdfId = signal<number | null>(null);
   readonly loadingGlobalPdf = signal(false);
 
+  readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
+
   readonly totalGlobal = computed(() => {
     return this.items().reduce((acc, curr) => acc + curr.total, 0);
   });
@@ -76,7 +78,7 @@ export class ReportesComponent implements OnInit {
   cargarFacturas(): void {
     this.loading.set(true);
     this.errorMsg.set('');
-    this.reportesService.getFacturas().subscribe({
+    this.reportesService.getFacturas(this.fechaFiltroFacturas()).subscribe({
       next: (data) => {
         this.facturas.set(data || []);
         this.loading.set(false);

@@ -463,16 +463,8 @@ export class CuadernoComponent implements OnInit {
 
         // 2. Gestionar el cliente y la creación de la factura
         if (this.tipoCliente() === 'final') {
-          // Factura a Consumidor Final: Solo registramos la venta y actualizamos UI
-          this.resumen.set({
-            id_venta: idVenta,
-            total:    this.totales().total,
-            items:    ventaRes.items_cargados
-          });
-          this.guardadoExitoso.set(true);
-          this.modalVisible.set(false);
-          this.guardando.set(false);
-          this.items.set([]);
+          // Factura a Consumidor Final: Registramos la venta y creamos el recibo para descarga automática
+          this.crearFacturaBackend(idVenta, 2, null, null, ventaRes, undefined, itemsParaRecibo);
         } else {
           // Factura con datos. Buscar si existe el cliente o crearlo
           const ruc = this.clienteIdentificacion().trim();

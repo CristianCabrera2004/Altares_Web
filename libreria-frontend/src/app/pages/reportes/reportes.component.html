@@ -114,7 +114,13 @@
   }
 
   @if (tab() === 'facturas') {
-    <div style="margin-bottom: 20px; display: flex; justify-content: flex-end;">
+    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label for="fechaFiltro" style="font-weight: 500; font-size: 14px; color: #555;">Filtrar por Día:</label>
+        <input type="date" id="fechaFiltro" class="form-control" style="width: auto;"
+               [ngModel]="fechaFiltroFacturas()" (ngModelChange)="fechaFiltroFacturas.set($event); cargarFacturas()" />
+      </div>
+
       <button class="btn btn-primary" (click)="descargarFacturaGlobal()" [disabled]="loadingGlobalPdf()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" style="margin-right: 6px;">
           <polyline points="6 9 6 2 18 2 18 9"></polyline>
