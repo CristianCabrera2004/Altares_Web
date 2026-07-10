@@ -13,6 +13,25 @@ export interface ReporteItem {
   total: number;
 }
 
+export interface FacturaResponse {
+  id_factura: number;
+  id_venta: number;
+  id_tipo_factura: number;
+  nombre_tipo_factura: string;
+  id_cliente?: number;
+  cliente_identificacion: string;
+  cliente_nombre: string;
+  cliente_direccion?: string;
+  cliente_telefono?: string;
+  cliente_email?: string;
+  archivo_pdf?: string;
+  fecha_emision: string;
+  subtotal: number;
+  total_iva: number;
+  total: number;
+  items?: any[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -29,5 +48,13 @@ export class ReportesService {
     }
     
     return this.http.get<ReporteItem[]>(`${environment.apiUrl}/reportes/ventas`, { params });
+  }
+
+  getFacturas(): Observable<FacturaResponse[]> {
+    return this.http.get<FacturaResponse[]>(`${environment.apiUrl}/facturas`);
+  }
+
+  getFacturaById(idFactura: number): Observable<FacturaResponse> {
+    return this.http.get<FacturaResponse>(`${environment.apiUrl}/facturas?id=${idFactura}`);
   }
 }

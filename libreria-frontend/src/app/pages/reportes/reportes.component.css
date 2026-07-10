@@ -19,6 +19,15 @@
   gap: 20px;
   align-items: flex-end;
 }
+
+.tab-btn:hover {
+  color: var(--text-heading) !important;
+}
+
+.tab-btn.active {
+  color: #4F8EF7 !important;
+  border-bottom-color: #4F8EF7 !important;
+}
 .filter-group { display: flex; flex-direction: column; gap: 6px; }
 .filter-group label { font-size: 0.8rem; color: #a0a8bb; font-weight: 500; }
 .input-field {

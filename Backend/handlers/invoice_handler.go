@@ -154,9 +154,10 @@ type FacturaResponse struct {
 	ClienteEmail          string `json:"cliente_email,omitempty"`
 	ArchivoPdf            string `json:"archivo_pdf,omitempty"`
 	FechaEmision          string `json:"fecha_emision"`
-	Subtotal              int    `json:"subtotal"`
-	TotalIva              int    `json:"total_iva"`
-	Total                 int    `json:"total"`
+	Subtotal              int             `json:"subtotal"`
+	TotalIva              int             `json:"total_iva"`
+	Total                 int             `json:"total"`
+	Items                 []InvoiceDetail `json:"items,omitempty"`
 }
 
 // FacturasHandler despacha peticiones de factura
@@ -284,6 +285,23 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura."})
 		return
+	}
+
+	// Fetch items
+	rows, errItems := db.Query(`
+		SELECT p.nombre, d.cantidad, d.precio_unitario, d.iva_aplicado, d.subtotal
+		FROM operaciones.detalle_ventas d
+		JOIN inventario.productos p ON d.id_producto = p.id_producto
+		WHERE d.id_venta = $1
+	`, f.IdVenta)
+	if errItems == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var item InvoiceDetail
+			if rows.Scan(&item.Producto, &item.Cantidad, &item.PrecioUnitario, &item.IvaAplicado, &item.Subtotal) == nil {
+				f.Items = append(f.Items, item)
+			}
+		}
 	}
 
 	json.NewEncoder(w).Encode(f)

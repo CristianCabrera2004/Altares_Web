@@ -2,9 +2,16 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">Reportes y Analítica</h1>
-      <p class="page-subtitle">Exportación de datos de ventas (HU-07)</p>
+      <p class="page-subtitle">Exportación de datos y respaldo de recibos</p>
     </div>
   </div>
+
+  <div class="tabs-container" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-light); display: flex; gap: 20px;">
+    <button class="tab-btn" [class.active]="tab() === 'ventas'" (click)="setTab('ventas')" style="background: none; border: none; padding: 10px 0; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;">Por Fecha (Resumen)</button>
+    <button class="tab-btn" [class.active]="tab() === 'facturas'" (click)="setTab('facturas')" style="background: none; border: none; padding: 10px 0; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;">Historial de Recibos</button>
+  </div>
+
+  @if (tab() === 'ventas') {
 
   <div class="filters-card">
     <div class="filter-group">
@@ -98,12 +105,61 @@
         <tfoot>
           <tr>
             <td colspan="5" class="text-right" style="font-weight: bold; color: #a0a8bb;">Total Global:</td>
-            <td class="text-right" style="font-weight: bold; color: #22c55e; font-size: 1.1rem;">{{ formatCurrency(totalGlobal()) }}</td>
+            <td class="text-right text-highlight">{{ formatCurrency(totalGlobal()) }}</td>
           </tr>
         </tfoot>
       </table>
     </div>
   }
+  }
+
+  @if (tab() === 'facturas') {
+    @if (errorMsg()) {
+      <div class="error-state">
+        <p>{{ errorMsg() }}</p>
+      </div>
+    } @else if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando recibos...</p>
+      </div>
+    } @else if (facturas().length === 0) {
+      <div class="empty-state">
+        <p>No hay recibos registrados.</p>
+      </div>
+    } @else {
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Recibo N.-</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th class="text-right">Total</th>
+              <th class="text-right">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of facturas(); track f.id_factura) {
+              <tr>
+                <td>{{ f.id_venta.toString().padStart(6, '0') }}</td>
+                <td>{{ f.fecha_emision }}</td>
+                <td>{{ f.cliente_nombre }}</td>
+                <td class="text-right">{{ formatCurrency(f.total) }}</td>
+                <td class="text-right">
+                  <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" (click)="descargarFactura(f)" [disabled]="loadingPdfId() === f.id_factura">
+                    @if (loadingPdfId() === f.id_factura) {
+                      Generando...
+                    } @else {
+                      Descargar PDF
+                    }
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
 </div>
-
-

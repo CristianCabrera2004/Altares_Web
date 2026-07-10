@@ -1,7 +1,8 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ReportesService, ReporteItem } from '../../core/services/reportes.service';
+import { ReportesService, ReporteItem, FacturaResponse } from '../../core/services/reportes.service';
+import { PdfService, ItemRecibo } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -14,6 +15,9 @@ import autoTable from 'jspdf-autotable';
 })
 export class ReportesComponent implements OnInit {
   private readonly reportesService = inject(ReportesService);
+  private readonly pdfService = inject(PdfService);
+
+  readonly tab = signal<'ventas' | 'facturas'>('ventas');
 
   readonly startDate = signal('');
   readonly endDate = signal('');
@@ -22,8 +26,10 @@ export class ReportesComponent implements OnInit {
   readonly categorias = ['Todas', 'Papelería', 'Bazar', 'Arte y Diseño', 'Tecnología'];
   
   readonly items = signal<ReporteItem[]>([]);
+  readonly facturas = signal<FacturaResponse[]>([]);
   readonly loading = signal(false);
   readonly errorMsg = signal('');
+  readonly loadingPdfId = signal<number | null>(null);
 
   readonly totalGlobal = computed(() => {
     return this.items().reduce((acc, curr) => acc + curr.total, 0);
@@ -38,6 +44,7 @@ export class ReportesComponent implements OnInit {
     this.startDate.set(hace30.toISOString().split('T')[0]);
     
     this.generarReporte();
+    this.cargarFacturas();
   }
 
   generarReporte(): void {
@@ -54,6 +61,58 @@ export class ReportesComponent implements OnInit {
       error: (err) => {
         this.errorMsg.set('Error al cargar los reportes de ventas.');
         this.loading.set(false);
+      }
+    });
+  }
+
+  setTab(newTab: 'ventas' | 'facturas') {
+    this.tab.set(newTab);
+    if (newTab === 'facturas' && this.facturas().length === 0) {
+      this.cargarFacturas();
+    }
+  }
+
+  cargarFacturas(): void {
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.reportesService.getFacturas().subscribe({
+      next: (data) => {
+        this.facturas.set(data || []);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al cargar el historial de recibos.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  descargarFactura(f: FacturaResponse): void {
+    this.loadingPdfId.set(f.id_factura);
+    this.errorMsg.set('');
+    this.reportesService.getFacturaById(f.id_factura).subscribe({
+      next: (data) => {
+        const items = data.items || [];
+        const mappedItems: ItemRecibo[] = items.map(i => ({
+          cantidad: i.cantidad,
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+        }));
+        const doc = this.pdfService.generarPdfRecibo(
+          data.id_venta,
+          data.fecha_emision,
+          data.cliente_nombre,
+          data.cliente_identificacion,
+          mappedItems
+        );
+        const name = data.id_tipo_factura === 3 
+          ? `Recibo_Electronico_${data.id_venta.toString().padStart(6, '0')}.pdf`
+          : `Recibo_${data.id_venta.toString().padStart(6, '0')}.pdf`;
+        doc.save(name);
+        this.loadingPdfId.set(null);
+      },
+      error: () => {
+        this.errorMsg.set('Error al descargar el recibo.');
+        this.loadingPdfId.set(null);
       }
     });
   }

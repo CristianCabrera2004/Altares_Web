@@ -12,8 +12,8 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CuadernoService, ProductoCatalogo, RespuestaCuaderno } from '../../core/services/cuaderno.service';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { PdfService } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 // Una línea del cuaderno en el estado local del frontend
 interface ItemCuaderno {
@@ -30,6 +30,7 @@ interface ItemCuaderno {
 export class CuadernoComponent implements OnInit {
   private readonly cuadernoService = inject(CuadernoService);
   private readonly authService = inject(AuthService);
+  private readonly pdfService = inject(PdfService);
 
   // ── Estado del catálogo ─────────────────────────────────────────────────
   readonly catalogo         = signal<ProductoCatalogo[]>([]);
@@ -556,7 +557,13 @@ export class CuadernoComponent implements OnInit {
     let pdfBase64: string | null = null;
     
     // Generar PDF
-    const doc = this.generarPdfFactura(idVenta, this.clienteNombre(), this.clienteIdentificacion(), this.items());
+    const doc = this.pdfService.generarPdfRecibo(
+      idVenta,
+      null,
+      this.clienteNombre(),
+      this.clienteIdentificacion(),
+      this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }))
+    );
     
     if (this.tipoFactura() === 'digital') {
       const pdfDataUri = doc.output('datauristring');
@@ -586,10 +593,16 @@ export class CuadernoComponent implements OnInit {
         this.guardando.set(false);
 
         // Descargar PDF
-        const docToSave = doc || this.generarPdfFactura(idVenta, this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final', this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999', this.items());
+        const docToSave = doc || this.pdfService.generarPdfRecibo(
+          idVenta,
+          null,
+          this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
+          this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
+          this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }))
+        );
         const docName = idTipoFactura === 3 
-          ? `Factura_Electronica_${idVenta.toString().padStart(6, '0')}.pdf`
-          : `Factura_${idVenta.toString().padStart(6, '0')}.pdf`;
+          ? `Recibo_Electronico_${idVenta.toString().padStart(6, '0')}.pdf`
+          : `Recibo_${idVenta.toString().padStart(6, '0')}.pdf`;
         docToSave.save(docName);
 
         this.items.set([]);
@@ -599,75 +612,6 @@ export class CuadernoComponent implements OnInit {
         this.guardando.set(false);
       }
     });
-  }
-
-  generarPdfFactura(idVenta: number, clienteNombre: string, clienteIdentificacion: string, itemsFactura: ItemCuaderno[]): jsPDF {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a5'
-    });
-
-    const numFactura = idVenta.toString().padStart(6, '0');
-    const fecha = new Date().toLocaleString('es-EC');
-
-    // Header
-    doc.setFontSize(16);
-    doc.text('LIBRERÍA "LOS ALTARES"', 74, 15, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.text(`Factura Nro: ${numFactura}`, 10, 25);
-    doc.text(`Fecha: ${fecha}`, 10, 30);
-    doc.text(`Cliente: ${clienteNombre}`, 10, 35);
-    doc.text(`RUC/CI: ${clienteIdentificacion}`, 10, 40);
-
-    let subtotal = 0;
-    let totalIva = 0;
-
-    const tableData = itemsFactura.map(item => {
-      const totalLinea = this.totalLinea(item);
-      
-      let lineaBase = totalLinea;
-      let ivaLinea = 0;
-      if (item.producto.tasa_iva > 0) {
-        lineaBase = Math.round(totalLinea / (1 + item.producto.tasa_iva / 100));
-        ivaLinea = totalLinea - lineaBase;
-      }
-      
-      subtotal += lineaBase;
-      totalIva += ivaLinea;
-
-      return [
-        item.cantidad.toString(),
-        item.producto.nombre,
-        this.currency(item.producto.precio_venta),
-        this.currency(totalLinea)
-      ];
-    });
-
-    autoTable(doc, {
-      startY: 45,
-      head: [['Cant', 'Descripción', 'V. Unit', 'Total']],
-      body: tableData,
-      theme: 'grid',
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [79, 142, 247] },
-      margin: { left: 10, right: 10 }
-    });
-
-    // Summary
-    const finalY = (doc as any).lastAutoTable.finalY || 45;
-    
-    doc.setFontSize(9);
-    doc.text(`Subtotal: ${this.currency(subtotal)}`, 85, finalY + 10);
-    doc.text(`IVA: ${this.currency(totalIva)}`, 85, finalY + 15);
-    doc.setFontSize(11);
-    doc.text(`TOTAL A PAGAR: ${this.currency(subtotal + totalIva)}`, 85, finalY + 22);
-
-    doc.setFontSize(10);
-    doc.text('¡Gracias por su compra!', 74, finalY + 35, { align: 'center' });
-
-    return doc;
   }
 
   nuevoCuaderno(): void {
