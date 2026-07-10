@@ -133,6 +133,7 @@ func main() {
 
 	// ─── HU-07: Reportes (Solo Operador) ─────────────────────────────────────
 	mux.HandleFunc("/api/reportes/ventas", middleware.RequireRole(db, "operador_caja")(handlers.ReportesVentasHandler(db)))
+	mux.HandleFunc("/api/reportes/factura-diaria", middleware.RequireRole(db, "operador_caja")(handlers.FacturaDiariaConsumidorFinalHandler(db)))
 	// GET /api/dashboard/grafica -> Reportes Gráficos
 	mux.HandleFunc("/api/dashboard/grafica", middleware.RequireRole(db, "operador_caja")(handlers.ReporteGraficaHandler(db)))
 

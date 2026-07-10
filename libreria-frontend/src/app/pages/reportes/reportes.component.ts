@@ -30,6 +30,7 @@ export class ReportesComponent implements OnInit {
   readonly loading = signal(false);
   readonly errorMsg = signal('');
   readonly loadingPdfId = signal<number | null>(null);
+  readonly loadingGlobalPdf = signal(false);
 
   readonly totalGlobal = computed(() => {
     return this.items().reduce((acc, curr) => acc + curr.total, 0);
@@ -111,8 +112,48 @@ export class ReportesComponent implements OnInit {
         this.loadingPdfId.set(null);
       },
       error: () => {
-        this.errorMsg.set('Error al descargar el recibo.');
+        this.errorMsg.set('No se pudo descargar el recibo.');
         this.loadingPdfId.set(null);
+      }
+    });
+  }
+
+  descargarFacturaGlobal(): void {
+    this.loadingGlobalPdf.set(true);
+    this.errorMsg.set('');
+    
+    // Podemos obtener el día de hoy, o permitir pasar una fecha (para empezar, usaremos hoy)
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    
+    this.reportesService.getFacturaDiaria(fechaHoy).subscribe({
+      next: (data) => {
+        const items = data.items || [];
+        if (items.length === 0) {
+          this.errorMsg.set('No hay ventas a Consumidor Final registradas el día de hoy.');
+          this.loadingGlobalPdf.set(false);
+          return;
+        }
+        
+        const mappedItems: ItemRecibo[] = items.map(i => ({
+          cantidad: i.cantidad,
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+        }));
+        
+        const doc = this.pdfService.generarPdfRecibo(
+          0, // 0 para que no salga un id_venta
+          data.fecha_emision,
+          data.cliente_nombre,
+          data.cliente_identificacion,
+          mappedItems
+        );
+        
+        const name = `Factura_Global_Diaria_${fechaHoy}.pdf`;
+        doc.save(name);
+        this.loadingGlobalPdf.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al generar la Factura Global del Día.');
+        this.loadingGlobalPdf.set(false);
       }
     });
   }

@@ -174,3 +174,92 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(data)
 	}
 }
+
+// FacturaDiariaConsumidorFinalHandler aggregates all sales for "Consumidor Final" on a given day.
+func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Método no permitido."})
+			return
+		}
+
+		q := r.URL.Query()
+		fechaStr := q.Get("fecha") // Formato YYYY-MM-DD
+		if fechaStr == "" {
+			fechaStr = time.Now().Format("2006-01-02")
+		}
+
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		// Agrupar los detalles de ventas del día actual para consumidor final
+		query := `
+			SELECT 
+				p.nombre, 
+				SUM(d.cantidad) as cantidad, 
+				d.precio_unitario, 
+				COALESCE(d.iva_aplicado, 0) as iva_aplicado, 
+				SUM(d.subtotal) as subtotal
+			FROM operaciones.detalle_ventas d
+			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+			JOIN inventario.productos p ON d.id_producto = p.id_producto
+			WHERE v.id_tienda = $1 
+			  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+			  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
+			  AND v.estado = 'completada'
+			GROUP BY p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
+			ORDER BY p.nombre ASC
+		`
+
+		rows, err := db.Query(query, idTienda, fechaStr)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura diaria."})
+			return
+		}
+		defer rows.Close()
+
+		var items []InvoiceDetail
+		for rows.Next() {
+			var item InvoiceDetail
+			if err := rows.Scan(&item.Producto, &item.Cantidad, &item.PrecioUnitario, &item.IvaAplicado, &item.Subtotal); err == nil {
+				items = append(items, item)
+			}
+		}
+
+		var f FacturaResponse
+		f.IdVenta = 0
+		f.NombreTipoFactura = "Factura Global Diaria"
+		f.ClienteIdentificacion = "9999999999999"
+		f.ClienteNombre = "Consumidor Final"
+		f.FechaEmision = time.Now().Format("2006-01-02 15:04:05")
+		
+		var subtotal, totalIva, total int
+		for _, item := range items {
+			f.Items = append(f.Items, item)
+			
+			lineTotal := item.Subtotal
+			lineBase := lineTotal
+			ivaLinea := 0
+			if item.IvaAplicado > 0 {
+				lineBase = int(float64(lineTotal) / (1.0 + float64(item.IvaAplicado)/100.0))
+				ivaLinea = lineTotal - lineBase
+			}
+			subtotal += lineBase
+			totalIva += ivaLinea
+			total += lineTotal
+		}
+		f.Subtotal = subtotal
+		f.TotalIva = totalIva
+		f.Total = total
+
+		if f.Items == nil {
+			f.Items = make([]InvoiceDetail, 0)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(f)
+	}
+}

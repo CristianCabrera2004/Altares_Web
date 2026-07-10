@@ -459,10 +459,20 @@ export class CuadernoComponent implements OnInit {
       next: (ventaRes) => {
         const idVenta = ventaRes.id_venta;
 
+        const itemsParaRecibo: ItemRecibo[] = this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
+
         // 2. Gestionar el cliente y la creación de la factura
         if (this.tipoCliente() === 'final') {
-          // Factura a Consumidor Final (tipo 1)
-          this.crearFacturaBackend(idVenta, 1, null, null, ventaRes);
+          // Factura a Consumidor Final: Solo registramos la venta y actualizamos UI
+          this.resumen.set({
+            id_venta: idVenta,
+            total:    this.totales().total,
+            items:    ventaRes.items_cargados
+          });
+          this.guardadoExitoso.set(true);
+          this.modalVisible.set(false);
+          this.guardando.set(false);
+          this.items.set([]);
         } else {
           // Factura con datos. Buscar si existe el cliente o crearlo
           const ruc = this.clienteIdentificacion().trim();
@@ -491,15 +501,15 @@ export class CuadernoComponent implements OnInit {
                     email: formEmail
                   }).subscribe({
                     next: () => {
-                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes, itemsParaRecibo);
                     },
                     error: (err) => {
                       console.warn("No se pudo actualizar la info del cliente", err);
-                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes, itemsParaRecibo);
                     }
                   });
                 } else {
-                  this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                  this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes, itemsParaRecibo);
                 }
               } else {
                 // Cliente no existe, crearlo
@@ -513,7 +523,7 @@ export class CuadernoComponent implements OnInit {
                   next: (newClientRes) => {
                     this.clienteNuevoMsg.set(`Nuevo cliente "${this.clienteNombre()}" registrado automáticamente.`);
                     setTimeout(() => this.clienteNuevoMsg.set(''), 5000);
-                    this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
+                    this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes, itemsParaRecibo);
                   },
                   error: (err) => {
                     this.errorMsg.set('Venta guardada, pero falló al crear el cliente para la factura: ' + (err?.error?.error ?? ''));
@@ -534,7 +544,7 @@ export class CuadernoComponent implements OnInit {
                 next: (newClientRes) => {
                   this.clienteNuevoMsg.set(`Nuevo cliente "${this.clienteNombre()}" registrado automáticamente.`);
                   setTimeout(() => this.clienteNuevoMsg.set(''), 5000);
-                  this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
+                  this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes, itemsParaRecibo);
                 },
                 error: (err) => {
                   this.errorMsg.set('Venta guardada, pero falló al registrar el cliente: ' + (err?.error?.error ?? ''));
@@ -552,17 +562,18 @@ export class CuadernoComponent implements OnInit {
     });
   }
 
-  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno): void {
+  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno, itemsParaRecibo?: ItemRecibo[]): void {
     const tipoFacturaId = this.tipoFactura() === 'digital' ? 3 : 2; // 3: Electrónica, 2: Física con Datos
     let pdfBase64: string | null = null;
     
     // Generar PDF
+    const items = itemsParaRecibo || this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
     const doc = this.pdfService.generarPdfRecibo(
       idVenta,
       null,
       this.clienteNombre(),
       this.clienteIdentificacion(),
-      this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }))
+      items
     );
     
     if (this.tipoFactura() === 'digital') {
@@ -573,7 +584,7 @@ export class CuadernoComponent implements OnInit {
     this.crearFacturaBackend(idVenta, tipoFacturaId, idCliente, pdfBase64, ventaRes, doc);
   }
 
-  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF): void {
+  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF, itemsParaRecibo?: ItemRecibo[]): void {
     const payload = {
       id_venta: idVenta,
       id_tipo_factura: idTipoFactura,
@@ -593,12 +604,13 @@ export class CuadernoComponent implements OnInit {
         this.guardando.set(false);
 
         // Descargar PDF
+        const items = itemsParaRecibo || this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
         const docToSave = doc || this.pdfService.generarPdfRecibo(
           idVenta,
           null,
           this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
           this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
-          this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }))
+          items
         );
         const docName = idTipoFactura === 3 
           ? `Recibo_Electronico_${idVenta.toString().padStart(6, '0')}.pdf`

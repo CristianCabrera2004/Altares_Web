@@ -296,12 +296,17 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	`, f.IdVenta)
 	if errItems == nil {
 		defer rows.Close()
+		f.Items = make([]InvoiceDetail, 0)
 		for rows.Next() {
 			var item InvoiceDetail
-			if rows.Scan(&item.Producto, &item.Cantidad, &item.PrecioUnitario, &item.IvaAplicado, &item.Subtotal) == nil {
+			if err := rows.Scan(&item.Producto, &item.Cantidad, &item.PrecioUnitario, &item.IvaAplicado, &item.Subtotal); err == nil {
 				f.Items = append(f.Items, item)
+			} else {
+				log.Printf("Error scanning InvoiceDetail for id_venta %d: %v", f.IdVenta, err)
 			}
 		}
+	} else {
+		log.Printf("Error querying items for id_venta %d: %v", f.IdVenta, errItems)
 	}
 
 	json.NewEncoder(w).Encode(f)

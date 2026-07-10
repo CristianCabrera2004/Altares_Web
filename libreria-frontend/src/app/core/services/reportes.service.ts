@@ -57,4 +57,12 @@ export class ReportesService {
   getFacturaById(idFactura: number): Observable<FacturaResponse> {
     return this.http.get<FacturaResponse>(`${environment.apiUrl}/facturas?id=${idFactura}`);
   }
+
+  getFacturaDiaria(fecha?: string): Observable<FacturaResponse> {
+    let url = `${environment.apiUrl}/reportes/factura-diaria`;
+    if (fecha) {
+      url += `?fecha=${fecha}`;
+    }
+    return this.http.get<FacturaResponse>(url);
+  }
 }
