@@ -198,7 +198,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
-			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision, 'YYYY-MM-DD HH24:MI:SS'),
+			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
 			       v.subtotal, v.total_iva, v.total
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
@@ -217,7 +217,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
-			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision, 'YYYY-MM-DD HH24:MI:SS'),
+			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
 			       v.subtotal, v.total_iva, v.total
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
@@ -237,7 +237,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
-			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision, 'YYYY-MM-DD HH24:MI:SS'),
+			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
 			       v.subtotal, v.total_iva, v.total
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura

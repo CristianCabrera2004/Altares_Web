@@ -234,7 +234,11 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 		f.NombreTipoFactura = "Factura Global Diaria"
 		f.ClienteIdentificacion = "9999999999999"
 		f.ClienteNombre = "Consumidor Final"
-		f.FechaEmision = time.Now().Format("2006-01-02 15:04:05")
+		loc, _ := time.LoadLocation("America/Guayaquil")
+		if loc == nil {
+			loc = time.FixedZone("ECT", -5*3600)
+		}
+		f.FechaEmision = time.Now().In(loc).Format("2006-01-02 15:04:05")
 		
 		var subtotal, totalIva, total int
 		for _, item := range items {
