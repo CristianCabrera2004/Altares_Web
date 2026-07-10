@@ -232,8 +232,16 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		}
 		arg = idFactura
 	} else {
-		// Listar últimas 100 facturas
-		rows, err := db.Query(`
+		fechaStr := r.URL.Query().Get("fecha")
+		whereClause := ""
+		args := []interface{}{}
+
+		if fechaStr != "" {
+			whereClause = "WHERE DATE(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1"
+			args = append(args, fechaStr)
+		}
+
+		queryList := fmt.Sprintf(`
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
@@ -243,8 +251,12 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
 			JOIN operaciones.ventas v ON f.id_venta = v.id_venta
 			LEFT JOIN operaciones.clientes c ON f.id_cliente = c.id_cliente
+			%s
 			ORDER BY f.fecha_emision DESC
-			LIMIT 100`)
+			LIMIT 100`, whereClause)
+
+		// Listar últimas 100 facturas o filtradas por fecha
+		rows, err := db.Query(queryList, args...)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar facturas."})
