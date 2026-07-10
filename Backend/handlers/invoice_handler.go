@@ -290,9 +290,9 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	// Fetch items
 	rows, errItems := db.Query(`
-		SELECT p.nombre, d.cantidad, d.precio_unitario, COALESCE(d.iva_aplicado, 0), d.subtotal
+		SELECT COALESCE(p.nombre, 'Producto Eliminado'), d.cantidad, d.precio_unitario, COALESCE(d.iva_aplicado, 0), d.subtotal
 		FROM operaciones.detalle_ventas d
-		JOIN inventario.productos p ON d.id_producto = p.id_producto
+		LEFT JOIN inventario.productos p ON d.id_producto = p.id_producto
 		WHERE d.id_venta = $1
 	`, f.IdVenta)
 	if errItems == nil {
