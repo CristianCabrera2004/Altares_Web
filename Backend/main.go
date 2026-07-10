@@ -148,6 +148,31 @@ func main() {
 	mux.HandleFunc("/api/predicciones/lista-compras", middleware.RequireRole(db, "operador_caja")(handlers.PredictionHandler(db)))
 	mux.HandleFunc("/api/predicciones", middleware.RequireRole(db, "operador_caja")(handlers.PredictionHandler(db)))
 
+	// DEBUG TEMPORARY
+	mux.HandleFunc("/api/debug/detalle", func(w http.ResponseWriter, r *http.Request) {
+		idVenta := r.URL.Query().Get("v")
+		rows, err := db.Query(`SELECT p.nombre, d.cantidad, d.precio_unitario, d.iva_aplicado, d.subtotal FROM operaciones.detalle_ventas d LEFT JOIN inventario.productos p ON d.id_producto = p.id_producto WHERE d.id_venta = $1`, idVenta)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		defer rows.Close()
+		var res string
+		for rows.Next() {
+			var n string
+			var c, p, i, s *int
+			err := rows.Scan(&n, &c, &p, &i, &s)
+			if err != nil {
+				res += fmt.Sprintf("SCAN ERR: %v\n", err)
+			} else {
+				iv := -1
+				if i != nil { iv = *i }
+				res += fmt.Sprintf("OK: %s - cant:%v - p:%v - iva:%v - sub:%v\n", n, *c, *p, iv, *s)
+			}
+		}
+		w.Write([]byte(res))
+	})
+
 	// ─── Catálogo de Clientes (Anexo 3) ───────────────────────────────────────
 	mux.HandleFunc("/api/clientes/buscar", middleware.RequireRole(db, "operador_caja")(handlers.BuscarClienteHandler(db)))
 	mux.HandleFunc("/api/clientes", middleware.RequireRole(db, "operador_caja")(handlers.ClientHandler(db)))
