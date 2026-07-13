@@ -65,7 +65,7 @@ export class InventarioComponent implements OnInit {
 
   private readonly apiProductos  = `${environment.apiUrl}/productos`;
   private readonly apiBuscar     = `${environment.apiUrl}/productos/buscar`;
-  private readonly apiCategorias = `${environment.apiUrl}/productos/categorias`;
+  private readonly apiCategorias = `${environment.apiUrl}/categorias`;
   private readonly apiTiendas    = `${environment.apiUrl}/tiendas/activas`;
   private readonly apiTransfer   = `${environment.apiUrl}/inventario/transferencias`;
 
