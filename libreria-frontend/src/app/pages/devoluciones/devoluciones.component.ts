@@ -10,6 +10,7 @@ import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
+import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
 
 interface Producto {
   id_producto: number;
@@ -38,7 +39,8 @@ interface Devolucion {
 
 @Component({
   selector: 'app-devoluciones',
-  imports: [ReactiveFormsModule, CommonModule],
+  standalone: true,
+  imports: [ReactiveFormsModule, CommonModule, ScannerComponent],
   templateUrl: './devoluciones.component.html',
   styleUrl: './devoluciones.component.css'
 })
@@ -52,12 +54,15 @@ export class DevolucionesComponent implements OnInit {
 
   // ─── Estado ───────────────────────────────────────────────────────────────
   readonly devoluciones    = signal<Devolucion[]>([]);
-  readonly productos       = signal<Producto[]>([]);
+  readonly tabActiva       = signal<'registrar' | 'historial'>('registrar');
+  readonly scannerVisible  = signal(false);
+  readonly scannerTarget   = signal<'devolucion' | 'cambio'>('devolucion');
   readonly cargando        = signal(true);
   readonly guardando       = signal(false);
   readonly successMsg      = signal('');
   readonly errorMsg        = signal('');
   readonly busqueda        = signal('');
+  readonly productos       = signal<Producto[]>([]);
 
   // ─── Autocomplete 1: Producto Original ────────────────────────────────────
   readonly busquedaProducto   = signal('');
@@ -201,6 +206,35 @@ export class DevolucionesComponent implements OnInit {
   }
 
   ocultarSugerenciasCambio(): void { setTimeout(() => this.mostrarSugerenciasCambio.set(false), 180); }
+
+  // ─── Escáner ──────────────────────────────────────────────────────────────
+  abrirScanner(target: 'devolucion' | 'cambio') {
+    this.scannerTarget.set(target);
+    this.scannerVisible.set(true);
+  }
+
+  cerrarScanner() {
+    this.scannerVisible.set(false);
+  }
+
+  onScanSuccess(decodedText: string) {
+    const text = decodedText.trim().toLowerCase();
+    const found = this.productos().find(p => 
+      p.id_producto.toString() === text || 
+      p.nombre.toLowerCase() === text || 
+      p.nombre.toLowerCase().includes(text)
+    );
+
+    if (found) {
+      if (this.scannerTarget() === 'devolucion') {
+        this.seleccionarProducto(found);
+      } else {
+        this.seleccionarProductoCambio(found);
+      }
+    } else {
+      alert(`Producto con código "${decodedText}" no encontrado en el catálogo.`);
+    }
+  }
 
   // ─── Registrar ────────────────────────────────────────────────────────────
   registrar(): void {

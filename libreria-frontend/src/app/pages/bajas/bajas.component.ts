@@ -10,6 +10,7 @@ import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
+import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
 
 interface Producto {
   id_producto: number;
@@ -31,7 +32,8 @@ interface MovimientoBaja {
 
 @Component({
   selector: 'app-bajas',
-  imports: [ReactiveFormsModule, CommonModule],
+  standalone: true,
+  imports: [ReactiveFormsModule, CommonModule, ScannerComponent],
   templateUrl: './bajas.component.html',
   styleUrl: './bajas.component.css'
 })
@@ -54,6 +56,7 @@ export class BajasComponent implements OnInit {
   readonly successMsg = signal('');
   readonly errorMsg   = signal('');
   readonly busqueda   = signal('');
+  readonly scannerVisible = signal(false);
 
   // ─── Búsqueda de producto en el formulario ────────────────────────────────
   readonly busquedaProducto    = signal('');
@@ -131,6 +134,31 @@ export class BajasComponent implements OnInit {
     this.busquedaProducto.set(p.nombre);
     this.mostrarSugerencias.set(false);
     this.form.patchValue({ id_producto: p.id_producto });
+  }
+
+  // ─── Escáner ──────────────────────────────────────────────────────────────
+  abrirScanner() {
+    this.scannerVisible.set(true);
+  }
+
+  cerrarScanner() {
+    this.scannerVisible.set(false);
+  }
+
+  onScanSuccess(decodedText: string) {
+    const text = decodedText.trim().toLowerCase();
+    const found = this.productos().find(p => 
+      p.id_producto.toString() === text || 
+      p.nombre.toLowerCase() === text || 
+      p.nombre.toLowerCase().includes(text)
+    );
+
+    if (found) {
+      this.seleccionarProducto(found);
+      this.cerrarScanner();
+    } else {
+      alert(`Producto con código "${decodedText}" no encontrado en el catálogo.`);
+    }
   }
 
   ocultarSugerencias(): void {

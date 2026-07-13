@@ -13,6 +13,7 @@ import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
 
 interface Producto {
   id_producto: number;
@@ -53,7 +54,7 @@ interface ProductoResponse {
 
 @Component({
   selector: 'app-inventario',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ScannerComponent],
   templateUrl: './inventario.component.html',
   styleUrl: './inventario.component.css',
   standalone: true
@@ -74,9 +75,11 @@ export class InventarioComponent implements OnInit {
   readonly categorias   = signal<Categoria[]>([]);
   readonly proveedores  = signal<Proveedor[]>([]);
   readonly tiendas      = signal<Tienda[]>([]);
-  readonly cargando     = signal(true);
-  readonly guardando    = signal(false);
-  readonly errorMsg     = signal('');
+  readonly catalogo = signal<Producto[]>([]);
+  readonly cargando = signal(true);
+  readonly guardando = signal(false);
+  readonly errorMsg = signal('');
+  readonly scannerVisible = signal(false);
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
   readonly proveedorIngresoId = signal<number>(0);
@@ -588,6 +591,21 @@ export class InventarioComponent implements OnInit {
     this.confirmAction = null;
   }
 
+  // ── Escáner ──
+  abrirScanner() {
+    this.scannerVisible.set(true);
+  }
+
+  cerrarScanner() {
+    this.scannerVisible.set(false);
+  }
+
+  onScanSuccess(decodedText: string) {
+    // Para el inventario, simplemente establecemos el texto en el buscador
+    this.setBusqueda(decodedText.trim().toLowerCase());
+  }
+
+  // ── Ingreso Rápido (Modal) ────────────────────────────────────────────────
   // ─── Helpers ──────────────────────────────────────────────────────────────
   formatPrecio(centavos: number): string { return '$' + (centavos / 100).toFixed(2); }
 

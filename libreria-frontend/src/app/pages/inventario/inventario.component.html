@@ -86,6 +86,12 @@
           class="search-input"
           (input)="setBusqueda($any($event.target).value)"
         />
+        <button class="btn-secondary" (click)="abrirScanner()" title="Escanear Código de Barras o QR" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); padding: 6px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <path d="M3 9h18"/><path d="M9 21V9"/>
+          </svg>
+        </button>
       </div>
 
       <!-- Filtro por categoría -->
@@ -766,3 +772,9 @@
     </div>
   </div>
 }
+
+<app-scanner 
+  [visible]="scannerVisible()" 
+  (close)="cerrarScanner()" 
+  (scanSuccess)="onScanSuccess($event)">
+</app-scanner>
