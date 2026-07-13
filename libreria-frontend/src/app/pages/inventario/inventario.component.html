@@ -496,6 +496,22 @@
             </div>
           </div>
 
+          <!-- Proveedor (Opcional) -->
+          <div class="field-group full-width">
+            <label for="select-proveedor-ingreso">Proveedor <span style="color: var(--text-secondary); font-weight: 400;">(Opcional)</span></label>
+            <select
+              id="select-proveedor-ingreso"
+              class="select-input"
+              [value]="proveedorIngresoId()"
+              (change)="proveedorIngresoId.set(+$any($event.target).value)"
+            >
+              <option value="0">— Sin proveedor —</option>
+              @for (prov of proveedores(); track prov.id_proveedor) {
+                <option [value]="prov.id_proveedor">{{ prov.nombre_proveedor }}</option>
+              }
+            </select>
+          </div>
+
           <!-- Acciones del formulario -->
           <div class="form-actions">
             <button type="button" class="btn-ghost" (click)="cerrarModalIngreso()">Cancelar</button>

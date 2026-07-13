@@ -24,6 +24,11 @@ interface IngresoItem {
   costo_unitario: number;
 }
 
+interface Proveedor {
+  id_proveedor: number;
+  nombre_proveedor: string;
+}
+
 @Component({
   selector: 'app-ingresos',
   imports: [DatePipe, FormsModule],
@@ -66,6 +71,8 @@ export class IngresosComponent implements OnInit {
 
   // Observación (opcional)
   readonly observacion = signal('');
+  proveedorId = 0;
+  readonly proveedores = signal<Proveedor[]>([]);
 
   readonly resultados = computed(() => {
     let raw = [...this.catalogo()];
@@ -103,6 +110,14 @@ export class IngresosComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargarCatalogo();
+    this.cargarProveedores();
+  }
+
+  cargarProveedores(): void {
+    this.http.get<Proveedor[]>(`${environment.apiUrl}/proveedores`).subscribe({
+      next: (data) => this.proveedores.set(data ?? []),
+      error: () => {}
+    });
   }
 
   cargarCatalogo() {
@@ -228,7 +243,7 @@ export class IngresosComponent implements OnInit {
     }
 
     const payload = {
-      id_proveedor: 0,
+      id_proveedor: this.proveedorId,
       id_usuario: id_usuario,
       observacion: this.observacion(),
       items: this.items().map(i => ({

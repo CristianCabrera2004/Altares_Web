@@ -65,6 +65,20 @@
         ></textarea>
       </div>
 
+      <div class="arqueo-field" style="margin-top: 12px;">
+        <label for="select-proveedor-bulk" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Proveedor <span style="font-weight: 400;">(Opcional)</span></label>
+        <select
+          id="select-proveedor-bulk"
+          [(ngModel)]="proveedorId"
+          style="width: 100%; padding: 9px 12px; background: var(--border-subtle); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text-main); font-size: 0.9rem; outline: none;"
+        >
+          <option [ngValue]="0">— Sin proveedor —</option>
+          @for (prov of proveedores(); track prov.id_proveedor) {
+            <option [ngValue]="prov.id_proveedor">{{ prov.nombre_proveedor }}</option>
+          }
+        </select>
+      </div>
+
       @if (errorMsg()) {
         <div class="modal-error">{{ errorMsg() }}</div>
       }

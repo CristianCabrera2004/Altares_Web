@@ -34,6 +34,11 @@ interface Categoria {
   tasa_iva: number;
 }
 
+interface Proveedor {
+  id_proveedor: number;
+  nombre_proveedor: string;
+}
+
 interface Tienda {
   id_tienda: number;
   nombre: string;
@@ -67,12 +72,14 @@ export class InventarioComponent implements OnInit {
   // ─── Estado general ───────────────────────────────────────────────────────
   readonly productos    = signal<Producto[]>([]);
   readonly categorias   = signal<Categoria[]>([]);
+  readonly proveedores  = signal<Proveedor[]>([]);
   readonly tiendas      = signal<Tienda[]>([]);
   readonly cargando     = signal(true);
   readonly guardando    = signal(false);
   readonly errorMsg     = signal('');
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
+  readonly proveedorIngresoId = signal<number>(0);
 
   // ─── Modal de Confirmación ──────────────────────────────────────────────
   readonly confirmModalVisible = signal(false);
@@ -255,6 +262,30 @@ export class InventarioComponent implements OnInit {
     return '$' + (val / 100).toFixed(2);
   }
 
+  setBusqueda(val: string): void {
+    this.busqueda.set(val);
+    this.displayedCount.set(50);
+  }
+
+  setFiltroCat(val: string): void {
+    this.filtroCat.set(val === '' ? null : Number(val));
+    this.displayedCount.set(50);
+  }
+
+  setSort(campo: 'nombre' | 'precio_venta' | 'stock_actual'): void {
+    if (this.sortField() === campo) {
+      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(campo);
+      this.sortDir.set('asc');
+    }
+  }
+
+  sortIcon(campo: string): string {
+    if (this.sortField() !== campo) return '↕';
+    return this.sortDir() === 'asc' ? '↑' : '↓';
+  }
+
   irATransferencias() {
     this.router.navigate(['/transferencias']);
   }
@@ -263,6 +294,7 @@ export class InventarioComponent implements OnInit {
     this.cargarProductos();
     this.cargarCategorias();
     this.cargarTiendas();
+    this.cargarProveedores();
   }
 
   cargarTiendas(): void {
@@ -290,6 +322,13 @@ export class InventarioComponent implements OnInit {
   cargarCategorias(): void {
     this.http.get<Categoria[]>(this.apiCategorias).subscribe({
       next: (data) => this.categorias.set(data),
+      error: () => {}
+    });
+  }
+
+  cargarProveedores(): void {
+    this.http.get<Proveedor[]>(`${environment.apiUrl}/proveedores`).subscribe({
+      next: (data) => this.proveedores.set(data ?? []),
       error: () => {}
     });
   }
