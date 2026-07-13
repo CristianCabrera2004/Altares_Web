@@ -1,0 +1,55 @@
+@if (visible) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card anim-slide-up" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" style="margin-right: 8px;">
+            <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/>
+            <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"/>
+          </svg>
+          Escanear Código
+        </h2>
+        <button class="btn-close" (click)="closeModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        @if (cameraError) {
+          <div class="alert-error" style="margin-bottom: 16px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            {{ cameraError }}
+          </div>
+        }
+
+        @if (hasCameras) {
+          <div class="camera-selector">
+            <label for="cameraSelect">Cámara:</label>
+            <select id="cameraSelect" class="form-control" (change)="onCameraChange($event)" [value]="selectedCameraId">
+              @for (cam of cameras; track cam.id) {
+                <option [value]="cam.id">{{ cam.label || 'Cámara ' + ($index + 1) }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        <!-- Contenedor del Escáner -->
+        <div class="scanner-container">
+          <div id="reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000;"></div>
+          <!-- overlay animado -->
+          <div class="scan-overlay">
+             <div class="scan-line"></div>
+          </div>
+        </div>
+
+        <p class="scan-hint">
+          Apunta la cámara hacia el código de barras o código QR. El escaneo se realizará automáticamente.
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" (click)="closeModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}

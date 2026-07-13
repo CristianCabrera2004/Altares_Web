@@ -1,0 +1,99 @@
+.modal-backdrop {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 20px; box-sizing: border-box;
+}
+
+.modal-card {
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: 16px; width: 100%; max-width: 500px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+.modal-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text-heading); margin: 0; display: flex; align-items: center; }
+
+.btn-close {
+  background: none; border: none; font-size: 1.5rem; color: var(--text-muted);
+  cursor: pointer; padding: 4px; line-height: 1; transition: color 0.15s;
+}
+.btn-close:hover { color: var(--text-heading); }
+
+.modal-body {
+  padding: 20px; display: flex; flex-direction: column; gap: 16px;
+}
+
+.camera-selector {
+  display: flex; align-items: center; gap: 12px;
+}
+.camera-selector label { font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); }
+.camera-selector select { flex: 1; }
+
+.form-control {
+  padding: 8px 12px; background: var(--border-subtle); border: 1px solid var(--border-strong);
+  border-radius: 8px; color: var(--text-main); font-size: 0.875rem; width: 100%;
+}
+.form-control:focus { border-color: #4F8EF7; outline: none; }
+
+.scanner-container {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  background: #000;
+  min-height: 250px;
+}
+
+/* Html5Qrcode injects its own video. This ensures it fits nicely */
+#reader video {
+  width: 100% !important;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+/* Animación tipo escáner */
+.scan-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 4px rgba(79, 142, 247, 0.4);
+  border-radius: 12px;
+}
+.scan-line {
+  position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+  background: #4F8EF7; box-shadow: 0 0 8px #4F8EF7;
+  animation: scan 2s linear infinite;
+}
+@keyframes scan {
+  0% { top: 10%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 90%; opacity: 0; }
+}
+
+.scan-hint {
+  font-size: 0.85rem; color: var(--text-muted); text-align: center; margin: 0;
+}
+
+.alert-error {
+  background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171; padding: 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px;
+  font-size: 0.875rem;
+}
+
+.modal-footer {
+  padding: 16px 20px; border-top: 1px solid var(--border-subtle);
+  display: flex; justify-content: flex-end; gap: 12px; background: rgba(0, 0, 0, 0.1);
+}
+
+.btn-ghost {
+  padding: 8px 16px; background: transparent; border: 1px solid var(--border-strong);
+  border-radius: 8px; color: var(--text-muted); font-size: 0.875rem; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-ghost:hover { border-color: #4b5563; color: #d1d5db; }
