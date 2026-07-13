@@ -1,7 +1,8 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ReportesService, ReporteItem } from '../../core/services/reportes.service';
+import { ReportesService, ReporteItem, FacturaResponse } from '../../core/services/reportes.service';
+import { PdfService, ItemRecibo } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -14,6 +15,9 @@ import autoTable from 'jspdf-autotable';
 })
 export class ReportesComponent implements OnInit {
   private readonly reportesService = inject(ReportesService);
+  private readonly pdfService = inject(PdfService);
+
+  readonly tab = signal<'ventas' | 'facturas'>('ventas');
 
   readonly startDate = signal('');
   readonly endDate = signal('');
@@ -22,8 +26,13 @@ export class ReportesComponent implements OnInit {
   readonly categorias = ['Todas', 'Papelería', 'Bazar', 'Arte y Diseño', 'Tecnología'];
   
   readonly items = signal<ReporteItem[]>([]);
+  readonly facturas = signal<FacturaResponse[]>([]);
   readonly loading = signal(false);
   readonly errorMsg = signal('');
+  readonly loadingPdfId = signal<number | null>(null);
+  readonly loadingGlobalPdf = signal(false);
+
+  readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
 
   readonly totalGlobal = computed(() => {
     return this.items().reduce((acc, curr) => acc + curr.total, 0);
@@ -38,6 +47,7 @@ export class ReportesComponent implements OnInit {
     this.startDate.set(hace30.toISOString().split('T')[0]);
     
     this.generarReporte();
+    this.cargarFacturas();
   }
 
   generarReporte(): void {
@@ -48,12 +58,104 @@ export class ReportesComponent implements OnInit {
     
     this.reportesService.getVentas(this.startDate(), this.endDate(), this.categoria()).subscribe({
       next: (data) => {
-        this.items.set(data);
+        this.items.set(data || []);
         this.loading.set(false);
       },
       error: (err) => {
         this.errorMsg.set('Error al cargar los reportes de ventas.');
         this.loading.set(false);
+      }
+    });
+  }
+
+  setTab(newTab: 'ventas' | 'facturas') {
+    this.tab.set(newTab);
+    if (newTab === 'facturas' && this.facturas().length === 0) {
+      this.cargarFacturas();
+    }
+  }
+
+  cargarFacturas(): void {
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.reportesService.getFacturas(this.fechaFiltroFacturas()).subscribe({
+      next: (data) => {
+        this.facturas.set(data || []);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al cargar el historial de recibos.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  descargarFactura(f: FacturaResponse): void {
+    this.loadingPdfId.set(f.id_factura);
+    this.errorMsg.set('');
+    this.reportesService.getFacturaById(f.id_factura).subscribe({
+      next: (data) => {
+        const items = data.items || [];
+        const mappedItems: ItemRecibo[] = items.map(i => ({
+          cantidad: i.cantidad,
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+        }));
+        const doc = this.pdfService.generarPdfRecibo(
+          data.id_venta,
+          data.fecha_emision,
+          data.cliente_nombre,
+          data.cliente_identificacion,
+          mappedItems
+        );
+        const name = data.id_tipo_factura === 3 
+          ? `Recibo_Electronico_${data.id_venta.toString().padStart(6, '0')}.pdf`
+          : `Recibo_${data.id_venta.toString().padStart(6, '0')}.pdf`;
+        doc.save(name);
+        this.loadingPdfId.set(null);
+      },
+      error: () => {
+        this.errorMsg.set('No se pudo descargar el recibo.');
+        this.loadingPdfId.set(null);
+      }
+    });
+  }
+
+  descargarFacturaGlobal(): void {
+    this.loadingGlobalPdf.set(true);
+    this.errorMsg.set('');
+    
+    // Podemos obtener el día de hoy, o permitir pasar una fecha (para empezar, usaremos hoy)
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    
+    this.reportesService.getFacturaDiaria(fechaHoy).subscribe({
+      next: (data) => {
+        const items = data.items || [];
+        if (items.length === 0) {
+          this.errorMsg.set('No hay ventas a Consumidor Final registradas el día de hoy.');
+          this.loadingGlobalPdf.set(false);
+          return;
+        }
+        
+        const mappedItems: ItemRecibo[] = items.map(i => ({
+          cantidad: i.cantidad,
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+        }));
+        
+        const doc = this.pdfService.generarPdfRecibo(
+          0, // 0 para que no salga un id_venta
+          data.fecha_emision,
+          data.cliente_nombre,
+          data.cliente_identificacion,
+          mappedItems
+        );
+        
+        const name = `Factura_Global_Diaria_${fechaHoy}.pdf`;
+        doc.save(name);
+        this.loadingGlobalPdf.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al generar la Factura Global del Día.');
+        this.loadingGlobalPdf.set(false);
       }
     });
   }
@@ -147,6 +249,10 @@ export class ReportesComponent implements OnInit {
 
   formatDate(isoString: string): string {
     if (!isoString) return '';
+    if (isoString.length === 10) {
+      const [year, month, day] = isoString.split('-');
+      return `${day}/${month}/${year}`;
+    }
     const date = new Date(isoString);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');

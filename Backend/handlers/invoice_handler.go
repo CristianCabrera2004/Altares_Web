@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -61,7 +62,7 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 			FROM operaciones.detalle_ventas d
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
-			WHERE DATE(v.fecha_venta) = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
+			WHERE DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
 			GROUP BY p.nombre, d.precio_unitario, d.iva_aplicado
 		`
 
@@ -154,9 +155,10 @@ type FacturaResponse struct {
 	ClienteEmail          string `json:"cliente_email,omitempty"`
 	ArchivoPdf            string `json:"archivo_pdf,omitempty"`
 	FechaEmision          string `json:"fecha_emision"`
-	Subtotal              int    `json:"subtotal"`
-	TotalIva              int    `json:"total_iva"`
-	Total                 int    `json:"total"`
+	Subtotal              int             `json:"subtotal"`
+	TotalIva              int             `json:"total_iva"`
+	Total                 int             `json:"total"`
+	Items                 []InvoiceDetail `json:"items,omitempty"`
 }
 
 // FacturasHandler despacha peticiones de factura
@@ -196,7 +198,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
-			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision, 'YYYY-MM-DD HH24:MI:SS'),
+			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
 			       v.subtotal, v.total_iva, v.total
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
@@ -215,7 +217,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
-			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision, 'YYYY-MM-DD HH24:MI:SS'),
+			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
 			       v.subtotal, v.total_iva, v.total
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
@@ -230,19 +232,31 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		}
 		arg = idFactura
 	} else {
-		// Listar últimas 100 facturas
-		rows, err := db.Query(`
+		fechaStr := r.URL.Query().Get("fecha")
+		whereClause := ""
+		args := []interface{}{}
+
+		if fechaStr != "" {
+			whereClause = "WHERE DATE(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1"
+			args = append(args, fechaStr)
+		}
+
+		queryList := fmt.Sprintf(`
 			SELECT f.id_factura, f.id_venta, f.id_tipo_factura, tf.nombre,
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
-			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision, 'YYYY-MM-DD HH24:MI:SS'),
+			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
 			       v.subtotal, v.total_iva, v.total
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
 			JOIN operaciones.ventas v ON f.id_venta = v.id_venta
 			LEFT JOIN operaciones.clientes c ON f.id_cliente = c.id_cliente
+			%s
 			ORDER BY f.fecha_emision DESC
-			LIMIT 100`)
+			LIMIT 100`, whereClause)
+
+		// Listar últimas 100 facturas o filtradas por fecha
+		rows, err := db.Query(queryList, args...)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar facturas."})
@@ -284,6 +298,28 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura."})
 		return
+	}
+
+	// Fetch items
+	rows, errItems := db.Query(`
+		SELECT COALESCE(p.nombre, 'Producto Eliminado'), d.cantidad, d.precio_unitario, COALESCE(d.iva_aplicado, 0), d.subtotal
+		FROM operaciones.detalle_ventas d
+		LEFT JOIN inventario.productos p ON d.id_producto = p.id_producto
+		WHERE d.id_venta = $1
+	`, f.IdVenta)
+	if errItems == nil {
+		defer rows.Close()
+		f.Items = make([]InvoiceDetail, 0)
+		for rows.Next() {
+			var item InvoiceDetail
+			if err := rows.Scan(&item.Producto, &item.Cantidad, &item.PrecioUnitario, &item.IvaAplicado, &item.Subtotal); err == nil {
+				f.Items = append(f.Items, item)
+			} else {
+				log.Printf("Error scanning InvoiceDetail for id_venta %d: %v", f.IdVenta, err)
+			}
+		}
+	} else {
+		log.Printf("Error querying items for id_venta %d: %v", f.IdVenta, errItems)
 	}
 
 	json.NewEncoder(w).Encode(f)

@@ -12,8 +12,8 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CuadernoService, ProductoCatalogo, RespuestaCuaderno } from '../../core/services/cuaderno.service';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { PdfService } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 // Una línea del cuaderno en el estado local del frontend
 interface ItemCuaderno {
@@ -30,6 +30,7 @@ interface ItemCuaderno {
 export class CuadernoComponent implements OnInit {
   private readonly cuadernoService = inject(CuadernoService);
   private readonly authService = inject(AuthService);
+  private readonly pdfService = inject(PdfService);
 
   // ── Estado del catálogo ─────────────────────────────────────────────────
   readonly catalogo         = signal<ProductoCatalogo[]>([]);
@@ -458,10 +459,12 @@ export class CuadernoComponent implements OnInit {
       next: (ventaRes) => {
         const idVenta = ventaRes.id_venta;
 
+        const itemsParaRecibo: ItemRecibo[] = this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
+
         // 2. Gestionar el cliente y la creación de la factura
         if (this.tipoCliente() === 'final') {
-          // Factura a Consumidor Final (tipo 1)
-          this.crearFacturaBackend(idVenta, 1, null, null, ventaRes);
+          // Factura a Consumidor Final: Registramos la venta y creamos el recibo para descarga automática
+          this.crearFacturaBackend(idVenta, 2, null, null, ventaRes, undefined, itemsParaRecibo);
         } else {
           // Factura con datos. Buscar si existe el cliente o crearlo
           const ruc = this.clienteIdentificacion().trim();
@@ -490,15 +493,15 @@ export class CuadernoComponent implements OnInit {
                     email: formEmail
                   }).subscribe({
                     next: () => {
-                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes, itemsParaRecibo);
                     },
                     error: (err) => {
                       console.warn("No se pudo actualizar la info del cliente", err);
-                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                      this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes, itemsParaRecibo);
                     }
                   });
                 } else {
-                  this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes);
+                  this.procederConFacturaConDatos(idVenta, exactClient.id_cliente, ventaRes, itemsParaRecibo);
                 }
               } else {
                 // Cliente no existe, crearlo
@@ -512,7 +515,7 @@ export class CuadernoComponent implements OnInit {
                   next: (newClientRes) => {
                     this.clienteNuevoMsg.set(`Nuevo cliente "${this.clienteNombre()}" registrado automáticamente.`);
                     setTimeout(() => this.clienteNuevoMsg.set(''), 5000);
-                    this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
+                    this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes, itemsParaRecibo);
                   },
                   error: (err) => {
                     this.errorMsg.set('Venta guardada, pero falló al crear el cliente para la factura: ' + (err?.error?.error ?? ''));
@@ -533,7 +536,7 @@ export class CuadernoComponent implements OnInit {
                 next: (newClientRes) => {
                   this.clienteNuevoMsg.set(`Nuevo cliente "${this.clienteNombre()}" registrado automáticamente.`);
                   setTimeout(() => this.clienteNuevoMsg.set(''), 5000);
-                  this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes);
+                  this.procederConFacturaConDatos(idVenta, newClientRes.cliente.id_cliente, ventaRes, itemsParaRecibo);
                 },
                 error: (err) => {
                   this.errorMsg.set('Venta guardada, pero falló al registrar el cliente: ' + (err?.error?.error ?? ''));
@@ -551,12 +554,19 @@ export class CuadernoComponent implements OnInit {
     });
   }
 
-  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno): void {
+  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno, itemsParaRecibo?: ItemRecibo[]): void {
     const tipoFacturaId = this.tipoFactura() === 'digital' ? 3 : 2; // 3: Electrónica, 2: Física con Datos
     let pdfBase64: string | null = null;
     
     // Generar PDF
-    const doc = this.generarPdfFactura(idVenta, this.clienteNombre(), this.clienteIdentificacion(), this.items());
+    const items = itemsParaRecibo || this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
+    const doc = this.pdfService.generarPdfRecibo(
+      idVenta,
+      null,
+      this.clienteNombre(),
+      this.clienteIdentificacion(),
+      items
+    );
     
     if (this.tipoFactura() === 'digital') {
       const pdfDataUri = doc.output('datauristring');
@@ -566,7 +576,7 @@ export class CuadernoComponent implements OnInit {
     this.crearFacturaBackend(idVenta, tipoFacturaId, idCliente, pdfBase64, ventaRes, doc);
   }
 
-  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF): void {
+  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF, itemsParaRecibo?: ItemRecibo[]): void {
     const payload = {
       id_venta: idVenta,
       id_tipo_factura: idTipoFactura,
@@ -586,10 +596,17 @@ export class CuadernoComponent implements OnInit {
         this.guardando.set(false);
 
         // Descargar PDF
-        const docToSave = doc || this.generarPdfFactura(idVenta, this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final', this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999', this.items());
+        const items = itemsParaRecibo || this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
+        const docToSave = doc || this.pdfService.generarPdfRecibo(
+          idVenta,
+          null,
+          this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
+          this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
+          items
+        );
         const docName = idTipoFactura === 3 
-          ? `Factura_Electronica_${idVenta.toString().padStart(6, '0')}.pdf`
-          : `Factura_${idVenta.toString().padStart(6, '0')}.pdf`;
+          ? `Recibo_Electronico_${idVenta.toString().padStart(6, '0')}.pdf`
+          : `Recibo_${idVenta.toString().padStart(6, '0')}.pdf`;
         docToSave.save(docName);
 
         this.items.set([]);
@@ -599,75 +616,6 @@ export class CuadernoComponent implements OnInit {
         this.guardando.set(false);
       }
     });
-  }
-
-  generarPdfFactura(idVenta: number, clienteNombre: string, clienteIdentificacion: string, itemsFactura: ItemCuaderno[]): jsPDF {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a5'
-    });
-
-    const numFactura = idVenta.toString().padStart(6, '0');
-    const fecha = new Date().toLocaleString('es-EC');
-
-    // Header
-    doc.setFontSize(16);
-    doc.text('LIBRERÍA "LOS ALTARES"', 74, 15, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.text(`Factura Nro: ${numFactura}`, 10, 25);
-    doc.text(`Fecha: ${fecha}`, 10, 30);
-    doc.text(`Cliente: ${clienteNombre}`, 10, 35);
-    doc.text(`RUC/CI: ${clienteIdentificacion}`, 10, 40);
-
-    let subtotal = 0;
-    let totalIva = 0;
-
-    const tableData = itemsFactura.map(item => {
-      const totalLinea = this.totalLinea(item);
-      
-      let lineaBase = totalLinea;
-      let ivaLinea = 0;
-      if (item.producto.tasa_iva > 0) {
-        lineaBase = Math.round(totalLinea / (1 + item.producto.tasa_iva / 100));
-        ivaLinea = totalLinea - lineaBase;
-      }
-      
-      subtotal += lineaBase;
-      totalIva += ivaLinea;
-
-      return [
-        item.cantidad.toString(),
-        item.producto.nombre,
-        this.currency(item.producto.precio_venta),
-        this.currency(totalLinea)
-      ];
-    });
-
-    autoTable(doc, {
-      startY: 45,
-      head: [['Cant', 'Descripción', 'V. Unit', 'Total']],
-      body: tableData,
-      theme: 'grid',
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [79, 142, 247] },
-      margin: { left: 10, right: 10 }
-    });
-
-    // Summary
-    const finalY = (doc as any).lastAutoTable.finalY || 45;
-    
-    doc.setFontSize(9);
-    doc.text(`Subtotal: ${this.currency(subtotal)}`, 85, finalY + 10);
-    doc.text(`IVA: ${this.currency(totalIva)}`, 85, finalY + 15);
-    doc.setFontSize(11);
-    doc.text(`TOTAL A PAGAR: ${this.currency(subtotal + totalIva)}`, 85, finalY + 22);
-
-    doc.setFontSize(10);
-    doc.text('¡Gracias por su compra!', 74, finalY + 35, { align: 'center' });
-
-    return doc;
   }
 
   nuevoCuaderno(): void {

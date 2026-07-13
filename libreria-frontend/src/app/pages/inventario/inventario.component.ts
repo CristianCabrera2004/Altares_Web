@@ -11,6 +11,7 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 
 interface Producto {
@@ -33,6 +34,17 @@ interface Categoria {
   tasa_iva: number;
 }
 
+interface Proveedor {
+  id_proveedor: number;
+  nombre_proveedor: string;
+}
+
+interface Tienda {
+  id_tienda: number;
+  nombre: string;
+  estado: string;
+}
+
 interface ProductoResponse {
   accion: 'producto_creado' | 'stock_incrementado';
   mensaje: string;
@@ -43,23 +55,31 @@ interface ProductoResponse {
   selector: 'app-inventario',
   imports: [ReactiveFormsModule],
   templateUrl: './inventario.component.html',
-  styleUrl: './inventario.component.css'
+  styleUrl: './inventario.component.css',
+  standalone: true
 })
 export class InventarioComponent implements OnInit {
   private readonly http   = inject(HttpClient);
   private readonly fb     = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   private readonly apiProductos  = `${environment.apiUrl}/productos`;
   private readonly apiBuscar     = `${environment.apiUrl}/productos/buscar`;
   private readonly apiCategorias = `${environment.apiUrl}/categorias`;
+  private readonly apiTiendas    = `${environment.apiUrl}/tiendas/activas`;
+  private readonly apiTransfer   = `${environment.apiUrl}/inventario/transferencias`;
 
   // ─── Estado general ───────────────────────────────────────────────────────
   readonly productos    = signal<Producto[]>([]);
   readonly categorias   = signal<Categoria[]>([]);
+  readonly proveedores  = signal<Proveedor[]>([]);
+  readonly tiendas      = signal<Tienda[]>([]);
   readonly cargando     = signal(true);
+  readonly guardando    = signal(false);
   readonly errorMsg     = signal('');
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
+  readonly proveedorIngresoId = signal<number>(0);
 
   // ─── Modal de Confirmación ──────────────────────────────────────────────
   readonly confirmModalVisible = signal(false);
@@ -94,6 +114,14 @@ export class InventarioComponent implements OnInit {
   readonly mostrarModalEditar = signal(false);
   readonly productoEditar     = signal<Producto | null>(null);
   readonly guardandoEdicion   = signal(false);
+
+  // ─── Modal Transferir ─────────────────────────────────────────────────────
+  readonly modalTransferVisible = signal(false);
+  readonly prodTransfer         = signal<Producto | null>(null);
+  readonly tipoTransfer         = signal<'solicitar' | 'enviar'>('enviar');
+  readonly transferTienda       = signal<number | null>(null);
+  readonly transferObs          = signal('');
+  readonly transferQty          = new FormControl<number>(1, [Validators.required, Validators.min(1)]);
 
   readonly formEditar = this.fb.group({
     nombre:          ['', [Validators.required, Validators.minLength(2)]],
@@ -142,9 +170,140 @@ export class InventarioComponent implements OnInit {
     return lista;
   });
 
+  // ─── Paginación Virtual / Scroll Infinito ──────────────────────────────
+  readonly displayedCount = signal(50);
+
+  readonly productosMostrados = computed(() => {
+    return this.productosFiltrados().slice(0, this.displayedCount());
+  });
+
+  onTableScroll(event: Event) {
+    const target = event.target as HTMLElement;
+    // Si estamos a 100px del final, cargamos más
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 100) {
+      if (this.displayedCount() < this.productosFiltrados().length) {
+        this.displayedCount.update(c => c + 50);
+      }
+    }
+  }
+
+  readonly totalDineroInventario = computed(() => {
+    return this.productosFiltrados().reduce((sum, p) => sum + (p.stock_actual > 0 ? (p.precio_venta * p.stock_actual) : 0), 0);
+  });
+
+  exportarExcel() {
+    const data = this.productosFiltrados()
+      .filter(p => p.stock_actual > 0)
+      .map(p => ({
+        ID: p.id_producto,
+        Nombre: p.nombre,
+        Categoria: p.nombre_categoria,
+        Stock: p.stock_actual,
+        'Precio Venta': p.precio_venta / 100,
+        'Total ($)': (p.stock_actual * p.precio_venta) / 100
+      }));
+
+    if (data.length === 0) {
+      alert('No hay productos con stock para exportar.');
+      return;
+    }
+
+    import('xlsx').then(XLSX => {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+      XLSX.writeFile(wb, `Inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+    });
+  }
+
+  exportarPDF() {
+    const data = this.productosFiltrados().filter(p => p.stock_actual > 0);
+    if (data.length === 0) {
+      alert('No hay productos con stock para exportar.');
+      return;
+    }
+
+    Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ]).then(([jspdf, autoTable]) => {
+      const doc = new jspdf.default();
+      const rows = data.map(p => [
+        p.id_producto.toString(),
+        p.nombre,
+        p.nombre_categoria,
+        p.stock_actual.toString(),
+        this.currency(p.precio_venta),
+        this.currency(p.precio_venta * p.stock_actual)
+      ]);
+
+      const totalDinero = data.reduce((sum, p) => sum + (p.precio_venta * p.stock_actual), 0);
+
+      doc.setFontSize(18);
+      doc.text('Reporte de Inventario Activo', 14, 22);
+      doc.setFontSize(11);
+      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 30);
+      doc.text(`Total en Inventario: ${this.currency(totalDinero)}`, 14, 36);
+
+      autoTable.default(doc, {
+        head: [['ID', 'Producto', 'Categoría', 'Stock', 'P. Venta', 'Total']],
+        body: rows,
+        startY: 42,
+        theme: 'grid',
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [79, 142, 247] }
+      });
+
+      doc.save(`Inventario_${new Date().toISOString().split('T')[0]}.pdf`);
+    });
+  }
+
+  currency(val: number): string {
+    return '$' + (val / 100).toFixed(2);
+  }
+
+  setBusqueda(val: string): void {
+    this.busqueda.set(val);
+    this.displayedCount.set(50);
+  }
+
+  setFiltroCat(val: string): void {
+    this.filtroCat.set(val === '' ? null : Number(val));
+    this.displayedCount.set(50);
+  }
+
+  setSort(campo: 'nombre' | 'precio_venta' | 'stock_actual'): void {
+    if (this.sortField() === campo) {
+      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(campo);
+      this.sortDir.set('asc');
+    }
+  }
+
+  sortIcon(campo: string): string {
+    if (this.sortField() !== campo) return '↕';
+    return this.sortDir() === 'asc' ? '↑' : '↓';
+  }
+
+  irATransferencias() {
+    this.router.navigate(['/transferencias']);
+  }
+
   ngOnInit(): void {
     this.cargarProductos();
     this.cargarCategorias();
+    this.cargarTiendas();
+    this.cargarProveedores();
+  }
+
+  cargarTiendas(): void {
+    this.http.get<Tienda[]>(this.apiTiendas).subscribe({
+      next: (data) => {
+        // Excluir la tienda actual (1) idealmente
+        this.tiendas.set(data.filter(t => t.id_tienda !== 1));
+      }
+    });
   }
 
   // ─── Cargar datos ─────────────────────────────────────────────────────────
@@ -163,6 +322,13 @@ export class InventarioComponent implements OnInit {
   cargarCategorias(): void {
     this.http.get<Categoria[]>(this.apiCategorias).subscribe({
       next: (data) => this.categorias.set(data),
+      error: () => {}
+    });
+  }
+
+  cargarProveedores(): void {
+    this.http.get<Proveedor[]>(`${environment.apiUrl}/proveedores`).subscribe({
+      next: (data) => this.proveedores.set(data ?? []),
       error: () => {}
     });
   }
@@ -454,9 +620,13 @@ export class InventarioComponent implements OnInit {
     return 'ok';
   }
 
-  setBusqueda(value: string): void { this.busqueda.set(value); }
+  setBusqueda(value: string): void {
+    this.displayedCount.set(50);
+    this.busqueda.set(value);
+  }
 
   setSort(campo: 'nombre' | 'precio_venta' | 'stock_actual'): void {
+    this.displayedCount.set(50);
     if (this.sortField() === campo) {
       // Mismo campo → invertir dirección
       this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
@@ -467,11 +637,75 @@ export class InventarioComponent implements OnInit {
   }
 
   setFiltroCat(valor: string): void {
+    this.displayedCount.set(50);
     this.filtroCat.set(valor === '' ? null : Number(valor));
   }
 
   sortIcon(campo: 'nombre' | 'precio_venta' | 'stock_actual'): string {
     if (this.sortField() !== campo) return '↕';
     return this.sortDir() === 'asc' ? '↑' : '↓';
+  }
+
+  // ─── Modal Transferir ─────────────────────────────────────────────────────
+
+  abrirModalTransferencia(p: Producto) {
+    this.prodTransfer.set(p);
+    this.transferQty.setValue(1);
+    this.transferQty.setValidators([Validators.required, Validators.min(1), Validators.max(this.tipoTransfer() === 'enviar' ? p.stock_actual : 9999)]);
+    this.transferQty.updateValueAndValidity();
+    this.transferTienda.set(null);
+    this.transferObs.set('');
+    this.modalTransferVisible.set(true);
+  }
+
+  cerrarModalTransferencia() {
+    this.modalTransferVisible.set(false);
+    this.prodTransfer.set(null);
+  }
+
+  guardarTransferencia() {
+    if (this.transferQty.invalid || !this.transferTienda()) return;
+
+    const p = this.prodTransfer();
+    if (!p) return;
+
+    this.guardando.set(true);
+    
+    const token = localStorage.getItem('jwt_token');
+    let id_usuario = 1;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        id_usuario = payload.id_usuario;
+      } catch(e) {}
+    }
+
+    const payload = {
+      id_tienda_origen: this.tipoTransfer() === 'enviar' ? 1 : this.transferTienda(),
+      id_tienda_destino: this.tipoTransfer() === 'enviar' ? this.transferTienda() : 1,
+      id_usuario: id_usuario,
+      observacion: this.transferObs(),
+      productos: [{
+        id_producto: p.id_producto,
+        cantidad: this.transferQty.value
+      }]
+    };
+
+    const headers = { Authorization: `Bearer ${token}` };
+
+    this.http.post(this.apiTransfer, payload, { headers }).subscribe({
+      next: () => {
+        this.guardando.set(false);
+        this.successMsg.set(`Transferencia registrada.`);
+        this.cerrarModalTransferencia();
+        this.cargarProductos();
+        setTimeout(() => this.successMsg.set(''), 3000);
+      },
+      error: (err: any) => {
+        this.guardando.set(false);
+        this.errorMsg.set(err.error?.error || 'Error al procesar la transferencia');
+        setTimeout(() => this.errorMsg.set(''), 4000);
+      }
+    });
   }
 }

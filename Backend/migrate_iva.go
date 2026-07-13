@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	err := godotenv.Load(".env")
 	dbUrl := os.Getenv("DATABASE_URL")
 	if dbUrl == "" {
 		host := os.Getenv("DB_HOST")

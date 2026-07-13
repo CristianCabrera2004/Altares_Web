@@ -96,6 +96,7 @@ func main() {
 
 	// ─── HT-02: Inventario Transaccional (CA 45) ────────────────────────────
 	mux.HandleFunc("/api/inventario/ingreso", middleware.RequireRole(db, "operador_caja")(handlers.IngresoHandler(db)))
+	mux.HandleFunc("/api/inventario/ingreso-multiple", middleware.RequireRole(db, "operador_caja")(handlers.IngresoMultipleHandler(db)))
 	mux.HandleFunc("/api/inventario/baja", middleware.RequireRole(db, "operador_caja")(handlers.BajaHandler(db)))
 	mux.HandleFunc("/api/inventario/movimientos", middleware.RequireRole(db, "operador_caja")(handlers.MovimientosHandler(db)))
 	mux.HandleFunc("/api/inventario/transferencias/responder", middleware.RequireRole(db, "operador_caja")(handlers.ResponderTransferenciaHandler(db)))
@@ -132,6 +133,7 @@ func main() {
 
 	// ─── HU-07: Reportes (Solo Operador) ─────────────────────────────────────
 	mux.HandleFunc("/api/reportes/ventas", middleware.RequireRole(db, "operador_caja")(handlers.ReportesVentasHandler(db)))
+	mux.HandleFunc("/api/reportes/factura-diaria", middleware.RequireRole(db, "operador_caja")(handlers.FacturaDiariaConsumidorFinalHandler(db)))
 	// GET /api/dashboard/grafica -> Reportes Gráficos
 	mux.HandleFunc("/api/dashboard/grafica", middleware.RequireRole(db, "operador_caja")(handlers.ReporteGraficaHandler(db)))
 

@@ -47,7 +47,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		args := []interface{}{startDate, endDate, idTienda}
 		query := `
 			SELECT 
-				TO_CHAR(v.fecha_venta, 'YYYY-MM-DD') as fecha_v,
+				TO_CHAR(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha_v,
 				p.id_producto,
 				p.nombre as producto,
 				c.nombre as categoria,
@@ -58,7 +58,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
-			WHERE DATE(v.fecha_venta) >= $1 AND DATE(v.fecha_venta) <= $2
+			WHERE DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') >= $1 AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') <= $2
 			AND v.id_tienda = $3
 			AND v.estado = 'completada'
 		`
@@ -69,7 +69,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		query += `
-			GROUP BY TO_CHAR(v.fecha_venta, 'YYYY-MM-DD'), p.id_producto, p.nombre, c.nombre, d.precio_unitario
+			GROUP BY TO_CHAR(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD'), p.id_producto, p.nombre, c.nombre, d.precio_unitario
 			ORDER BY fecha_v DESC, total DESC
 			LIMIT 50000
 		`
@@ -82,7 +82,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var items []ReporteItem
+		var items = []ReporteItem{}
 		for rows.Next() {
 			var i ReporteItem
 			if err := rows.Scan(&i.FechaVenta, &i.IdProducto, &i.Producto, &i.Categoria, &i.Cantidad, &i.PrecioUnitario, &i.Total); err != nil {
@@ -121,25 +121,25 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 
 		switch periodo {
 		case "7":
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '6 days'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD')"
-		case "30": // Mes: agrupa por mes de los últimos 12 meses
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '11 months'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM')"
-		case "365": // Año: agrupa por año de los últimos 5 años
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '4 years'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY')"
-		case "0": // General: agrupa por año sin límite de fecha
+			whereClause = "AND fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '6 days'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD')"
+		case "30":
+			whereClause = "AND fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '11 months'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM')"
+		case "365":
+			whereClause = "AND fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '4 years'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY')"
+		case "0":
 			whereClause = ""
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY')"
-		default: // "15" (15 días)
-			whereClause = "AND fecha_venta >= CURRENT_DATE - INTERVAL '14 days'"
-			selectClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD') as fecha"
-			groupClause = "TO_CHAR(fecha_venta, 'YYYY-MM-DD')"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY')"
+		default:
+			whereClause = "AND fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil' >= CURRENT_DATE - INTERVAL '14 days'"
+			selectClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') as fecha"
+			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD')"
 		}
 
 		query := fmt.Sprintf(`
@@ -172,5 +172,98 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(data)
+	}
+}
+
+// FacturaDiariaConsumidorFinalHandler aggregates all sales for "Consumidor Final" on a given day.
+func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Método no permitido."})
+			return
+		}
+
+		q := r.URL.Query()
+		fechaStr := q.Get("fecha") // Formato YYYY-MM-DD
+		if fechaStr == "" {
+			fechaStr = time.Now().Format("2006-01-02")
+		}
+
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
+
+		// Agrupar los detalles de ventas del día actual para consumidor final
+		query := `
+			SELECT 
+				p.nombre, 
+				SUM(d.cantidad) as cantidad, 
+				d.precio_unitario, 
+				COALESCE(d.iva_aplicado, 0) as iva_aplicado, 
+				SUM(d.subtotal) as subtotal
+			FROM operaciones.detalle_ventas d
+			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+			JOIN inventario.productos p ON d.id_producto = p.id_producto
+			WHERE v.id_tienda = $1 
+			  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+			  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
+			  AND v.estado = 'completada'
+			GROUP BY p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
+			ORDER BY p.nombre ASC
+		`
+
+		rows, err := db.Query(query, idTienda, fechaStr)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura diaria."})
+			return
+		}
+		defer rows.Close()
+
+		var items []InvoiceDetail
+		for rows.Next() {
+			var item InvoiceDetail
+			if err := rows.Scan(&item.Producto, &item.Cantidad, &item.PrecioUnitario, &item.IvaAplicado, &item.Subtotal); err == nil {
+				items = append(items, item)
+			}
+		}
+
+		var f FacturaResponse
+		f.IdVenta = 0
+		f.NombreTipoFactura = "Factura Global Diaria"
+		f.ClienteIdentificacion = "9999999999999"
+		f.ClienteNombre = "Consumidor Final"
+		loc, _ := time.LoadLocation("America/Guayaquil")
+		if loc == nil {
+			loc = time.FixedZone("ECT", -5*3600)
+		}
+		f.FechaEmision = time.Now().In(loc).Format("2006-01-02 15:04:05")
+		
+		var subtotal, totalIva, total int
+		for _, item := range items {
+			f.Items = append(f.Items, item)
+			
+			lineTotal := item.Subtotal
+			lineBase := lineTotal
+			ivaLinea := 0
+			if item.IvaAplicado > 0 {
+				lineBase = int(float64(lineTotal) / (1.0 + float64(item.IvaAplicado)/100.0))
+				ivaLinea = lineTotal - lineBase
+			}
+			subtotal += lineBase
+			totalIva += ivaLinea
+			total += lineTotal
+		}
+		f.Subtotal = subtotal
+		f.TotalIva = totalIva
+		f.Total = total
+
+		if f.Items == nil {
+			f.Items = make([]InvoiceDetail, 0)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(f)
 	}
 }
