@@ -5,6 +5,7 @@ import { FormBuilder, Validators, ReactiveFormsModule, FormControl } from '@angu
 import { CommonModule } from '@angular/common';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
+import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
 
 interface Tienda {
   id_tienda: number;
@@ -56,7 +57,8 @@ interface TransferItem {
 
 @Component({
   selector: 'app-transferencias',
-  imports: [ReactiveFormsModule, CommonModule],
+  standalone: true,
+  imports: [ReactiveFormsModule, CommonModule, ScannerComponent],
   templateUrl: './transferencias.component.html',
   styleUrl: './transferencias.component.css'
 })
@@ -82,6 +84,7 @@ export class TransferenciasComponent implements OnInit {
   readonly guardando        = signal(false);
   readonly successMsg       = signal('');
   readonly errorMsg         = signal('');
+  readonly scannerVisible   = signal(false);
   readonly tabActiva        = signal<'crear' | 'historial'>(this.auth.isAdmin() ? 'historial' : 'crear');
   readonly filtroHistorial  = signal<'todas' | 'enviadas' | 'recibidas'>('todas');
   readonly busquedaFiltro   = signal('');
@@ -325,9 +328,45 @@ export class TransferenciasComponent implements OnInit {
     }
 
     const currentItems = this.itemsATransferir();
-    this.itemsATransferir.set([...currentItems, { producto: p, cantidad: 1 }]);
+    // Verificar si ya existe
+    const existingIndex = currentItems.findIndex(i => i.producto.id_producto === p.id_producto);
+    if (existingIndex >= 0) {
+      if (currentItems[existingIndex].cantidad < p.stock_actual) {
+        currentItems[existingIndex].cantidad++;
+      } else {
+        this.mostrarNotificacion(`No hay más stock disponible de "${p.nombre}".`);
+      }
+      this.itemsATransferir.set([...currentItems]);
+    } else {
+      this.itemsATransferir.set([...currentItems, { producto: p, cantidad: 1 }]);
+    }
+    
     this.busquedaProducto.set('');
     this.mostrarSugerencias.set(false);
+  }
+
+  // ── Escáner ──
+  abrirScanner() {
+    this.scannerVisible.set(true);
+  }
+
+  cerrarScanner() {
+    this.scannerVisible.set(false);
+  }
+
+  onScanSuccess(decodedText: string) {
+    const text = decodedText.trim().toLowerCase();
+    const found = this.productos().find(p => 
+      p.id_producto.toString() === text || 
+      p.nombre.toLowerCase() === text || 
+      p.nombre.toLowerCase().includes(text)
+    );
+
+    if (found) {
+      this.seleccionarProducto(found);
+    } else {
+      alert(`Producto con código "${decodedText}" no encontrado en la tienda de origen seleccionada.`);
+    }
   }
 
   ocultarSugerencias(): void {
