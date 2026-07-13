@@ -459,7 +459,7 @@ export class CuadernoComponent implements OnInit {
       next: (ventaRes) => {
         const idVenta = ventaRes.id_venta;
 
-        const itemsParaRecibo: ItemRecibo[] = this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
+        const itemsParaRecibo: any[] = this.items().map(i => ({ cantidad: i.cantidad, producto: { nombre: i.producto.nombre, precio_venta: i.producto.precio_venta, tasa_iva: i.producto.tasa_iva } }));
 
         // 2. Gestionar el cliente y la creación de la factura
         if (this.tipoCliente() === 'final') {
@@ -554,7 +554,7 @@ export class CuadernoComponent implements OnInit {
     });
   }
 
-  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno, itemsParaRecibo?: ItemRecibo[]): void {
+  procederConFacturaConDatos(idVenta: number, idCliente: number, ventaRes: RespuestaCuaderno, itemsParaRecibo?: any[]): void {
     const tipoFacturaId = this.tipoFactura() === 'digital' ? 3 : 2; // 3: Electrónica, 2: Física con Datos
     let pdfBase64: string | null = null;
     
@@ -576,7 +576,7 @@ export class CuadernoComponent implements OnInit {
     this.crearFacturaBackend(idVenta, tipoFacturaId, idCliente, pdfBase64, ventaRes, doc);
   }
 
-  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF, itemsParaRecibo?: ItemRecibo[]): void {
+  crearFacturaBackend(idVenta: number, idTipoFactura: number, idCliente: number | null, pdfBase64: string | null, ventaRes: RespuestaCuaderno, doc?: jsPDF, itemsParaRecibo?: any[]): void {
     const payload = {
       id_venta: idVenta,
       id_tipo_factura: idTipoFactura,

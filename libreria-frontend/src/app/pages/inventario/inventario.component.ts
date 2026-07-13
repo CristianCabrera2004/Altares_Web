@@ -262,29 +262,6 @@ export class InventarioComponent implements OnInit {
     return '$' + (val / 100).toFixed(2);
   }
 
-  setBusqueda(val: string): void {
-    this.busqueda.set(val);
-    this.displayedCount.set(50);
-  }
-
-  setFiltroCat(val: string): void {
-    this.filtroCat.set(val === '' ? null : Number(val));
-    this.displayedCount.set(50);
-  }
-
-  setSort(campo: 'nombre' | 'precio_venta' | 'stock_actual'): void {
-    if (this.sortField() === campo) {
-      this.sortDir.update(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      this.sortField.set(campo);
-      this.sortDir.set('asc');
-    }
-  }
-
-  sortIcon(campo: string): string {
-    if (this.sortField() !== campo) return '↕';
-    return this.sortDir() === 'asc' ? '↑' : '↓';
-  }
 
   irATransferencias() {
     this.router.navigate(['/transferencias']);
