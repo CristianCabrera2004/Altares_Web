@@ -203,6 +203,39 @@ body.light-mode tbody tr:hover {
   box-shadow: none;
 }
 
+/* ── Botones Secundarios (Efecto Glass/Premium) ── */
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 8px 16px; gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 0.875rem; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(79, 142, 247, 0.3);
+  color: #4F8EF7;
+  transform: translateY(-1px);
+}
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.08);
+}
+body.light-mode .btn-secondary {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: var(--text-title);
+}
+body.light-mode .btn-secondary:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(79, 142, 247, 0.4);
+}
+
 /* ── Modales Animados ── */
 .modal-backdrop {
   animation: fadeIn 0.2s ease;

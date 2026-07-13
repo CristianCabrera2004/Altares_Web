@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
 
 interface Producto {
   id_producto: number;
@@ -31,7 +32,7 @@ interface Proveedor {
 
 @Component({
   selector: 'app-ingresos',
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, FormsModule, ScannerComponent],
   templateUrl: './ingresos.component.html',
   styleUrl: './ingresos.component.css',
   standalone: true
@@ -62,11 +63,36 @@ export class IngresosComponent implements OnInit {
     return set;
   });
 
-  // Modal de confirmación
+  // ── Escáner ──
+  abrirScanner() {
+    this.scannerVisible.set(true);
+  }
+
+  cerrarScanner() {
+    this.scannerVisible.set(false);
+  }
+
+  onScanSuccess(decodedText: string) {
+    const text = decodedText.trim().toLowerCase();
+    const found = this.catalogo().find(p => 
+      p.id_producto.toString() === text || 
+      p.nombre.toLowerCase() === text || 
+      p.nombre.toLowerCase().includes(text)
+    );
+
+    if (found) {
+      this.agregarItem(found);
+    } else {
+      alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+    }
+  }
+
+  // ── Modal de Confirmación ──
   readonly modalVisible = signal(false);
   readonly guardando = signal(false);
   readonly guardadoExitoso = signal(false);
   readonly errorMsg = signal('');
+  readonly scannerVisible = signal(false);
   readonly resumen = signal<{ items: number, totalCosto: number } | null>(null);
 
   // Observación (opcional)

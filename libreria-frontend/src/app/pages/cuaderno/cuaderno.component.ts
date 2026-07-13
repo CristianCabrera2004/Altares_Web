@@ -14,6 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 import { PdfService } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
+import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
 
 // Una línea del cuaderno en el estado local del frontend
 interface ItemCuaderno {
@@ -23,7 +24,8 @@ interface ItemCuaderno {
 
 @Component({
   selector: 'app-cuaderno',
-  imports: [],
+  standalone: true,
+  imports: [ScannerComponent],
   templateUrl: './cuaderno.component.html',
   styleUrl: './cuaderno.component.css'
 })
@@ -48,10 +50,12 @@ export class CuadernoComponent implements OnInit {
   // ── Ítems del cuaderno (CA 2) ────────────────────────────────────────────
   readonly items = signal<ItemCuaderno[]>([]);
 
-  // ── Estado UI ────────────────────────────────────────────────────────────
-  readonly modalVisible     = signal(false);
-  readonly efectivoCaja     = signal(0);   // en centavos
-  readonly guardando        = signal(false);
+  // ── Modales ──────────────────────────────────────────────────────────────
+  readonly modalVisible = signal(false);
+  readonly reciboVisible = signal(false);
+  readonly scannerVisible = signal(false);
+  readonly efectivoCaja = signal(0);   // en centavos
+  readonly guardando = signal(false);
   readonly errorMsg         = signal('');
   readonly guardadoExitoso  = signal(false);
   readonly resumen          = signal<{ id_venta: number; total: number; items: number } | null>(null);
@@ -400,8 +404,39 @@ export class CuadernoComponent implements OnInit {
     this.confirmModalVisible.set(false);
     this.confirmAction = null;
   }
+  
+  actualizarTerminoEnlace(val: string) {
+    this.terminoEnlace.set(val);
+  }
 
-  // ── Helpers de cálculo ───────────────────────────────────────────────────
+  // ── Escáner ──
+  abrirScanner() {
+    this.scannerVisible.set(true);
+  }
+
+  cerrarScanner() {
+    this.scannerVisible.set(false);
+  }
+
+  onScanSuccess(decodedText: string) {
+    // Buscar en el catálogo por id o nombre exacto temporalmente (asumiendo que id_producto o nombre coinciden con código)
+    // Lo ideal es tener un campo codigo_barras en el backend, pero por ahora lo buscamos por ID o nombre.
+    const text = decodedText.trim().toLowerCase();
+    const found = this.catalogo().find(p => 
+      p.id_producto.toString() === text || 
+      p.nombre.toLowerCase() === text || 
+      p.nombre.toLowerCase().includes(text)
+    );
+
+    if (found) {
+      this.agregarItem(found);
+      // Feedback opcional, pero como ya cierra el modal, es suficiente
+    } else {
+      alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+    }
+  }
+
+  // ── Funciones auxiliares ───────────────────────────────────────────────────
 
   /** Total de una línea incluyendo el IVA correspondiente. (El precio de venta ya incluye IVA) */
   totalLinea(item: ItemCuaderno): number {
