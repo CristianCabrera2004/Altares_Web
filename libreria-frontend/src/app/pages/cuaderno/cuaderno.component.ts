@@ -419,20 +419,29 @@ export class CuadernoComponent implements OnInit {
   }
 
   onScanSuccess(decodedText: string) {
-    // Buscar en el catálogo por id o nombre exacto temporalmente (asumiendo que id_producto o nombre coinciden con código)
-    // Lo ideal es tener un campo codigo_barras en el backend, pero por ahora lo buscamos por ID o nombre.
     const text = decodedText.trim().toLowerCase();
     const found = this.catalogo().find(p => 
       p.id_producto.toString() === text || 
       p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text)
+      p.nombre.toLowerCase().includes(text) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
     );
 
     if (found) {
       this.agregarItem(found);
-      // Feedback opcional, pero como ya cierra el modal, es suficiente
     } else {
-      alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+      // Buscar en backend si no está en el catálogo en memoria local
+      this.cuadernoService.buscarProductoPorCodigo(text).subscribe({
+        next: (producto) => {
+          this.agregarItem(producto);
+        },
+        error: () => {
+          this.barcodeDesconocido.set(text);
+          this.modoBarcode.set('opciones');
+          this.terminoEnlace.set('');
+          this.errorEnlace.set('');
+        }
+      });
     }
   }
 

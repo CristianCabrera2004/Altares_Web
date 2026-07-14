@@ -359,7 +359,8 @@ export class TransferenciasComponent implements OnInit {
     const found = this.productos().find(p => 
       p.id_producto.toString() === text || 
       p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text)
+      p.nombre.toLowerCase().includes(text) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
     );
 
     if (found) {

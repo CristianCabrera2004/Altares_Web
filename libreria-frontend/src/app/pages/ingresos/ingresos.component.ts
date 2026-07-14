@@ -77,13 +77,26 @@ export class IngresosComponent implements OnInit {
     const found = this.catalogo().find(p => 
       p.id_producto.toString() === text || 
       p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text)
+      p.nombre.toLowerCase().includes(text) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
     );
 
     if (found) {
       this.agregarItem(found);
     } else {
-      alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+      // Si no, buscar en la API por código de barras
+      this.http.get<Producto>(`${this.apiBuscar}?q=${encodeURIComponent(text)}`).subscribe({
+        next: (p) => {
+          if (p) {
+            this.agregarItem(p);
+          } else {
+            alert(`Producto con código "${decodedText}" no encontrado.`);
+          }
+        },
+        error: () => {
+          alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+        }
+      });
     }
   }
 
