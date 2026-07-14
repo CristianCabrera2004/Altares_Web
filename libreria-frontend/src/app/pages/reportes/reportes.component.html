@@ -9,6 +9,7 @@
   <div class="tabs-container" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-light); display: flex; gap: 20px;">
     <button class="tab-btn" [class.active]="tab() === 'ventas'" (click)="setTab('ventas')" style="background: none; border: none; padding: 10px 0; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;">Por Fecha (Resumen)</button>
     <button class="tab-btn" [class.active]="tab() === 'facturas'" (click)="setTab('facturas')" style="background: none; border: none; padding: 10px 0; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;">Historial de Recibos</button>
+    <button class="tab-btn" [class.active]="tab() === 'compras'" (click)="setTab('compras')" style="background: none; border: none; padding: 10px 0; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;">Historial de Compras</button>
   </div>
 
   @if (tab() === 'ventas') {
@@ -183,4 +184,101 @@
       </div>
     }
   }
+
+  @if (tab() === 'compras') {
+    <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+      <label for="fechaFiltroCompras" style="font-weight: 500; font-size: 14px; color: #555;">Filtrar por Día:</label>
+      <input type="date" id="fechaFiltroCompras" class="form-control" style="width: auto;"
+             [ngModel]="fechaFiltroCompras()" (ngModelChange)="fechaFiltroCompras.set($event); cargarCompras()" />
+    </div>
+
+    @if (errorMsg()) {
+      <div class="error-state">
+        <p>{{ errorMsg() }}</p>
+      </div>
+    } @else if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando compras...</p>
+      </div>
+    } @else if (compras().length === 0) {
+      <div class="empty-state">
+        <p>No hay facturas de compra registradas.</p>
+      </div>
+    } @else if (!compraDetalle()) {
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nro. Factura</th>
+              <th>Fecha Compra</th>
+              <th>Proveedor</th>
+              <th class="text-right">Total</th>
+              <th class="text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of compras(); track c.id_factura) {
+              <tr>
+                <td>#{{ c.id_factura }}</td>
+                <td>{{ c.numero_factura || 'N/A' }}</td>
+                <td>{{ c.fecha_compra }}</td>
+                <td>{{ c.proveedor }}</td>
+                <td class="text-right text-highlight">{{ formatCurrency(c.total) }}</td>
+                <td class="text-right">
+                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; height: auto;" (click)="verDetalleCompra(c)">
+                    Ver Detalle
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (compraDetalle(); as det) {
+      <div class="detail-view" style="background: var(--bg-card); border-radius: 8px; padding: 20px; border: 1px solid var(--border-light);">
+        <button class="btn-ghost" (click)="compraDetalle.set(null)" style="margin-bottom: 15px; display: flex; align-items: center; gap: 5px;">
+          <svg viewBox="0 0 24 24" width="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          Volver a la lista
+        </button>
+
+        <h3 style="margin-bottom: 5px;">Detalle de Compra #{{ det.id_factura }}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; font-size: 14px;">
+          <div><strong>Factura:</strong> {{ det.numero_factura || 'N/A' }}</div>
+          <div><strong>Proveedor:</strong> {{ det.proveedor }}</div>
+          <div><strong>Fecha Compra:</strong> {{ det.fecha_compra }}</div>
+          <div><strong>Fecha Registro:</strong> {{ det.fecha_registro }}</div>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="text-right">Cant.</th>
+              <th class="text-right">Costo Unit.</th>
+              <th class="text-right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of det.items; track item.producto) {
+              <tr>
+                <td>{{ item.producto }}</td>
+                <td class="text-right">{{ item.cantidad }}</td>
+                <td class="text-right">{{ formatCurrency(item.precio_unitario) }}</td>
+                <td class="text-right text-highlight">{{ formatCurrency(item.subtotal) }}</td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="text-right" style="font-weight: bold; color: var(--text-muted);">Total Pagado:</td>
+              <td class="text-right text-highlight">{{ formatCurrency(det.total) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    }
+  }
+
 </div>

@@ -13,10 +13,12 @@ type IngresoMultipleItem struct {
 }
 
 type IngresoMultipleInput struct {
-	IdProveedor int                   `json:"id_proveedor"`
-	IdUsuario   int                   `json:"id_usuario"`
-	Observacion string                `json:"observacion"`
-	Items       []IngresoMultipleItem `json:"items"`
+	IdProveedor   int                   `json:"id_proveedor"`
+	NumeroFactura string                `json:"numero_factura"`
+	FechaCompra   string                `json:"fecha_compra"`
+	IdUsuario     int                   `json:"id_usuario"`
+	Observacion   string                `json:"observacion"`
+	Items         []IngresoMultipleItem `json:"items"`
 }
 
 // IngresoMultipleHandler registra múltiples entradas de mercadería de forma transaccional.
@@ -74,6 +76,29 @@ func IngresoMultipleHandler(db *sql.DB) http.HandlerFunc {
 			proveedorNullable = &input.IdProveedor
 		}
 
+		var idFacturaCompra *int
+		var totalCompra int
+		for _, item := range input.Items {
+			totalCompra += item.CantidadIngresada * item.CostoUnitario
+		}
+
+		if input.NumeroFactura != "" && input.FechaCompra != "" {
+			var idFactura int
+			err = tx.QueryRow(`
+				INSERT INTO inventario.facturas_compra
+				  (numero_factura, fecha_compra, id_proveedor, id_tienda, id_usuario, total)
+				VALUES ($1, $2, $3, $4, $5, $6)
+				RETURNING id_factura`,
+				input.NumeroFactura, input.FechaCompra, proveedorNullable, idTienda, input.IdUsuario, totalCompra,
+			).Scan(&idFactura)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Error al registrar la factura de compra."})
+				return
+			}
+			idFacturaCompra = &idFactura
+		}
+
 		for _, item := range input.Items {
 			// Upsert del stock en la tienda
 			var nuevoStock int
@@ -93,13 +118,14 @@ func IngresoMultipleHandler(db *sql.DB) http.HandlerFunc {
 
 			// Insertar registro de ingreso
 			var idIngreso int
+			subtotalItem := item.CantidadIngresada * item.CostoUnitario
 			err = tx.QueryRow(`
 				INSERT INTO inventario.ingreso_inventario
-				  (id_producto, id_proveedor, id_usuario, id_tienda, cantidad_ingresada, costo_unitario, observacion)
-				VALUES ($1, $2, $3, $4, $5, $6, $7)
+				  (id_producto, id_proveedor, id_usuario, id_tienda, cantidad_ingresada, costo_unitario, observacion, id_factura_compra, subtotal)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 				RETURNING id_ingreso`,
 				item.IdProducto, proveedorNullable, input.IdUsuario, idTienda,
-				item.CantidadIngresada, item.CostoUnitario, input.Observacion,
+				item.CantidadIngresada, item.CostoUnitario, input.Observacion, idFacturaCompra, subtotalItem,
 			).Scan(&idIngreso)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)

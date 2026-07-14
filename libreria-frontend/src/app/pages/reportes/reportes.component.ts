@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ReportesService, ReporteItem, FacturaResponse } from '../../core/services/reportes.service';
+import { ReportesService, ReporteItem, FacturaResponse, FacturaCompra } from '../../core/services/reportes.service';
 import { PdfService, ItemRecibo } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -17,7 +17,7 @@ export class ReportesComponent implements OnInit {
   private readonly reportesService = inject(ReportesService);
   private readonly pdfService = inject(PdfService);
 
-  readonly tab = signal<'ventas' | 'facturas'>('ventas');
+  readonly tab = signal<'ventas' | 'facturas' | 'compras'>('ventas');
 
   readonly startDate = signal('');
   readonly endDate = signal('');
@@ -27,12 +27,16 @@ export class ReportesComponent implements OnInit {
   
   readonly items = signal<ReporteItem[]>([]);
   readonly facturas = signal<FacturaResponse[]>([]);
+  readonly compras = signal<FacturaCompra[]>([]);
   readonly loading = signal(false);
   readonly errorMsg = signal('');
   readonly loadingPdfId = signal<number | null>(null);
   readonly loadingGlobalPdf = signal(false);
 
   readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
+  readonly fechaFiltroCompras = signal<string>('');
+  
+  readonly compraDetalle = signal<FacturaCompra | null>(null);
 
   readonly totalGlobal = computed(() => {
     return this.items().reduce((acc, curr) => acc + curr.total, 0);
@@ -68,10 +72,13 @@ export class ReportesComponent implements OnInit {
     });
   }
 
-  setTab(newTab: 'ventas' | 'facturas') {
+  setTab(newTab: 'ventas' | 'facturas' | 'compras') {
     this.tab.set(newTab);
     if (newTab === 'facturas' && this.facturas().length === 0) {
       this.cargarFacturas();
+    }
+    if (newTab === 'compras' && this.compras().length === 0) {
+      this.cargarCompras();
     }
   }
 
@@ -85,6 +92,37 @@ export class ReportesComponent implements OnInit {
       },
       error: () => {
         this.errorMsg.set('Error al cargar el historial de recibos.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  cargarCompras(): void {
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.compraDetalle.set(null);
+    this.reportesService.getCompras(this.fechaFiltroCompras()).subscribe({
+      next: (data) => {
+        this.compras.set(data || []);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al cargar el historial de compras.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  verDetalleCompra(c: FacturaCompra): void {
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.reportesService.getCompraById(c.id_factura).subscribe({
+      next: (data) => {
+        this.compraDetalle.set(data);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al cargar el detalle de la compra.');
         this.loading.set(false);
       }
     });

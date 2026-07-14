@@ -385,7 +385,8 @@ export class InventarioComponent implements OnInit {
       precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),
       tipo_iva:         raw.tipo_iva ?? '0%',
       stock_actual:     raw.stock_actual ?? 0,
-      stock_alerta_min: raw.stock_alerta_min ?? 5
+      stock_alerta_min: raw.stock_alerta_min ?? 5,
+      id_proveedor:     this.proveedorIngresoId()
     };
     this.http.post<ProductoResponse>(this.apiProductos, payload).subscribe({
       next: (res) => {
@@ -414,7 +415,8 @@ export class InventarioComponent implements OnInit {
     const codigos = producto.codigos_barras && producto.codigos_barras.length > 0 ? producto.codigos_barras : [(this.form.get('codigos_barras')?.value ?? '').trim()];
     const payload = {
       codigos_barras: codigos,
-      stock_actual:  this.cantidadAgregar.value ?? 1
+      stock_actual:  this.cantidadAgregar.value ?? 1,
+      id_proveedor:  this.proveedorIngresoId()
     };
     this.http.post<ProductoResponse>(this.apiProductos, payload).subscribe({
       next: (res) => {

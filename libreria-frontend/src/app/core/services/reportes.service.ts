@@ -32,6 +32,25 @@ export interface FacturaResponse {
   items?: any[];
 }
 
+export interface CompraDetail {
+  producto: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+export interface FacturaCompra {
+  id_factura: number;
+  numero_factura: string;
+  fecha_compra: string;
+  id_proveedor?: number;
+  proveedor: string;
+  id_usuario: number;
+  total: number;
+  fecha_registro: string;
+  items?: CompraDetail[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -68,5 +87,17 @@ export class ReportesService {
       url += `?fecha=${fecha}`;
     }
     return this.http.get<FacturaResponse>(url);
+  }
+
+  getCompras(fecha?: string): Observable<FacturaCompra[]> {
+    let url = `${environment.apiUrl}/reportes/compras`;
+    if (fecha) {
+      url += `?fecha=${fecha}`;
+    }
+    return this.http.get<FacturaCompra[]>(url);
+  }
+
+  getCompraById(idFactura: number): Observable<FacturaCompra> {
+    return this.http.get<FacturaCompra>(`${environment.apiUrl}/reportes/compras/${idFactura}`);
   }
 }

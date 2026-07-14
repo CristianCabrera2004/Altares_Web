@@ -65,8 +65,51 @@
         ></textarea>
       </div>
 
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div class="arqueo-field">
+          <label for="input-factura" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Nro. Factura <span style="font-weight: 400;">(Opcional)</span></label>
+          <input 
+            type="text" 
+            id="input-factura"
+            placeholder="Ej: 001-002-00034"
+            [(ngModel)]="numeroFactura"
+            style="width: 100%; padding: 9px 12px; background: var(--border-subtle); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text-main); font-size: 0.9rem; outline: none; box-sizing: border-box;"
+          >
+        </div>
+        
+        <div class="arqueo-field">
+          <label for="input-fecha-compra" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Fecha de Compra</label>
+          <input 
+            type="date" 
+            id="input-fecha-compra"
+            [(ngModel)]="fechaCompra"
+            style="width: 100%; padding: 9px 12px; background: var(--border-subtle); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text-main); font-size: 0.9rem; outline: none; box-sizing: border-box;"
+          >
+        </div>
+      </div>
+
       <div class="arqueo-field" style="margin-top: 12px;">
-        <label for="select-proveedor-bulk" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; display: block;">Proveedor <span style="font-weight: 400;">(Opcional)</span></label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label for="select-proveedor-bulk" style="font-size: 0.85rem; color: var(--text-secondary);">Proveedor <span style="font-weight: 400;">(Opcional)</span></label>
+          <button class="btn-ghost" style="padding: 2px 8px; font-size: 0.8rem; height: auto;" (click)="mostrarNuevoProveedor = !mostrarNuevoProveedor">
+            + Nuevo Proveedor
+          </button>
+        </div>
+        
+        @if (mostrarNuevoProveedor) {
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input 
+              type="text" 
+              placeholder="Nombre del nuevo proveedor" 
+              [(ngModel)]="nuevoProveedorNombre"
+              style="flex: 1; padding: 7px 10px; background: var(--border-subtle); border: 1px solid var(--primary-color); border-radius: 6px; color: var(--text-main); font-size: 0.9rem; outline: none;"
+            >
+            <button class="btn-primary" style="padding: 0 12px; height: auto;" (click)="crearProveedorRapido()" [disabled]="!nuevoProveedorNombre || creandoProveedor">
+              @if (creandoProveedor) { ... } @else { Crear }
+            </button>
+          </div>
+        }
+
         <select
           id="select-proveedor-bulk"
           [(ngModel)]="proveedorId"
