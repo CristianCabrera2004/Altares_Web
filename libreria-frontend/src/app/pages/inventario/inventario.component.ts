@@ -80,6 +80,7 @@ export class InventarioComponent implements OnInit {
   readonly guardando = signal(false);
   readonly errorMsg = signal('');
   readonly scannerVisible = signal(false);
+  readonly scannerTarget = signal<'busqueda' | 'edicion' | 'ingreso'>('busqueda');
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
   readonly proveedorIngresoId = signal<number>(0);
@@ -592,7 +593,8 @@ export class InventarioComponent implements OnInit {
   }
 
   // ── Escáner ──
-  abrirScanner() {
+  abrirScanner(target: 'busqueda' | 'edicion' | 'ingreso' = 'busqueda') {
+    this.scannerTarget.set(target);
     this.scannerVisible.set(true);
   }
 
@@ -601,8 +603,19 @@ export class InventarioComponent implements OnInit {
   }
 
   onScanSuccess(decodedText: string) {
-    // Para el inventario, simplemente establecemos el texto en el buscador
-    this.setBusqueda(decodedText.trim().toLowerCase());
+    const text = decodedText.trim();
+    if (this.scannerTarget() === 'edicion') {
+      this.nuevoCodigoEdicion.set(text);
+      this.agregarCodigoBarraEnEdicion();
+      this.cerrarScanner();
+    } else if (this.scannerTarget() === 'ingreso') {
+      this.form.patchValue({ codigos_barras: text });
+      this.cerrarScanner();
+    } else {
+      // Para búsqueda, simplemente establecemos el texto en el buscador
+      this.setBusqueda(text.toLowerCase());
+      this.cerrarScanner();
+    }
   }
 
   // ── Ingreso Rápido (Modal) ────────────────────────────────────────────────
