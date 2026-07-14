@@ -288,6 +288,12 @@
             (keydown.enter)="buscarPorCodigo()"
             autocomplete="off"
           />
+          <button class="btn-secondary" type="button" (click)="abrirScanner('ingreso')" title="Escanear Código" style="position: absolute; right: 48px; top: 50%; transform: translateY(-50%); padding: 6px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <path d="M3 9h18"/><path d="M9 21V9"/>
+            </svg>
+          </button>
           @if (buscandoCodigo()) {
             <span class="barcode-spinner">
               <span class="spinner-sm"></span>
@@ -663,7 +669,15 @@
           </div>
 
           <div style="display: flex; gap: 8px;">
-            <input type="text" [value]="nuevoCodigoEdicion()" (input)="nuevoCodigoEdicion.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); agregarCodigoBarraEnEdicion()" placeholder="Escanea o escribe un código y presiona Enter" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; font-size: 0.9rem; background: var(--bg-surface); color: var(--text-primary);" [disabled]="guardandoCodigoEdicion()" />
+            <div style="position: relative; flex: 1;">
+              <input type="text" [value]="nuevoCodigoEdicion()" (input)="nuevoCodigoEdicion.set($any($event.target).value)" (keydown.enter)="$event.preventDefault(); agregarCodigoBarraEnEdicion()" placeholder="Escanea o escribe un código y presiona Enter" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; font-size: 0.9rem; background: var(--bg-surface); color: var(--text-primary); padding-right: 36px;" [disabled]="guardandoCodigoEdicion()" />
+              <button class="btn-secondary" type="button" (click)="abrirScanner('edicion')" title="Escanear Código" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); padding: 6px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 6px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <path d="M3 9h18"/><path d="M9 21V9"/>
+                </svg>
+              </button>
+            </div>
             <button type="button" class="btn-primary" style="padding: 0 16px; font-size: 0.9rem;" (click)="agregarCodigoBarraEnEdicion()" [disabled]="!nuevoCodigoEdicion() || guardandoCodigoEdicion()">
               @if (guardandoCodigoEdicion()) {
                 <span class="spinner-sm"></span>
