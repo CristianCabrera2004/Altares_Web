@@ -152,9 +152,7 @@ func main() {
 	mux.HandleFunc("/api/clientes/buscar", middleware.RequireRole(db, "operador_caja")(handlers.BuscarClienteHandler(db)))
 	mux.HandleFunc("/api/clientes", middleware.RequireRole(db, "operador_caja")(handlers.ClientHandler(db)))
 
-	// ─── Facturas de Ventas (SRI / Notas de Venta) ─────────────────────────────
-	mux.HandleFunc("/api/facturas", middleware.RequireRole(db, "operador_caja")(handlers.FacturasHandler(db)))
-	
+
 	// ─── Facturas de Compras (Ingresos Múltiples) ──────────────────────────────
 	mux.HandleFunc("/api/reportes/compras", middleware.RequireRole(db, "operador_caja")(handlers.ComprasReporteListHandler(db)))
 	mux.HandleFunc("GET /api/reportes/compras/{id}", middleware.RequireRole(db, "operador_caja")(handlers.ComprasReporteDetailHandler(db)))
