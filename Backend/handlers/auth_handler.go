@@ -269,21 +269,28 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 
 		ipOrigen := getIP(r)
 
-		// AC-10: Control de Concurrencia de Sesión Única
-		// Invalidar cualquier sesión activa previa del usuario antes de crear la nueva
+		// AC-10: Control de Concurrencia (Máximo 2 dispositivos)
+		// Invalidar las sesiones activas más antiguas si ya hay demasiadas.
+		// Retenemos solo la sesión más reciente (OFFSET 1), para que la nueva que vamos a crear sea la segunda.
 		res, err := db.Exec(`
 			UPDATE seguridad.sesiones
 			SET activa = FALSE
-			WHERE id_usuario = $1 AND activa = TRUE`,
+			WHERE id_sesion IN (
+				SELECT id_sesion
+				FROM seguridad.sesiones
+				WHERE id_usuario = $1 AND activa = TRUE
+				ORDER BY fecha_inicio DESC
+				OFFSET 1
+			)`,
 			idUsuario,
 		)
 		if err == nil {
 			rows, _ := res.RowsAffected()
 			if rows > 0 {
-				// Registrar en auditoría la revocación por concurrencia
+				// Registrar en auditoría la revocación por límite de dispositivos
 				db.Exec(`
 					INSERT INTO seguridad.logs_auditoria (id_usuario, accion, tabla_afectada, ip_origen, valor_anterior, valor_nuevo)
-					VALUES ($1, 'SESION_CONCURRENTE_REVOCADA', 'sesiones', $2, 'activa=true', 'activa=false')`,
+					VALUES ($1, 'SESION_CONCURRENTE_REVOCADA_MAX_DISPOSITIVOS', 'sesiones', $2, 'activa=true', 'activa=false')`,
 					idUsuario, ipOrigen,
 				)
 			}
