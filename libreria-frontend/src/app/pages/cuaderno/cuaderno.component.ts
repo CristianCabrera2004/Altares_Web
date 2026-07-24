@@ -396,12 +396,8 @@ export class CuadernoComponent implements OnInit {
 
   limpiarCuaderno(): void {
     if (this.items().length === 0) return;
-    this.confirmModalMessage.set('¿Limpiar todo el cuaderno? Los ítems no guardados se perderán.');
-    this.confirmAction = () => {
-      this.items.set([]);
-      this.confirmModalVisible.set(false);
-    };
-    this.confirmModalVisible.set(true);
+    this.items.set([]);
+    this.termino.set('');
   }
 
 
