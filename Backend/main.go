@@ -37,6 +37,12 @@ func main() {
 	db := database.Connect()
 	defer db.Close()
 
+	// Migración automática para añadir metodo_pago si no existe
+	_, err := db.Exec(`ALTER TABLE operaciones.ventas ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(50) NOT NULL DEFAULT 'efectivo'`)
+	if err != nil {
+		log.Printf("Error al aplicar migracion metodo_pago: %v", err)
+	}
+
 	// 3. Crear el mux y registrar todas las rutas
 	mux := http.NewServeMux()
 

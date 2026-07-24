@@ -77,6 +77,7 @@ export class CuadernoComponent implements OnInit {
   readonly clienteDireccion = signal('');
   readonly clienteTelefono  = signal('');
   readonly clienteCorreo    = signal('');
+  readonly metodoPago       = signal<'efectivo' | 'transferencia'>('efectivo');
 
   // ── Estado de búsqueda de cliente ──────────────────────────────────────────
   readonly buscandoCliente   = signal(false);
@@ -498,6 +499,7 @@ export class CuadernoComponent implements OnInit {
       id_usuario: idUsuario,
       cliente_identificacion: this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
       cliente_nombre: this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
+      metodo_pago: this.metodoPago(),
       items: this.items().map(item => ({
         id_producto:     item.producto.id_producto,
         cantidad:        item.cantidad,

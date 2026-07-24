@@ -92,7 +92,7 @@ func registrarVentaDesdeDeuda(tx *sql.Tx, idUsuario int, idTienda int, nombreDeu
 		}
 	}
 
-	_, _, err := procesarVentaSaldadaConTx(tx, idUsuario, idTienda, items, "9999999999999", nombreDeudor)
+	_, _, err := procesarVentaSaldadaConTx(tx, idUsuario, idTienda, items, "9999999999999", nombreDeudor, "efectivo")
 	if err != nil {
 		return err
 	}

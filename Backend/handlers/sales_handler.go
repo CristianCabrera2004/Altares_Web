@@ -33,8 +33,9 @@ type DetalleVentaInput struct {
 
 // VentaInput es el cuerpo de POST /api/ventas.
 type VentaInput struct {
-	IdUsuario int                 `json:"id_usuario"`
-	Items     []DetalleVentaInput `json:"items"`
+	IdUsuario  int                 `json:"id_usuario"`
+	Items      []DetalleVentaInput `json:"items"`
+	MetodoPago string              `json:"metodo_pago"`
 }
 
 // CuadernoInput es el cuerpo de POST /api/ventas/cuaderno (carga masiva).
@@ -43,6 +44,7 @@ type CuadernoInput struct {
 	Items         []DetalleVentaInput `json:"items"`
 	ClienteId     string              `json:"cliente_identificacion"`
 	ClienteNombre string              `json:"cliente_nombre"`
+	MetodoPago    string              `json:"metodo_pago"`
 }
 
 // ─── POST /api/ventas ────────────────────────────────────────────────────────
@@ -88,8 +90,12 @@ func SalesHandler(db *sql.DB) http.HandlerFunc {
 
 		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
-		idVenta, total, err := procesarVenta(db, input.IdUsuario, idTienda, input.Items,
-			"9999999999999", "Consumidor Final")
+		metodoPago := input.MetodoPago
+		if metodoPago == "" {
+			metodoPago = "efectivo"
+		}
+
+		idVenta, total, err := procesarVenta(db, input.IdUsuario, idTienda, input.Items, "9999999999999", "Consumidor Final", metodoPago)
 		if err != nil {
 			httpCode := http.StatusInternalServerError
 			if err.Error() == "stock_insuficiente" || err.Error() == "producto_no_encontrado" {
@@ -161,8 +167,13 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 
 		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
+		metodoPago := input.MetodoPago
+		if metodoPago == "" {
+			metodoPago = "efectivo"
+		}
+
 		idVenta, total, err := procesarVenta(db, input.IdUsuario, idTienda, input.Items,
-			input.ClienteId, input.ClienteNombre)
+			input.ClienteId, input.ClienteNombre, metodoPago)
 		if err != nil {
 			httpCode := http.StatusInternalServerError
 			if err.Error() == "stock_insuficiente" || err.Error() == "producto_no_encontrado" {
@@ -184,7 +195,7 @@ func CuadernoHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // ─── FUNCIÓN INTERNA TRANSACCIONAL CON TRANSACCIÓN EXTERNA ────────────────────
-func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
+func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string, metodoPago string) (int, int, error) {
 	var subtotalBase int // suma de precios sin IVA
 	var totalIva     int // suma de IVA calculado
 	var totalConIva  int // suma total
@@ -206,10 +217,10 @@ func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []Detalle
 	// Paso 1 — Insertar la cabecera de la venta
 	var idVenta int
 	err := tx.QueryRow(`
-		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado)
-		VALUES ($1, $2, $3, $4, $5, 'completada')
+		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado, metodo_pago)
+		VALUES ($1, $2, $3, $4, $5, 'completada', $6)
 		RETURNING id_venta`,
-		idUsuario, idTienda, subtotalBase, totalIva, totalConIva,
+		idUsuario, idTienda, subtotalBase, totalIva, totalConIva, metodoPago,
 	).Scan(&idVenta)
 	if err != nil {
 		return 0, 0, fmt.Errorf("error_creando_venta")
@@ -275,7 +286,7 @@ func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []Detalle
 	return idVenta, totalConIva, nil
 }
 
-func procesarVentaSaldadaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
+func procesarVentaSaldadaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string, metodoPago string) (int, int, error) {
 	var subtotalBase int // suma de precios sin IVA
 	var totalIva     int // suma de IVA calculado
 	for _, item := range items {
@@ -289,10 +300,10 @@ func procesarVentaSaldadaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []
 	// Paso 1 — Insertar la cabecera de la venta
 	var idVenta int
 	err := tx.QueryRow(`
-		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado)
-		VALUES ($1, $2, $3, $4, $5, 'completada')
+		INSERT INTO operaciones.ventas (id_usuario, id_tienda, subtotal, total_iva, total, estado, metodo_pago)
+		VALUES ($1, $2, $3, $4, $5, 'completada', $6)
 		RETURNING id_venta`,
-		idUsuario, idTienda, subtotalBase, totalIva, totalConIva,
+		idUsuario, idTienda, subtotalBase, totalIva, totalConIva, metodoPago,
 	).Scan(&idVenta)
 	if err != nil {
 		return 0, 0, fmt.Errorf("error_creando_venta")
@@ -320,14 +331,14 @@ func procesarVentaSaldadaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []
 
 // ─── FUNCIÓN INTERNA TRANSACCIONAL ───────────────────────────────────────────
 // procesarVenta ejecuta los 4 pasos de una venta dentro de una SOLA transacción:
-func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string) (int, int, error) {
+func procesarVenta(db *sql.DB, idUsuario int, idTienda int, items []DetalleVentaInput, clienteId, clienteNombre string, metodoPago string) (int, int, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return 0, 0, fmt.Errorf("error_transaccion")
 	}
 	defer tx.Rollback()
 
-	idVenta, total, err := procesarVentaConTx(tx, idUsuario, idTienda, items, clienteId, clienteNombre)
+	idVenta, total, err := procesarVentaConTx(tx, idUsuario, idTienda, items, clienteId, clienteNombre, metodoPago)
 	if err != nil {
 		return 0, 0, err
 	}

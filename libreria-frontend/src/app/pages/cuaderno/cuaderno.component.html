@@ -137,6 +137,21 @@
         }
       </div>
 
+      <!-- Método de Pago -->
+      <div class="arqueo-field" style="margin-top: 15px; margin-bottom: 20px;">
+        <label>Método de Pago</label>
+        <div style="display: flex; gap: 16px; margin-top: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-title); font-size: 0.9rem;">
+            <input type="radio" name="metodoPago" value="efectivo" [checked]="metodoPago() === 'efectivo'" (change)="metodoPago.set('efectivo')" style="accent-color: #a78bfa;">
+            💵 Efectivo
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-title); font-size: 0.9rem;">
+            <input type="radio" name="metodoPago" value="transferencia" [checked]="metodoPago() === 'transferencia'" (change)="metodoPago.set('transferencia')" style="accent-color: #a78bfa;">
+            💳 Transferencia
+          </label>
+        </div>
+      </div>
+
       <!-- Total del sistema -->
       <div class="arqueo-system">
         <span class="arqueo-label">Total del sistema (con IVA)</span>
