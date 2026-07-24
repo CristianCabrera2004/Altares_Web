@@ -143,7 +143,8 @@ export class ReportesComponent implements OnInit {
           data.fecha_emision,
           data.cliente_nombre,
           data.cliente_identificacion,
-          mappedItems
+          mappedItems,
+          data.cliente_direccion || ''
         );
         const name = data.id_tipo_factura === 3 
           ? `Recibo_Electronico_${data.id_venta.toString().padStart(6, '0')}.pdf`
@@ -184,7 +185,8 @@ export class ReportesComponent implements OnInit {
           data.fecha_emision,
           data.cliente_nombre,
           data.cliente_identificacion,
-          mappedItems
+          mappedItems,
+          data.cliente_direccion || ''
         );
         
         const name = `Factura_Global_Diaria_${fechaHoy}.pdf`;
