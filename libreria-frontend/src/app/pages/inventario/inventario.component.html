@@ -732,25 +732,26 @@
 @if (modalTransferVisible()) {
   <div class="modal-backdrop" (click)="cerrarModalTransferencia()">
     <div class="modal-card" style="max-width: 500px; position: relative;" (click)="$event.stopPropagation()">
-      <button class="btn-ghost" (click)="cerrarModalTransferencia()" style="position: absolute; top: 16px; right: 16px; padding: 4px; border: none; background: transparent; color: var(--text-muted); cursor: pointer;" title="Cerrar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-
-      <div class="modal-header" style="display: flex; gap: 12px; margin-bottom: 20px;">
-        <div class="modal-icon" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+        <div style="display: flex; gap: 12px;">
+          <div class="modal-icon" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <polyline points="17 1 21 5 17 9"/>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <polyline points="7 23 3 19 7 15"/>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+          </div>
+          <div>
+            <h2 style="margin: 0 0 4px; font-size: 1.1rem; color: var(--text-heading);">Transferir Producto</h2>
+            <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);"><strong>{{ prodTransfer()?.nombre }}</strong></p>
+          </div>
+        </div>
+        <button class="btn-ghost" (click)="cerrarModalTransferencia()" style="padding: 4px; border: none; background: transparent; color: var(--text-muted); cursor: pointer;" title="Cerrar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-            <polyline points="17 1 21 5 17 9"/>
-            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-            <polyline points="7 23 3 19 7 15"/>
-            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
-        </div>
-        <div>
-          <h2 style="margin: 0 0 4px; font-size: 1.1rem; color: var(--text-heading);">Transferir Producto</h2>
-          <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);"><strong>{{ prodTransfer()?.nombre }}</strong></p>
-        </div>
+        </button>
       </div>
 
       <div style="display: flex; gap: 16px; margin-bottom: 20px;">
