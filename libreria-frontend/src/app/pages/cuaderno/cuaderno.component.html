@@ -115,6 +115,11 @@
                 [style.opacity]="clienteEncontrado() ? '0.7' : '1'" />
             </div>
             <div class="arqueo-field" style="margin-bottom: 0;">
+              <label>Dirección (opcional)</label>
+              <input type="text" placeholder="Ej: Quimiag Centro, calle principal..." [value]="clienteDireccion()" (input)="clienteDireccion.set($any($event.target).value)"
+                [readOnly]="clienteEncontrado()" [style.opacity]="clienteEncontrado() ? '0.7' : '1'" />
+            </div>
+            <div class="arqueo-field" style="margin-bottom: 0;">
               <label>Correo Electrónico {{ tipoFactura() === 'digital' ? '(requerido para envío)' : '(opcional)' }}</label>
               <input type="email" placeholder="correo@ejemplo.com" [value]="clienteCorreo()" (input)="clienteCorreo.set($any($event.target).value)" />
             </div>
