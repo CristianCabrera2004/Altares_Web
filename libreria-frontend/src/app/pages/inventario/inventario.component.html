@@ -94,6 +94,13 @@
         </button>
       </div>
 
+      <!-- Filtro por estado -->
+      <select class="filter-select" (change)="setFiltroEstado($any($event.target).value)">
+        <option value="activo">Activos</option>
+        <option value="inactivo">Desactivados</option>
+        <option value="todos">Todos</option>
+      </select>
+
       <!-- Filtro por categoría -->
       <select id="select-filtro-categoria" class="filter-select" (change)="setFiltroCat($any($event.target).value)">
         <option value="">Todas las categorías</option>
