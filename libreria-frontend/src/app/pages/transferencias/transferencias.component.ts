@@ -3,6 +3,7 @@ import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, Validators, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
@@ -58,7 +59,7 @@ interface TransferItem {
 @Component({
   selector: 'app-transferencias',
   standalone: true,
-  imports: [ReactiveFormsModule, CommonModule, ScannerComponent],
+  imports: [ReactiveFormsModule, CommonModule, ScannerComponent, RouterLink],
   templateUrl: './transferencias.component.html',
   styleUrl: './transferencias.component.css'
 })

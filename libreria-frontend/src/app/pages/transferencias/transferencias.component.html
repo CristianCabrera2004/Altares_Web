@@ -7,7 +7,13 @@
       <h1>Transferencias de Productos</h1>
       <p>Gestión de movimientos de stock inter-sucursales y logs de auditoría</p>
     </div>
-    <div class="header-actions">
+    <div class="header-actions" style="display: flex; gap: 12px;">
+      <a routerLink="/inventario" class="btn-ghost" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Volver al Inventario
+      </a>
       @if (!isAdmin()) {
         <button class="btn-primary" (click)="abrirModalCrear()" style="position: relative;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
