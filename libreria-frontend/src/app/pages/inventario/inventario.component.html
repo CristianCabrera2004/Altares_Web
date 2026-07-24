@@ -730,8 +730,14 @@
 
 <!-- ── MODAL: Transferencia Rápida ── -->
 @if (modalTransferVisible()) {
-  <div class="modal-backdrop">
-    <div class="modal-card" style="max-width: 500px;">
+  <div class="modal-backdrop" (click)="cerrarModalTransferencia()">
+    <div class="modal-card" style="max-width: 500px; position: relative;" (click)="$event.stopPropagation()">
+      <button class="btn-ghost" (click)="cerrarModalTransferencia()" style="position: absolute; top: 16px; right: 16px; padding: 4px; border: none; background: transparent; color: var(--text-muted); cursor: pointer;" title="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+
       <div class="modal-header" style="display: flex; gap: 12px; margin-bottom: 20px;">
         <div class="modal-icon" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
