@@ -85,7 +85,8 @@ export class TransferenciasComponent implements OnInit {
   readonly successMsg       = signal('');
   readonly errorMsg         = signal('');
   readonly scannerVisible   = signal(false);
-  readonly tabActiva        = signal<'crear' | 'historial'>(this.auth.isAdmin() ? 'historial' : 'crear');
+  readonly tabActiva        = signal<'crear' | 'historial'>(this.auth.isAdmin() ? 'historial' : 'historial');
+  readonly mostrarModalCrear = signal(false);
   readonly filtroHistorial  = signal<'todas' | 'enviadas' | 'recibidas'>('todas');
   readonly busquedaFiltro   = signal('');
   readonly filtroOrigen     = signal<number | null>(null);
@@ -315,6 +316,23 @@ export class TransferenciasComponent implements OnInit {
     }
   }
 
+  abrirModalCrear(): void {
+    this.errorMsg.set('');
+    this.successMsg.set('');
+    this.mostrarModalCrear.set(true);
+  }
+
+  cerrarModalCrear(): void {
+    this.mostrarModalCrear.set(false);
+    this.form.reset();
+    this.itemsATransferir.set([]);
+    this.busquedaProducto.set('');
+    this.productos.set([]);
+    if (!this.isAdmin()) {
+      this.aplicarTipoOperacion('solicitar');
+    }
+  }
+
   // ─── Selección de Productos y Autocomplete ────────────────────────────────
   onBusquedaProductoInput(valor: string): void {
     this.busquedaProducto.set(valor);
@@ -451,10 +469,11 @@ export class TransferenciasComponent implements OnInit {
         this.busquedaProducto.set('');
         this.productos.set([]);
 
-        // Redirigir a pestaña historial
+        // Cerrar modal y recargar historial
         setTimeout(() => {
-          this.setTab('historial');
-        }, 1500);
+          this.cerrarModalCrear();
+          this.cargarHistorial();
+        }, 1200);
       },
       error: (err) => {
         this.errorMsg.set(err?.error?.error ?? 'Error al procesar la transferencia de inventario.');
