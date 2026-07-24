@@ -108,6 +108,12 @@
                   Nuevo cliente — complete los datos para registrarlo
                 </div>
               }
+              @if (clienteIdentificacion().length > 0 || clienteNombre().length > 0) {
+                <button type="button" (click)="limpiarDatosCliente()" style="margin-top: 8px; display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; font-size: 0.78rem; color: #ef4444; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                  Limpiar datos del cliente
+                </button>
+              }
             </div>
             <div class="arqueo-field" style="margin-bottom: 0;">
               <label>Nombre / Razón Social</label>

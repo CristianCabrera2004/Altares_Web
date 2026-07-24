@@ -383,6 +383,17 @@ export class CuadernoComponent implements OnInit {
     this.items.update(items => items.filter(i => i.producto.id_producto !== idProducto));
   }
 
+  /** Limpia todos los datos del cliente para permitir ingresar uno nuevo */
+  limpiarDatosCliente(): void {
+    this.clienteIdentificacion.set('');
+    this.clienteNombre.set('');
+    this.clienteDireccion.set('');
+    this.clienteTelefono.set('');
+    this.clienteCorreo.set('');
+    this.clienteEncontrado.set(false);
+    this.clienteNuevoMsg.set('');
+  }
+
   limpiarCuaderno(): void {
     if (this.items().length === 0) return;
     this.confirmModalMessage.set('¿Limpiar todo el cuaderno? Los ítems no guardados se perderán.');
@@ -392,6 +403,7 @@ export class CuadernoComponent implements OnInit {
     };
     this.confirmModalVisible.set(true);
   }
+
 
   // ─── Acciones del Modal de Confirmación ─────────────────────────────────────
   confirmarAccion(): void {
