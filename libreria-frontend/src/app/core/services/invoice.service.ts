@@ -19,6 +19,8 @@ export interface InvoiceSummary {
   total_iva_15: number;
   total_iva_0: number;
   total_global: number;
+  total_efectivo: number;
+  total_transferencia: number;
   detalles: InvoiceDetail[];
   xml_sri_mock: string;
 }

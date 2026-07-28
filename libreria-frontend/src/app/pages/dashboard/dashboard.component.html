@@ -327,6 +327,12 @@
             <div class="total-row"><span>Subtotal (Base):</span> <span>{{ formatCurrency(invoiceData()?.subtotal_base || 0) }}</span></div>
             <div class="total-row"><span>IVA 0%:</span> <span>{{ formatCurrency(invoiceData()?.total_iva_0 || 0) }}</span></div>
             <div class="total-row"><span>IVA 15%:</span> <span>{{ formatCurrency(invoiceData()?.total_iva_15 || 0) }}</span></div>
+            <div class="total-row" style="margin-top: 8px; font-weight: 500; color: #a78bfa;">
+              <span>💵 En Efectivo:</span> <span>{{ formatCurrency(invoiceData()?.total_efectivo || 0) }}</span>
+            </div>
+            <div class="total-row" style="margin-bottom: 8px; font-weight: 500; color: #a78bfa;">
+              <span>💳 En Transferencias:</span> <span>{{ formatCurrency(invoiceData()?.total_transferencia || 0) }}</span>
+            </div>
             <div class="total-row grand-total"><span>Total a Declarar:</span> <span>{{ formatCurrency(invoiceData()?.total_global || 0) }}</span></div>
           </div>
 

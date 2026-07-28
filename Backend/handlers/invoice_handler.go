@@ -15,16 +15,18 @@ import (
 
 // InvoiceSummary representa el resumen de un cierre de caja.
 type InvoiceSummary struct {
-	FechaEmision  string          `json:"fecha_emision"`
-	RucCliente    string          `json:"ruc_cliente"`
-	NombreCliente string          `json:"nombre_cliente"`
-	SubtotalBase  int             `json:"subtotal_base"`
-	TotalIva15    int             `json:"total_iva_15"`
-	TotalIva0     int             `json:"total_iva_0"`
-	TotalGlobal   int             `json:"total_global"`
-	Detalles      []InvoiceDetail `json:"detalles"`
-	XmlGenerado   string          `json:"xml_sri_mock"`
-	IdCierre      int             `json:"id_cierre,omitempty"`
+	FechaEmision       string          `json:"fecha_emision"`
+	RucCliente         string          `json:"ruc_cliente"`
+	NombreCliente      string          `json:"nombre_cliente"`
+	SubtotalBase       int             `json:"subtotal_base"`
+	TotalIva15         int             `json:"total_iva_15"`
+	TotalIva0          int             `json:"total_iva_0"`
+	TotalGlobal        int             `json:"total_global"`
+	TotalEfectivo      int             `json:"total_efectivo"`
+	TotalTransferencia int             `json:"total_transferencia"`
+	Detalles           []InvoiceDetail `json:"detalles"`
+	XmlGenerado        string          `json:"xml_sri_mock"`
+	IdCierre           int             `json:"id_cierre,omitempty"`
 }
 
 type InvoiceDetail struct {
@@ -49,7 +51,11 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		hoy := time.Now().Format("2006-01-02")
+		loc, err := time.LoadLocation("America/Guayaquil")
+		if err != nil {
+			loc = time.FixedZone("ECT", -5*3600) // Fallback manual
+		}
+		hoy := time.Now().In(loc).Format("2006-01-02")
 		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 		query := `
@@ -58,7 +64,9 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				SUM(d.cantidad) as total_cantidad, 
 				d.precio_unitario, 
 				d.iva_aplicado, 
-				SUM(d.subtotal) as total_subtotal
+				SUM(d.subtotal) as total_subtotal,
+				SUM(CASE WHEN v.metodo_pago = 'efectivo' THEN d.subtotal ELSE 0 END) as total_efectivo,
+				SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN d.subtotal ELSE 0 END) as total_transferencia
 			FROM operaciones.detalle_ventas d
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
@@ -81,7 +89,8 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 
 		for rows.Next() {
 			var d InvoiceDetail
-			if err := rows.Scan(&d.Producto, &d.Cantidad, &d.PrecioUnitario, &d.IvaAplicado, &d.Subtotal); err != nil {
+			var subEfectivo, subTransferencia int
+			if err := rows.Scan(&d.Producto, &d.Cantidad, &d.PrecioUnitario, &d.IvaAplicado, &d.Subtotal, &subEfectivo, &subTransferencia); err != nil {
 				continue
 			}
 
@@ -94,6 +103,8 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				summary.TotalIva0 += (d.Subtotal - subBase)
 			}
 			summary.TotalGlobal += d.Subtotal
+			summary.TotalEfectivo += subEfectivo
+			summary.TotalTransferencia += subTransferencia
 
 			summary.Detalles = append(summary.Detalles, d)
 		}
@@ -122,6 +133,18 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				).Scan(&idCierre)
 				if insertErr == nil {
 					summary.IdCierre = idCierre
+					
+					// Marcar las ventas completadas como cerradas
+					_, updateErr := db.Exec(`
+						UPDATE operaciones.ventas 
+						SET estado = 'cerrada' 
+						WHERE id_tienda = $1 
+						  AND estado = 'completada' 
+						  AND DATE(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2`, 
+						idTienda, hoy)
+					if updateErr != nil {
+						log.Printf("Error actualizando ventas a 'cerrada': %v", updateErr)
+					}
 				}
 				utils.LogAction(db, claims.IdUsuario, "CIERRE_CAJA", "operaciones.cierres_diarios",
 					&idCierre, "", fmt.Sprintf("Total: %d centavos | Tienda: %d | Cierre #%d", summary.TotalGlobal, idTienda, idCierre), r.RemoteAddr)
