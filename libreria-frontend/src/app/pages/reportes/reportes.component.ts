@@ -31,6 +31,8 @@ export class ReportesComponent implements OnInit {
   readonly loading = signal(false);
   readonly errorMsg = signal('');
   readonly loadingPdfId = signal<number | null>(null);
+  readonly reenviandoId = signal<number | null>(null);
+  readonly mensajeExito = signal('');
   readonly loadingGlobalPdf = signal(false);
 
   readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
@@ -156,6 +158,56 @@ export class ReportesComponent implements OnInit {
       error: () => {
         this.errorMsg.set('No se pudo descargar el recibo.');
         this.loadingPdfId.set(null);
+      }
+    });
+  }
+
+  reenviarRecibo(f: FacturaResponse): void {
+    if (!f.cliente_email) {
+      this.errorMsg.set('Este cliente no tiene correo electrónico.');
+      return;
+    }
+    
+    this.reenviandoId.set(f.id_factura);
+    this.errorMsg.set('');
+    this.mensajeExito.set('');
+    
+    this.reportesService.getFacturaById(f.id_factura).subscribe({
+      next: (data) => {
+        const items = data.items || [];
+        const mappedItems: ItemRecibo[] = items.map(i => ({
+          cantidad: i.cantidad,
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+        }));
+        
+        const doc = this.pdfService.generarPdfRecibo(
+          data.id_venta,
+          data.fecha_emision,
+          data.cliente_nombre,
+          data.cliente_identificacion,
+          mappedItems,
+          data.cliente_direccion || '',
+          data.cliente_email || ''
+        );
+        
+        const pdfDataUri = doc.output('datauristring');
+        const pdfBase64 = pdfDataUri.split(',')[1];
+        
+        this.reportesService.reenviarRecibo(f.id_factura, pdfBase64).subscribe({
+          next: () => {
+            this.mensajeExito.set('¡Recibo reenviado correctamente al correo del cliente!');
+            this.reenviandoId.set(null);
+            setTimeout(() => this.mensajeExito.set(''), 5000);
+          },
+          error: () => {
+            this.errorMsg.set('No se pudo reenviar el correo. Intenta nuevamente.');
+            this.reenviandoId.set(null);
+          }
+        });
+      },
+      error: () => {
+        this.errorMsg.set('Error al preparar el PDF para el reenvío.');
+        this.reenviandoId.set(null);
       }
     });
   }

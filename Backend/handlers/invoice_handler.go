@@ -209,6 +209,115 @@ func FacturasHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// ResendInvoiceInput es el cuerpo de POST /api/facturas/reenviar.
+type ResendInvoiceInput struct {
+	IdFactura int    `json:"id_factura"`
+	PdfBase64 string `json:"pdf_base64"`
+}
+
+func ReenviarFacturaHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Método no soportado en este endpoint."})
+			return
+		}
+
+		var input ResendInvoiceInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "JSON inválido."})
+			return
+		}
+
+		if input.IdFactura <= 0 || input.PdfBase64 == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "'id_factura' y 'pdf_base64' son obligatorios."})
+			return
+		}
+
+		// Consultar la factura para obtener el email y otros datos
+		var email, nombre, identificacion string
+		var idVenta int
+		var fechaEmision time.Time
+
+		err := db.QueryRow(`
+			SELECT COALESCE(c.email, ''), f.cliente_nombre, f.cliente_identificacion, f.id_venta, f.fecha_emision
+			FROM operaciones.facturas f
+			LEFT JOIN operaciones.clientes c ON f.id_cliente = c.id_cliente
+			WHERE f.id_factura = $1
+		`, input.IdFactura).Scan(&email, &nombre, &identificacion, &idVenta, &fechaEmision)
+
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Factura no encontrada."})
+			return
+		} else if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura."})
+			return
+		}
+
+		if email == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El cliente de esta factura no tiene un correo electrónico registrado."})
+			return
+		}
+
+		archivoPdfName := fmt.Sprintf("factura_%d.pdf", idVenta)
+		subject := fmt.Sprintf("Factura #%d - Librería Los Altares (Reenvío)", input.IdFactura)
+		bodyHTML := fmt.Sprintf(`
+			<div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+				<h2 style="color: #4F8EF7; border-bottom: 2px solid #4F8EF7; padding-bottom: 10px;">Librería Los Altares</h2>
+				<p>Estimado(a) <strong>%s</strong>,</p>
+				<p>Adjunto a este correo encontrará la <strong>copia de su Factura/Recibo</strong> en formato PDF solicitada recientemente.</p>
+				<table style="width: 100%%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px;">
+					<tr style="background-color: #f8f9fa;">
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Nº Factura:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%d</td>
+					</tr>
+					<tr>
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Fecha original:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%s</td>
+					</tr>
+					<tr style="background-color: #f8f9fa;">
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Cliente:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%s</td>
+					</tr>
+					<tr>
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Identificación:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%s</td>
+					</tr>
+				</table>
+				<p style="font-size: 12px; color: #777; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
+					Este es un correo automático. Por favor no responda directamente a este mensaje.
+				</p>
+			</div>
+		`, nombre, input.IdFactura, fechaEmision.Format("2006-01-02 15:04:05"), nombre, identificacion)
+
+		go func() {
+			sendErr := utils.SendEmail(email, subject, bodyHTML, input.PdfBase64, archivoPdfName)
+			if sendErr != nil {
+				fmt.Printf("⚠️ ERROR AL REENVIAR CORREO FACTURA: %v\n", sendErr)
+			} else {
+				fmt.Printf("✅ CORREO FACTURA REENVIADO EXITOSAMENTE A %s\n", email)
+			}
+		}()
+
+		json.NewEncoder(w).Encode(map[string]string{"mensaje": "Correo encolado para reenvío."})
+	}
+}
+
 func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idVentaStr := r.URL.Query().Get("venta")
 	idFacturaStr := r.URL.Query().Get("id")

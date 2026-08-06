@@ -133,6 +133,8 @@ func main() {
 	mux.HandleFunc("/api/ventas/cuaderno", middleware.RequireRole(db, "operador_caja")(handlers.CuadernoHandler(db)))
 	// POST /api/ventas → Venta individual
 	mux.HandleFunc("/api/ventas", middleware.RequireRole(db, "operador_caja")(handlers.SalesHandler(db)))
+	mux.HandleFunc("/api/facturas/reenviar", middleware.RequireRole(db, "operador_caja")(handlers.ReenviarFacturaHandler(db)))
+	mux.HandleFunc("/api/caja", middleware.RequireRole(db, "operador_caja")(handlers.CajaHandler(db)))
 
 	// ─── HU-08: Auditoría y Logs (Solo Administrador) ────────────────────────
 	mux.HandleFunc("/api/auditoria", middleware.RequireRole(db, "admin_libreria")(handlers.AuditHandler(db)))

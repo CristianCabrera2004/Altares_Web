@@ -283,6 +283,16 @@ func procesarVentaConTx(tx *sql.Tx, idUsuario int, idTienda int, items []Detalle
 		}
 	}
 
+	if metodoPago == "efectivo" {
+		_, err = tx.Exec(
+			`UPDATE configuracion.tiendas SET saldo_caja = saldo_caja + $1 WHERE id_tienda = $2`,
+			totalConIva, idTienda,
+		)
+		if err != nil {
+			return 0, 0, fmt.Errorf("error_actualizando_caja")
+		}
+	}
+
 	return idVenta, totalConIva, nil
 }
 

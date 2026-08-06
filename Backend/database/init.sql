@@ -38,6 +38,7 @@ CREATE TABLE configuracion.tiendas (
     nombre      VARCHAR(150) NOT NULL,
     direccion   TEXT,
     telefono    VARCHAR(20),
+    saldo_caja  INT NOT NULL DEFAULT 0,
     estado      VARCHAR(20) NOT NULL DEFAULT 'activa'
 );
 
