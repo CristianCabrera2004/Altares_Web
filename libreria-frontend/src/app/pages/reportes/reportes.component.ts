@@ -144,7 +144,8 @@ export class ReportesComponent implements OnInit {
           data.cliente_nombre,
           data.cliente_identificacion,
           mappedItems,
-          data.cliente_direccion || ''
+          data.cliente_direccion || '',
+          data.cliente_email || ''
         );
         const name = data.id_tipo_factura === 3 
           ? `Recibo_Electronico_${data.id_venta.toString().padStart(6, '0')}.pdf`

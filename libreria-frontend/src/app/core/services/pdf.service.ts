@@ -36,7 +36,8 @@ export class PdfService {
     clienteNombre: string,
     clienteIdentificacion: string,
     itemsFactura: ItemRecibo[],
-    clienteDireccion?: string
+    clienteDireccion?: string,
+    clienteCorreo?: string
   ): jsPDF {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -67,8 +68,13 @@ export class PdfService {
 
     let startY = 60;
     if (clienteDireccion && clienteDireccion.trim() !== '') {
-      doc.text(`Dirección: ${clienteDireccion}`, 10, 60);
-      startY = 66;
+      doc.text(`Dirección: ${clienteDireccion}`, 10, startY);
+      startY += 6;
+    }
+    
+    if (clienteCorreo && clienteCorreo.trim() !== '') {
+      doc.text(`Correo: ${clienteCorreo}`, 10, startY);
+      startY += 6;
     }
 
     let subtotal = 0;
