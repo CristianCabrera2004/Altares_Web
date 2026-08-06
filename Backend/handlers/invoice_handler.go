@@ -433,16 +433,16 @@ func createFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Si es Factura Electrónica (tipo 3) y el cliente tiene email, enviar por correo
-	if input.IdTipoFactura == 3 && email != "" {
+	// Si el cliente tiene email, enviar por correo independientemente del tipo de factura
+	if email != "" && input.PdfBase64 != "" {
 		// Enviar por correo en segundo plano
 		go func() {
-			subject := fmt.Sprintf("Factura Electrónica #%d - Librería Los Altares", idFactura)
+			subject := fmt.Sprintf("Factura #%d - Librería Los Altares", idFactura)
 			bodyHTML := fmt.Sprintf(`
 				<div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
 					<h2 style="color: #4F8EF7; border-bottom: 2px solid #4F8EF7; padding-bottom: 10px;">Librería Los Altares</h2>
 					<p>Estimado(a) <strong>%s</strong>,</p>
-					<p>Le agradecemos su preferencia por nuestra librería. Adjunto a este correo encontrará su <strong>Factura Electrónica</strong> en formato PDF correspondiente a su compra.</p>
+					<p>Le agradecemos su preferencia por nuestra librería. Adjunto a este correo encontrará su <strong>Factura/Recibo</strong> en formato PDF correspondiente a su compra.</p>
 					<table style="width: 100%%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px;">
 						<tr style="background-color: #f8f9fa;">
 							<td style="padding: 10px; border: 1px solid #ddd;"><strong>Nº Factura:</strong></td>

@@ -624,7 +624,7 @@ export class CuadernoComponent implements OnInit {
       this.clienteCorreo()
     );
     
-    if (this.tipoFactura() === 'digital') {
+    if (this.tipoFactura() === 'digital' || (this.clienteCorreo() && this.clienteCorreo().trim() !== '')) {
       const pdfDataUri = doc.output('datauristring');
       pdfBase64 = pdfDataUri.split(',')[1];
     }
