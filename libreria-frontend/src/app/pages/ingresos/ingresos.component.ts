@@ -175,7 +175,7 @@ export class IngresosComponent implements OnInit {
     
     const payload = {
       nombre_proveedor: this.nuevoProveedorNombre.trim(),
-      identificacion: '',
+      identificacion: 'PROV-' + Date.now(),
       email: '',
       telefono: '',
       direccion: ''
