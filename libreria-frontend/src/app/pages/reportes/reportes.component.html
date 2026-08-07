@@ -180,15 +180,16 @@
                       Descargar PDF
                     }
                   </button>
-                  @if (f.cliente_email) {
-                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; background: #4F8EF7; border-color: #4F8EF7;" (click)="reenviarRecibo(f)" [disabled]="reenviandoId() === f.id_factura || loadingPdfId() === f.id_factura">
-                      @if (reenviandoId() === f.id_factura) {
-                        Enviando...
-                      } @else {
-                        Reenviar Correo
-                      }
-                    </button>
-                  }
+                  <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; background: #4F8EF7; border-color: #4F8EF7;" 
+                          (click)="reenviarRecibo(f)" 
+                          [disabled]="!f.cliente_email || reenviandoId() === f.id_factura || loadingPdfId() === f.id_factura"
+                          [title]="!f.cliente_email ? 'Cliente sin correo registrado' : 'Reenviar recibo por correo'">
+                    @if (reenviandoId() === f.id_factura) {
+                      Enviando...
+                    } @else {
+                      Reenviar Correo
+                    }
+                  </button>
                 </td>
               </tr>
             }
