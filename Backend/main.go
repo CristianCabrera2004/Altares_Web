@@ -43,6 +43,12 @@ func main() {
 		log.Printf("Error al aplicar migracion metodo_pago: %v", err)
 	}
 
+	// Migración automática para añadir saldo_caja si no existe
+	_, err = db.Exec(`ALTER TABLE configuracion.tiendas ADD COLUMN IF NOT EXISTS saldo_caja INT NOT NULL DEFAULT 0`)
+	if err != nil {
+		log.Printf("Error al aplicar migracion saldo_caja: %v", err)
+	}
+
 	// 3. Crear el mux y registrar todas las rutas
 	mux := http.NewServeMux()
 
