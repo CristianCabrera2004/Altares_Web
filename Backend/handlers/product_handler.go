@@ -119,9 +119,14 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Listar todo el catálogo activo con stock de la tienda.
-	// Soporte de ?stock_bajo=true para filtrar solo productos con stock <= stock_alerta_min
+	// Listar el catálogo con stock de la tienda.
+	// Soporte de ?stock_bajo=true y ?estado= (por defecto activo)
 	stockBajoFilter := r.URL.Query().Get("stock_bajo") == "true"
+	estadoParam := r.URL.Query().Get("estado")
+	if estadoParam == "" {
+		estadoParam = "activo"
+	}
+
 	query := `
 		SELECT p.id_producto, p.nombre, p.id_categoria, c.nombre, p.tipo_iva,
 		       CASE WHEN p.tipo_iva = 'grabado' THEN (SELECT valor::INT FROM configuracion.parametros WHERE clave='tasa_iva_grabado') ELSE 0 END as tasa_iva,
@@ -135,7 +140,12 @@ func getProducts(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		FROM inventario.productos p
 		JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 		LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $1
-		WHERE p.estado = 'activo'`
+		WHERE 1=1`
+
+	if estadoParam != "todos" {
+		query += fmt.Sprintf(` AND p.estado = '%s'`, estadoParam)
+	}
+
 	if stockBajoFilter {
 		query += ` AND COALESCE(st.stock_actual, 0) <= COALESCE(st.stock_alerta_min, 5)`
 	}

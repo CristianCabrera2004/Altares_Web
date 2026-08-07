@@ -77,6 +77,7 @@ export class CuadernoComponent implements OnInit {
   readonly clienteDireccion = signal('');
   readonly clienteTelefono  = signal('');
   readonly clienteCorreo    = signal('');
+  readonly metodoPago       = signal<'efectivo' | 'transferencia'>('efectivo');
 
   // ── Estado de búsqueda de cliente ──────────────────────────────────────────
   readonly buscandoCliente   = signal(false);
@@ -383,15 +384,23 @@ export class CuadernoComponent implements OnInit {
     this.items.update(items => items.filter(i => i.producto.id_producto !== idProducto));
   }
 
+  /** Limpia todos los datos del cliente para permitir ingresar uno nuevo */
+  limpiarDatosCliente(): void {
+    this.clienteIdentificacion.set('');
+    this.clienteNombre.set('');
+    this.clienteDireccion.set('');
+    this.clienteTelefono.set('');
+    this.clienteCorreo.set('');
+    this.clienteEncontrado.set(false);
+    this.clienteNuevoMsg.set('');
+  }
+
   limpiarCuaderno(): void {
     if (this.items().length === 0) return;
-    this.confirmModalMessage.set('¿Limpiar todo el cuaderno? Los ítems no guardados se perderán.');
-    this.confirmAction = () => {
-      this.items.set([]);
-      this.confirmModalVisible.set(false);
-    };
-    this.confirmModalVisible.set(true);
+    this.items.set([]);
+    this.termino.set('');
   }
+
 
   // ─── Acciones del Modal de Confirmación ─────────────────────────────────────
   confirmarAccion(): void {
@@ -419,20 +428,29 @@ export class CuadernoComponent implements OnInit {
   }
 
   onScanSuccess(decodedText: string) {
-    // Buscar en el catálogo por id o nombre exacto temporalmente (asumiendo que id_producto o nombre coinciden con código)
-    // Lo ideal es tener un campo codigo_barras en el backend, pero por ahora lo buscamos por ID o nombre.
     const text = decodedText.trim().toLowerCase();
     const found = this.catalogo().find(p => 
       p.id_producto.toString() === text || 
       p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text)
+      p.nombre.toLowerCase().includes(text) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
     );
 
     if (found) {
       this.agregarItem(found);
-      // Feedback opcional, pero como ya cierra el modal, es suficiente
     } else {
-      alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+      // Buscar en backend si no está en el catálogo en memoria local
+      this.cuadernoService.buscarProductoPorCodigo(text).subscribe({
+        next: (producto) => {
+          this.agregarItem(producto);
+        },
+        error: () => {
+          this.barcodeDesconocido.set(text);
+          this.modoBarcode.set('opciones');
+          this.terminoEnlace.set('');
+          this.errorEnlace.set('');
+        }
+      });
     }
   }
 
@@ -481,6 +499,7 @@ export class CuadernoComponent implements OnInit {
       id_usuario: idUsuario,
       cliente_identificacion: this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
       cliente_nombre: this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
+      metodo_pago: this.metodoPago(),
       items: this.items().map(item => ({
         id_producto:     item.producto.id_producto,
         cantidad:        item.cantidad,
@@ -600,10 +619,12 @@ export class CuadernoComponent implements OnInit {
       null,
       this.clienteNombre(),
       this.clienteIdentificacion(),
-      items
+      items,
+      this.clienteDireccion(),
+      this.clienteCorreo()
     );
     
-    if (this.tipoFactura() === 'digital') {
+    if (this.tipoFactura() === 'digital' || (this.clienteCorreo() && this.clienteCorreo().trim() !== '')) {
       const pdfDataUri = doc.output('datauristring');
       pdfBase64 = pdfDataUri.split(',')[1];
     }
@@ -637,7 +658,9 @@ export class CuadernoComponent implements OnInit {
           null,
           this.tipoCliente() === 'datos' ? this.clienteNombre() : 'Consumidor Final',
           this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
-          items
+          items,
+          this.tipoCliente() === 'datos' ? this.clienteDireccion() : '',
+          this.tipoCliente() === 'datos' ? this.clienteCorreo() : ''
         );
         const docName = idTipoFactura === 3 
           ? `Recibo_Electronico_${idVenta.toString().padStart(6, '0')}.pdf`

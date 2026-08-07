@@ -6,6 +6,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { PredictionService, Prediccion, PredictionResponse } from '../../core/services/prediction.service';
 import { InvoiceService, InvoiceSummary } from '../../core/services/invoice.service';
 import { DashboardService } from '../../core/services/dashboard.service';
+import { CajaService } from '../../core/services/caja.service';
 import { Chart, registerables } from 'chart.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,7 +25,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly predictionService = inject(PredictionService);
   private readonly invoiceService = inject(InvoiceService);
   private readonly dashboardService = inject(DashboardService);
+  private readonly cajaService = inject(CajaService);
   private readonly http = inject(HttpClient);
+
+  // Estado general
+  loading = signal(true);
+  errorMsg = signal('');
+
+  // Estado de la caja
+  saldoCaja = signal<number | null>(null);
+  mostrarModalCaja = signal(false);
+  nuevoSaldoCaja = signal<number>(0);
 
   readonly tiendas = signal<any[]>([]);
   readonly tiendaSeleccionada = signal<number>(1);
@@ -87,6 +98,45 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.cargarDashboard();
+    this.cargarSaldoCaja();
+  }
+
+  cargarSaldoCaja(): void {
+    this.cajaService.getSaldoCaja().subscribe({
+      next: (res) => {
+        this.saldoCaja.set(res.saldo_caja);
+      },
+      error: (err) => {
+        console.error('Error al cargar saldo de caja', err);
+      }
+    });
+  }
+
+  abrirModalCaja(): void {
+    this.nuevoSaldoCaja.set((this.saldoCaja() ?? 0) / 100);
+    this.mostrarModalCaja.set(true);
+  }
+
+  cerrarModalCaja(): void {
+    this.mostrarModalCaja.set(false);
+  }
+
+  guardarSaldoCaja(): void {
+    const centavos = Math.round(this.nuevoSaldoCaja() * 100);
+    this.cajaService.updateSaldoCaja(centavos).subscribe({
+      next: () => {
+        this.saldoCaja.set(centavos);
+        this.cerrarModalCaja();
+      },
+      error: (err) => {
+        this.errorMsg.set('No se pudo actualizar el saldo de caja.');
+        this.cerrarModalCaja();
+      }
+    });
+  }
+
+  cargarDashboard(): void {
     const nombre = this.authService.getNombre();
     if (nombre) {
       this.nombreUsuario.set(nombre);

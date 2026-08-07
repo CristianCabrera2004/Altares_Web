@@ -77,13 +77,26 @@ export class IngresosComponent implements OnInit {
     const found = this.catalogo().find(p => 
       p.id_producto.toString() === text || 
       p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text)
+      p.nombre.toLowerCase().includes(text) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
     );
 
     if (found) {
       this.agregarItem(found);
     } else {
-      alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+      // Si no, buscar en la API por código de barras
+      this.http.get<Producto>(`${this.apiBuscar}?q=${encodeURIComponent(text)}`).subscribe({
+        next: (p) => {
+          if (p) {
+            this.agregarItem(p);
+          } else {
+            alert(`Producto con código "${decodedText}" no encontrado.`);
+          }
+        },
+        error: () => {
+          alert(`Producto con código "${decodedText}" no encontrado en el catálogo activo.`);
+        }
+      });
     }
   }
 
@@ -98,6 +111,13 @@ export class IngresosComponent implements OnInit {
   // Observación (opcional)
   readonly observacion = signal('');
   proveedorId = 0;
+  numeroFactura = '';
+  fechaCompra = this.fechaHoy.toISOString().split('T')[0]; // Por defecto hoy
+  
+  // Creación rápida de proveedor
+  mostrarNuevoProveedor = false;
+  nuevoProveedorNombre = '';
+  creandoProveedor = false;
   readonly proveedores = signal<Proveedor[]>([]);
 
   readonly resultados = computed(() => {
@@ -143,6 +163,44 @@ export class IngresosComponent implements OnInit {
     this.http.get<Proveedor[]>(`${environment.apiUrl}/proveedores`).subscribe({
       next: (data) => this.proveedores.set(data ?? []),
       error: () => {}
+    });
+  }
+
+  crearProveedorRapido(): void {
+    if (!this.nuevoProveedorNombre.trim()) return;
+    this.creandoProveedor = true;
+    
+    const token = localStorage.getItem('jwt_token');
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    
+    const payload = {
+      nombre_proveedor: this.nuevoProveedorNombre.trim(),
+      identificacion: 'PROV-' + Date.now(),
+      email: '',
+      telefono: '',
+      direccion: ''
+    };
+
+    this.http.post<any>(`${environment.apiUrl}/proveedores`, payload, { headers }).subscribe({
+      next: (res) => {
+        this.creandoProveedor = false;
+        this.mostrarNuevoProveedor = false;
+        this.nuevoProveedorNombre = '';
+        
+        // Recargar proveedores y seleccionar el nuevo
+        this.http.get<Proveedor[]>(`${environment.apiUrl}/proveedores`).subscribe(data => {
+          this.proveedores.set(data ?? []);
+          // Assuming the backend returns the created ID or we can find it by name
+          const prov = (data ?? []).find(p => p.nombre_proveedor.toLowerCase() === payload.nombre_proveedor.toLowerCase());
+          if (prov) {
+            this.proveedorId = prov.id_proveedor;
+          }
+        });
+      },
+      error: () => {
+        this.creandoProveedor = false;
+        alert('Error al crear proveedor');
+      }
     });
   }
 
@@ -270,6 +328,8 @@ export class IngresosComponent implements OnInit {
 
     const payload = {
       id_proveedor: this.proveedorId,
+      numero_factura: this.numeroFactura,
+      fecha_compra: this.fechaCompra,
       id_usuario: id_usuario,
       observacion: this.observacion(),
       items: this.items().map(i => ({

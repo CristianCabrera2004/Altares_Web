@@ -15,16 +15,18 @@ import (
 
 // InvoiceSummary representa el resumen de un cierre de caja.
 type InvoiceSummary struct {
-	FechaEmision  string          `json:"fecha_emision"`
-	RucCliente    string          `json:"ruc_cliente"`
-	NombreCliente string          `json:"nombre_cliente"`
-	SubtotalBase  int             `json:"subtotal_base"`
-	TotalIva15    int             `json:"total_iva_15"`
-	TotalIva0     int             `json:"total_iva_0"`
-	TotalGlobal   int             `json:"total_global"`
-	Detalles      []InvoiceDetail `json:"detalles"`
-	XmlGenerado   string          `json:"xml_sri_mock"`
-	IdCierre      int             `json:"id_cierre,omitempty"`
+	FechaEmision       string          `json:"fecha_emision"`
+	RucCliente         string          `json:"ruc_cliente"`
+	NombreCliente      string          `json:"nombre_cliente"`
+	SubtotalBase       int             `json:"subtotal_base"`
+	TotalIva15         int             `json:"total_iva_15"`
+	TotalIva0          int             `json:"total_iva_0"`
+	TotalGlobal        int             `json:"total_global"`
+	TotalEfectivo      int             `json:"total_efectivo"`
+	TotalTransferencia int             `json:"total_transferencia"`
+	Detalles           []InvoiceDetail `json:"detalles"`
+	XmlGenerado        string          `json:"xml_sri_mock"`
+	IdCierre           int             `json:"id_cierre,omitempty"`
 }
 
 type InvoiceDetail struct {
@@ -49,7 +51,11 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		hoy := time.Now().Format("2006-01-02")
+		loc, err := time.LoadLocation("America/Guayaquil")
+		if err != nil {
+			loc = time.FixedZone("ECT", -5*3600) // Fallback manual
+		}
+		hoy := time.Now().In(loc).Format("2006-01-02")
 		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 		query := `
@@ -58,7 +64,9 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				SUM(d.cantidad) as total_cantidad, 
 				d.precio_unitario, 
 				d.iva_aplicado, 
-				SUM(d.subtotal) as total_subtotal
+				SUM(d.subtotal) as total_subtotal,
+				SUM(CASE WHEN v.metodo_pago = 'efectivo' THEN d.subtotal ELSE 0 END) as total_efectivo,
+				SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN d.subtotal ELSE 0 END) as total_transferencia
 			FROM operaciones.detalle_ventas d
 			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 			JOIN inventario.productos p ON d.id_producto = p.id_producto
@@ -81,7 +89,8 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 
 		for rows.Next() {
 			var d InvoiceDetail
-			if err := rows.Scan(&d.Producto, &d.Cantidad, &d.PrecioUnitario, &d.IvaAplicado, &d.Subtotal); err != nil {
+			var subEfectivo, subTransferencia int
+			if err := rows.Scan(&d.Producto, &d.Cantidad, &d.PrecioUnitario, &d.IvaAplicado, &d.Subtotal, &subEfectivo, &subTransferencia); err != nil {
 				continue
 			}
 
@@ -94,6 +103,8 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				summary.TotalIva0 += (d.Subtotal - subBase)
 			}
 			summary.TotalGlobal += d.Subtotal
+			summary.TotalEfectivo += subEfectivo
+			summary.TotalTransferencia += subTransferencia
 
 			summary.Detalles = append(summary.Detalles, d)
 		}
@@ -122,6 +133,18 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				).Scan(&idCierre)
 				if insertErr == nil {
 					summary.IdCierre = idCierre
+					
+					// Marcar las ventas completadas como cerradas
+					_, updateErr := db.Exec(`
+						UPDATE operaciones.ventas 
+						SET estado = 'cerrada' 
+						WHERE id_tienda = $1 
+						  AND estado = 'completada' 
+						  AND DATE(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2`, 
+						idTienda, hoy)
+					if updateErr != nil {
+						log.Printf("Error actualizando ventas a 'cerrada': %v", updateErr)
+					}
 				}
 				utils.LogAction(db, claims.IdUsuario, "CIERRE_CAJA", "operaciones.cierres_diarios",
 					&idCierre, "", fmt.Sprintf("Total: %d centavos | Tienda: %d | Cierre #%d", summary.TotalGlobal, idTienda, idCierre), r.RemoteAddr)
@@ -183,6 +206,115 @@ func FacturasHandler(db *sql.DB) http.HandlerFunc {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Método no soportado en este endpoint."})
 		}
+	}
+}
+
+// ResendInvoiceInput es el cuerpo de POST /api/facturas/reenviar.
+type ResendInvoiceInput struct {
+	IdFactura int    `json:"id_factura"`
+	PdfBase64 string `json:"pdf_base64"`
+}
+
+func ReenviarFacturaHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Método no soportado en este endpoint."})
+			return
+		}
+
+		var input ResendInvoiceInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "JSON inválido."})
+			return
+		}
+
+		if input.IdFactura <= 0 || input.PdfBase64 == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "'id_factura' y 'pdf_base64' son obligatorios."})
+			return
+		}
+
+		// Consultar la factura para obtener el email y otros datos
+		var email, nombre, identificacion string
+		var idVenta int
+		var fechaEmision time.Time
+
+		err := db.QueryRow(`
+			SELECT COALESCE(c.email, ''), f.cliente_nombre, f.cliente_identificacion, f.id_venta, f.fecha_emision
+			FROM operaciones.facturas f
+			LEFT JOIN operaciones.clientes c ON f.id_cliente = c.id_cliente
+			WHERE f.id_factura = $1
+		`, input.IdFactura).Scan(&email, &nombre, &identificacion, &idVenta, &fechaEmision)
+
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Factura no encontrada."})
+			return
+		} else if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura."})
+			return
+		}
+
+		if email == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "El cliente de esta factura no tiene un correo electrónico registrado."})
+			return
+		}
+
+		archivoPdfName := fmt.Sprintf("factura_%d.pdf", idVenta)
+		subject := fmt.Sprintf("Factura #%d - Librería Los Altares (Reenvío)", input.IdFactura)
+		bodyHTML := fmt.Sprintf(`
+			<div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+				<h2 style="color: #4F8EF7; border-bottom: 2px solid #4F8EF7; padding-bottom: 10px;">Librería Los Altares</h2>
+				<p>Estimado(a) <strong>%s</strong>,</p>
+				<p>Adjunto a este correo encontrará la <strong>copia de su Factura/Recibo</strong> en formato PDF solicitada recientemente.</p>
+				<table style="width: 100%%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px;">
+					<tr style="background-color: #f8f9fa;">
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Nº Factura:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%d</td>
+					</tr>
+					<tr>
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Fecha original:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%s</td>
+					</tr>
+					<tr style="background-color: #f8f9fa;">
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Cliente:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%s</td>
+					</tr>
+					<tr>
+						<td style="padding: 10px; border: 1px solid #ddd;"><strong>Identificación:</strong></td>
+						<td style="padding: 10px; border: 1px solid #ddd;">%s</td>
+					</tr>
+				</table>
+				<p style="font-size: 12px; color: #777; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
+					Este es un correo automático. Por favor no responda directamente a este mensaje.
+				</p>
+			</div>
+		`, nombre, input.IdFactura, fechaEmision.Format("2006-01-02 15:04:05"), nombre, identificacion)
+
+		go func() {
+			sendErr := utils.SendEmail(email, subject, bodyHTML, input.PdfBase64, archivoPdfName)
+			if sendErr != nil {
+				fmt.Printf("⚠️ ERROR AL REENVIAR CORREO FACTURA: %v\n", sendErr)
+			} else {
+				fmt.Printf("✅ CORREO FACTURA REENVIADO EXITOSAMENTE A %s\n", email)
+			}
+		}()
+
+		json.NewEncoder(w).Encode(map[string]string{"mensaje": "Correo encolado para reenvío."})
 	}
 }
 
@@ -410,16 +542,16 @@ func createFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Si es Factura Electrónica (tipo 3) y el cliente tiene email, enviar por correo
-	if input.IdTipoFactura == 3 && email != "" {
+	// Si el cliente tiene email, enviar por correo independientemente del tipo de factura
+	if email != "" && input.PdfBase64 != "" {
 		// Enviar por correo en segundo plano
 		go func() {
-			subject := fmt.Sprintf("Factura Electrónica #%d - Librería Los Altares", idFactura)
+			subject := fmt.Sprintf("Factura #%d - Librería Los Altares", idFactura)
 			bodyHTML := fmt.Sprintf(`
 				<div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
 					<h2 style="color: #4F8EF7; border-bottom: 2px solid #4F8EF7; padding-bottom: 10px;">Librería Los Altares</h2>
 					<p>Estimado(a) <strong>%s</strong>,</p>
-					<p>Le agradecemos su preferencia por nuestra librería. Adjunto a este correo encontrará su <strong>Factura Electrónica</strong> en formato PDF correspondiente a su compra.</p>
+					<p>Le agradecemos su preferencia por nuestra librería. Adjunto a este correo encontrará su <strong>Factura/Recibo</strong> en formato PDF correspondiente a su compra.</p>
 					<table style="width: 100%%; border-collapse: collapse; margin-top: 20px; margin-bottom: 20px;">
 						<tr style="background-color: #f8f9fa;">
 							<td style="padding: 10px; border: 1px solid #ddd;"><strong>Nº Factura:</strong></td>

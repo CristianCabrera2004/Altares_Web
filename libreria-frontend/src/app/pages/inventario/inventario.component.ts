@@ -94,6 +94,7 @@ export class InventarioComponent implements OnInit {
   readonly sortField = signal<'nombre' | 'precio_venta' | 'stock_actual'>('nombre');
   readonly sortDir   = signal<'asc' | 'desc'>('asc');
   readonly filtroCat = signal<number | null>(null);  // null = todas las categorías
+  readonly filtroEstado = signal<'activo'|'inactivo'|'todos'>('activo');
 
   // ─── Modal Ingresar Producto ──────────────────────────────────────────────
   readonly mostrarModalIngreso    = signal(false);
@@ -291,7 +292,10 @@ export class InventarioComponent implements OnInit {
   cargarProductos(): void {
     this.cargando.set(true);
     this.errorMsg.set('');
-    this.http.get<Producto[]>(this.apiProductos).subscribe({
+    
+    const url = `${this.apiProductos}?estado=${this.filtroEstado()}`;
+    
+    this.http.get<Producto[]>(url).subscribe({
       next: (data) => { this.productos.set(data); this.cargando.set(false); },
       error: (err) => {
         this.errorMsg.set(err?.error?.error ?? 'Error al cargar los productos.');
@@ -385,7 +389,8 @@ export class InventarioComponent implements OnInit {
       precio_venta:     Math.round((raw.precio_venta ?? 0) * 100),
       tipo_iva:         raw.tipo_iva ?? '0%',
       stock_actual:     raw.stock_actual ?? 0,
-      stock_alerta_min: raw.stock_alerta_min ?? 5
+      stock_alerta_min: raw.stock_alerta_min ?? 5,
+      id_proveedor:     this.proveedorIngresoId()
     };
     this.http.post<ProductoResponse>(this.apiProductos, payload).subscribe({
       next: (res) => {
@@ -414,7 +419,8 @@ export class InventarioComponent implements OnInit {
     const codigos = producto.codigos_barras && producto.codigos_barras.length > 0 ? producto.codigos_barras : [(this.form.get('codigos_barras')?.value ?? '').trim()];
     const payload = {
       codigos_barras: codigos,
-      stock_actual:  this.cantidadAgregar.value ?? 1
+      stock_actual:  this.cantidadAgregar.value ?? 1,
+      id_proveedor:  this.proveedorIngresoId()
     };
     this.http.post<ProductoResponse>(this.apiProductos, payload).subscribe({
       next: (res) => {
@@ -654,7 +660,12 @@ export class InventarioComponent implements OnInit {
     return this.sortDir() === 'asc' ? '↑' : '↓';
   }
 
-  // ─── Modal Transferir ─────────────────────────────────────────────────────
+  setFiltroEstado(val: string) {
+    this.filtroEstado.set(val as 'activo'|'inactivo'|'todos');
+    this.cargarProductos();
+  }
+
+  // ─── Filtrado y Ordenado (Frontend) ─────────────────────────────────────────────────────
 
   abrirModalTransferencia(p: Producto) {
     this.prodTransfer.set(p);

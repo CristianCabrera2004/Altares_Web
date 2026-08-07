@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ReportesService, ReporteItem, FacturaResponse } from '../../core/services/reportes.service';
+import { ReportesService, ReporteItem, FacturaResponse, FacturaCompra } from '../../core/services/reportes.service';
 import { PdfService, ItemRecibo } from '../../core/services/pdf.service';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -17,7 +17,7 @@ export class ReportesComponent implements OnInit {
   private readonly reportesService = inject(ReportesService);
   private readonly pdfService = inject(PdfService);
 
-  readonly tab = signal<'ventas' | 'facturas'>('ventas');
+  readonly tab = signal<'ventas' | 'facturas' | 'compras'>('ventas');
 
   readonly startDate = signal('');
   readonly endDate = signal('');
@@ -27,12 +27,18 @@ export class ReportesComponent implements OnInit {
   
   readonly items = signal<ReporteItem[]>([]);
   readonly facturas = signal<FacturaResponse[]>([]);
+  readonly compras = signal<FacturaCompra[]>([]);
   readonly loading = signal(false);
   readonly errorMsg = signal('');
   readonly loadingPdfId = signal<number | null>(null);
+  readonly reenviandoId = signal<number | null>(null);
+  readonly mensajeExito = signal('');
   readonly loadingGlobalPdf = signal(false);
 
   readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
+  readonly fechaFiltroCompras = signal<string>('');
+  
+  readonly compraDetalle = signal<FacturaCompra | null>(null);
 
   readonly totalGlobal = computed(() => {
     return this.items().reduce((acc, curr) => acc + curr.total, 0);
@@ -68,10 +74,13 @@ export class ReportesComponent implements OnInit {
     });
   }
 
-  setTab(newTab: 'ventas' | 'facturas') {
+  setTab(newTab: 'ventas' | 'facturas' | 'compras') {
     this.tab.set(newTab);
     if (newTab === 'facturas' && this.facturas().length === 0) {
       this.cargarFacturas();
+    }
+    if (newTab === 'compras' && this.compras().length === 0) {
+      this.cargarCompras();
     }
   }
 
@@ -85,6 +94,37 @@ export class ReportesComponent implements OnInit {
       },
       error: () => {
         this.errorMsg.set('Error al cargar el historial de recibos.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  cargarCompras(): void {
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.compraDetalle.set(null);
+    this.reportesService.getCompras(this.fechaFiltroCompras()).subscribe({
+      next: (data) => {
+        this.compras.set(data || []);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al cargar el historial de compras.');
+        this.loading.set(false);
+      }
+    });
+  }
+
+  verDetalleCompra(c: FacturaCompra): void {
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.reportesService.getCompraById(c.id_factura).subscribe({
+      next: (data) => {
+        this.compraDetalle.set(data);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorMsg.set('Error al cargar el detalle de la compra.');
         this.loading.set(false);
       }
     });
@@ -105,7 +145,9 @@ export class ReportesComponent implements OnInit {
           data.fecha_emision,
           data.cliente_nombre,
           data.cliente_identificacion,
-          mappedItems
+          mappedItems,
+          data.cliente_direccion || '',
+          data.cliente_email || ''
         );
         const name = data.id_tipo_factura === 3 
           ? `Recibo_Electronico_${data.id_venta.toString().padStart(6, '0')}.pdf`
@@ -116,6 +158,56 @@ export class ReportesComponent implements OnInit {
       error: () => {
         this.errorMsg.set('No se pudo descargar el recibo.');
         this.loadingPdfId.set(null);
+      }
+    });
+  }
+
+  reenviarRecibo(f: FacturaResponse): void {
+    if (!f.cliente_email) {
+      this.errorMsg.set('Este cliente no tiene correo electrónico.');
+      return;
+    }
+    
+    this.reenviandoId.set(f.id_factura);
+    this.errorMsg.set('');
+    this.mensajeExito.set('');
+    
+    this.reportesService.getFacturaById(f.id_factura).subscribe({
+      next: (data) => {
+        const items = data.items || [];
+        const mappedItems: ItemRecibo[] = items.map(i => ({
+          cantidad: i.cantidad,
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+        }));
+        
+        const doc = this.pdfService.generarPdfRecibo(
+          data.id_venta,
+          data.fecha_emision,
+          data.cliente_nombre,
+          data.cliente_identificacion,
+          mappedItems,
+          data.cliente_direccion || '',
+          data.cliente_email || ''
+        );
+        
+        const pdfDataUri = doc.output('datauristring');
+        const pdfBase64 = pdfDataUri.split(',')[1];
+        
+        this.reportesService.reenviarRecibo(f.id_factura, pdfBase64).subscribe({
+          next: () => {
+            this.mensajeExito.set('¡Recibo reenviado correctamente al correo del cliente!');
+            this.reenviandoId.set(null);
+            setTimeout(() => this.mensajeExito.set(''), 5000);
+          },
+          error: () => {
+            this.errorMsg.set('No se pudo reenviar el correo. Intenta nuevamente.');
+            this.reenviandoId.set(null);
+          }
+        });
+      },
+      error: () => {
+        this.errorMsg.set('Error al preparar el PDF para el reenvío.');
+        this.reenviandoId.set(null);
       }
     });
   }
@@ -146,7 +238,8 @@ export class ReportesComponent implements OnInit {
           data.fecha_emision,
           data.cliente_nombre,
           data.cliente_identificacion,
-          mappedItems
+          mappedItems,
+          data.cliente_direccion || ''
         );
         
         const name = `Factura_Global_Diaria_${fechaHoy}.pdf`;

@@ -3,6 +3,7 @@ import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, Validators, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
@@ -58,7 +59,7 @@ interface TransferItem {
 @Component({
   selector: 'app-transferencias',
   standalone: true,
-  imports: [ReactiveFormsModule, CommonModule, ScannerComponent],
+  imports: [ReactiveFormsModule, CommonModule, ScannerComponent, RouterLink],
   templateUrl: './transferencias.component.html',
   styleUrl: './transferencias.component.css'
 })
@@ -85,7 +86,8 @@ export class TransferenciasComponent implements OnInit {
   readonly successMsg       = signal('');
   readonly errorMsg         = signal('');
   readonly scannerVisible   = signal(false);
-  readonly tabActiva        = signal<'crear' | 'historial'>(this.auth.isAdmin() ? 'historial' : 'crear');
+  readonly tabActiva        = signal<'crear' | 'historial'>(this.auth.isAdmin() ? 'historial' : 'historial');
+  readonly mostrarModalCrear = signal(false);
   readonly filtroHistorial  = signal<'todas' | 'enviadas' | 'recibidas'>('todas');
   readonly busquedaFiltro   = signal('');
   readonly filtroOrigen     = signal<number | null>(null);
@@ -315,6 +317,23 @@ export class TransferenciasComponent implements OnInit {
     }
   }
 
+  abrirModalCrear(): void {
+    this.errorMsg.set('');
+    this.successMsg.set('');
+    this.mostrarModalCrear.set(true);
+  }
+
+  cerrarModalCrear(): void {
+    this.mostrarModalCrear.set(false);
+    this.form.reset();
+    this.itemsATransferir.set([]);
+    this.busquedaProducto.set('');
+    this.productos.set([]);
+    if (!this.isAdmin()) {
+      this.aplicarTipoOperacion('solicitar');
+    }
+  }
+
   // ─── Selección de Productos y Autocomplete ────────────────────────────────
   onBusquedaProductoInput(valor: string): void {
     this.busquedaProducto.set(valor);
@@ -359,7 +378,8 @@ export class TransferenciasComponent implements OnInit {
     const found = this.productos().find(p => 
       p.id_producto.toString() === text || 
       p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text)
+      p.nombre.toLowerCase().includes(text) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
     );
 
     if (found) {
@@ -450,10 +470,11 @@ export class TransferenciasComponent implements OnInit {
         this.busquedaProducto.set('');
         this.productos.set([]);
 
-        // Redirigir a pestaña historial
+        // Cerrar modal y recargar historial
         setTimeout(() => {
-          this.setTab('historial');
-        }, 1500);
+          this.cerrarModalCrear();
+          this.cargarHistorial();
+        }, 1200);
       },
       error: (err) => {
         this.errorMsg.set(err?.error?.error ?? 'Error al procesar la transferencia de inventario.');

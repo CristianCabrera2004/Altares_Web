@@ -35,7 +35,9 @@ export class PdfService {
     fechaEmision: string | null,
     clienteNombre: string,
     clienteIdentificacion: string,
-    itemsFactura: ItemRecibo[]
+    itemsFactura: ItemRecibo[],
+    clienteDireccion?: string,
+    clienteCorreo?: string
   ): jsPDF {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -64,6 +66,17 @@ export class PdfService {
     doc.text(`Cliente: ${clienteNombre}`, 10, 50);
     doc.text(`RUC/CI: ${clienteIdentificacion}`, 10, 55);
 
+    let startY = 60;
+    if (clienteDireccion && clienteDireccion.trim() !== '') {
+      doc.text(`Dirección: ${clienteDireccion}`, 10, startY);
+      startY += 6;
+    }
+    
+    if (clienteCorreo && clienteCorreo.trim() !== '') {
+      doc.text(`Correo: ${clienteCorreo}`, 10, startY);
+      startY += 6;
+    }
+
     let subtotal = 0;
     let totalIva = 0;
 
@@ -89,7 +102,7 @@ export class PdfService {
     });
 
     autoTable(doc, {
-      startY: 60,
+      startY: startY,
       head: [['Cant', 'Descripción', 'V. Unit', 'Total']],
       body: tableData,
       theme: 'grid',

@@ -37,6 +37,12 @@ func main() {
 	db := database.Connect()
 	defer db.Close()
 
+	// Migración automática para añadir metodo_pago si no existe
+	_, err := db.Exec(`ALTER TABLE operaciones.ventas ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(50) NOT NULL DEFAULT 'efectivo'`)
+	if err != nil {
+		log.Printf("Error al aplicar migracion metodo_pago: %v", err)
+	}
+
 	// 3. Crear el mux y registrar todas las rutas
 	mux := http.NewServeMux()
 
@@ -127,6 +133,8 @@ func main() {
 	mux.HandleFunc("/api/ventas/cuaderno", middleware.RequireRole(db, "operador_caja")(handlers.CuadernoHandler(db)))
 	// POST /api/ventas → Venta individual
 	mux.HandleFunc("/api/ventas", middleware.RequireRole(db, "operador_caja")(handlers.SalesHandler(db)))
+	mux.HandleFunc("/api/facturas/reenviar", middleware.RequireRole(db, "operador_caja")(handlers.ReenviarFacturaHandler(db)))
+	mux.HandleFunc("/api/caja", middleware.RequireRole(db, "operador_caja")(handlers.CajaHandler(db)))
 
 	// ─── HU-08: Auditoría y Logs (Solo Administrador) ────────────────────────
 	mux.HandleFunc("/api/auditoria", middleware.RequireRole(db, "admin_libreria")(handlers.AuditHandler(db)))
@@ -152,6 +160,11 @@ func main() {
 	mux.HandleFunc("/api/clientes/buscar", middleware.RequireRole(db, "operador_caja")(handlers.BuscarClienteHandler(db)))
 	mux.HandleFunc("/api/clientes", middleware.RequireRole(db, "operador_caja")(handlers.ClientHandler(db)))
 
+
+	// ─── Facturas de Compras (Ingresos Múltiples) ──────────────────────────────
+	mux.HandleFunc("/api/reportes/compras", middleware.RequireRole(db, "operador_caja")(handlers.ComprasReporteListHandler(db)))
+	mux.HandleFunc("GET /api/reportes/compras/{id}", middleware.RequireRole(db, "operador_caja")(handlers.ComprasReporteDetailHandler(db)))
+	
 	// ─── Módulo de Deudores/Fiados (Anexo 4) ──────────────────────────────────
 	mux.HandleFunc("/api/deudores/abono", middleware.RequireRole(db, "operador_caja")(handlers.AbonoHandler(db)))
 	mux.HandleFunc("/api/deudores/abonos", middleware.RequireRole(db, "operador_caja")(handlers.AbonosListHandler(db)))
