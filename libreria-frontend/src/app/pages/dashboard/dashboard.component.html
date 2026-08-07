@@ -108,7 +108,7 @@
       <div class="kpi-info">
         <span class="kpi-label">Dinero en Caja</span>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="kpi-value">{{ saldoCaja() !== null ? currency(saldoCaja()!) : '---' }}</span>
+          <span class="kpi-value">{{ saldoCaja() !== null ? formatCurrency(saldoCaja()!) : '---' }}</span>
           <button class="btn-ghost" style="padding: 4px 8px;" (click)="abrirModalCaja()" title="Editar Dinero en Caja">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M12 20h9"></path>

@@ -81,6 +81,13 @@ export class ReportesService {
     return this.http.get<FacturaResponse>(`${environment.apiUrl}/facturas?id=${idFactura}`);
   }
 
+  reenviarRecibo(idFactura: number, pdfBase64: string): Observable<any> {
+    return this.http.post<any>(`${environment.apiUrl}/facturas/reenviar`, {
+      id_factura: idFactura,
+      pdf_base64: pdfBase64
+    });
+  }
+
   getFacturaDiaria(fecha?: string): Observable<FacturaResponse> {
     let url = `${environment.apiUrl}/reportes/factura-diaria`;
     if (fecha) {
