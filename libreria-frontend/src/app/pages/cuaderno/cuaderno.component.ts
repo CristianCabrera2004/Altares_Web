@@ -668,6 +668,7 @@ export class CuadernoComponent implements OnInit {
         docToSave.save(docName);
 
         this.items.set([]);
+        this.cargarCatalogo();
       },
       error: (err) => {
         this.errorMsg.set('Venta registrada, pero falló al crear el comprobante de factura: ' + (err?.error?.error ?? ''));
