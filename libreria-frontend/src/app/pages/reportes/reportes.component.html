@@ -31,6 +31,14 @@
         }
       </select>
     </div>
+    <div class="filter-group">
+      <label>Método de Pago</label>
+      <select class="input-field" [ngModel]="metodoPagoVentas()" (ngModelChange)="metodoPagoVentas.set($event); generarReporte()">
+        <option value="Todos">Todos</option>
+        <option value="Efectivo">Efectivo</option>
+        <option value="Transferencia">Transferencia</option>
+      </select>
+    </div>
     <div class="filter-actions">
       <button class="btn btn-secondary" (click)="generarReporte()" [disabled]="loading()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" style="margin-right: 6px;">

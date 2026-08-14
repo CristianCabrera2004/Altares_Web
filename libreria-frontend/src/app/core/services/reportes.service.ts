@@ -58,13 +58,17 @@ export interface FacturaCompra {
 export class ReportesService {
   private readonly http = inject(HttpClient);
   
-  getVentas(startDate: string, endDate: string, categoria?: string): Observable<ReporteItem[]> {
+  getVentas(startDate: string, endDate: string, categoria?: string, metodoPago?: string): Observable<ReporteItem[]> {
     let params = new HttpParams()
       .set('start_date', startDate)
       .set('end_date', endDate);
       
     if (categoria && categoria !== 'Todas') {
       params = params.set('categoria', categoria);
+    }
+    
+    if (metodoPago && metodoPago !== 'Todos') {
+      params = params.set('metodo_pago', metodoPago.toLowerCase());
     }
     
     return this.http.get<ReporteItem[]>(`${environment.apiUrl}/reportes/ventas`, { params });

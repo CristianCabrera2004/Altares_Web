@@ -21,10 +21,11 @@ export class ReportesComponent implements OnInit {
 
   readonly startDate = signal('');
   readonly endDate = signal('');
-  readonly categoria = signal('Todas');
-  
   readonly categorias = ['Todas', 'Papelería', 'Bazar', 'Arte y Diseño', 'Tecnología'];
   
+  readonly categoria = signal<string>('Todas');
+  readonly metodoPagoVentas = signal<string>('Todos');
+
   readonly items = signal<ReporteItem[]>([]);
   readonly facturas = signal<FacturaResponse[]>([]);
   readonly compras = signal<FacturaCompra[]>([]);
@@ -73,7 +74,12 @@ export class ReportesComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
     
-    this.reportesService.getVentas(this.startDate(), this.endDate(), this.categoria()).subscribe({
+    this.reportesService.getVentas(
+      this.startDate(),
+      this.endDate(),
+      this.categoria(),
+      this.metodoPagoVentas()
+    ).subscribe({
       next: (data) => {
         this.items.set(data || []);
         this.loading.set(false);
