@@ -581,19 +581,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     let endDate = fecha;
     let titulo = '';
 
+    const filtro = this.filtroMetodoPago();
+    const filtroLabel = filtro === 'efectivo' ? ' (Efectivo)' : filtro === 'transferencia' ? ' (Transferencia)' : '';
+
     if (fecha.length === 10) { // YYYY-MM-DD
       const parts = fecha.split('-');
-      titulo = `Ventas del día ${parts[2]}/${parts[1]}/${parts[0]}`;
+      titulo = `Ventas del día ${parts[2]}/${parts[1]}/${parts[0]}${filtroLabel}`;
     } else if (fecha.length === 7) { // YYYY-MM
       const parts = fecha.split('-');
       const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
       const mesIdx = parseInt(parts[1], 10) - 1;
       const mesNombre = meses[mesIdx] || parts[1];
-      titulo = `Ventas de ${mesNombre} ${parts[0]}`;
+      titulo = `Ventas de ${mesNombre} ${parts[0]}${filtroLabel}`;
       startDate = `${fecha}-01`;
       endDate = this.getLastDayOfMonth(parts[0], parts[1]);
     } else { // YYYY
-      titulo = `Ventas del año ${fecha}`;
+      titulo = `Ventas del año ${fecha}${filtroLabel}`;
       startDate = `${fecha}-01-01`;
       endDate = `${fecha}-12-31`;
     }
@@ -605,7 +608,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.itemsDetalleDia.set([]);
 
     const tiendaId = this.isAdmin() ? this.tiendaSeleccionada() : 1;
-    this.http.get<any[]>(`${environment.apiUrl}/reportes/ventas?start_date=${startDate}&end_date=${endDate}&tienda=${tiendaId}`).subscribe({
+    const metodoPagoParam = filtro !== 'total' ? `&metodo_pago=${filtro}` : '';
+    this.http.get<any[]>(`${environment.apiUrl}/reportes/ventas?start_date=${startDate}&end_date=${endDate}&tienda=${tiendaId}${metodoPagoParam}`).subscribe({
       next: (data) => {
         this.itemsDetalleDia.set(data ?? []);
         this.cargandoDetalleDia.set(false);

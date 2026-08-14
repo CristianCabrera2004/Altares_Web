@@ -37,6 +37,7 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		startDate := q.Get("start_date")
 		endDate := q.Get("end_date")
 		categoria := q.Get("categoria")
+		metodoPago := q.Get("metodo_pago") // "efectivo", "transferencia", o vacío (todos)
 
 		if startDate == "" || endDate == "" {
 			endDate = time.Now().Format("2006-01-02")
@@ -67,6 +68,11 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 		if categoria != "" && categoria != "Todas" {
 			args = append(args, categoria)
 			query += fmt.Sprintf(" AND c.nombre = $%d", len(args))
+		}
+
+		if metodoPago == "efectivo" || metodoPago == "transferencia" {
+			args = append(args, metodoPago)
+			query += fmt.Sprintf(" AND v.metodo_pago = $%d", len(args))
 		}
 
 		query += `
