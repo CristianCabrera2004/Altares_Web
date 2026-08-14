@@ -76,6 +76,15 @@
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-efectivo {
+  background: rgba(34,197,94,0.15) !important;
+  color: #22c55e !important;
+}
+.badge-transferencia {
+  background: rgba(156,39,176,0.15) !important;
+  color: #9c27b0 !important;
 }
 
 .text-right { text-align: right !important; }

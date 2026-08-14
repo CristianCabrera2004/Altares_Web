@@ -21,10 +21,11 @@ export class ReportesComponent implements OnInit {
 
   readonly startDate = signal('');
   readonly endDate = signal('');
-  readonly categoria = signal('Todas');
-  
   readonly categorias = ['Todas', 'Papelería', 'Bazar', 'Arte y Diseño', 'Tecnología'];
   
+  readonly categoria = signal<string>('Todas');
+  readonly metodoPagoVentas = signal<string>('Todos');
+
   readonly items = signal<ReporteItem[]>([]);
   readonly facturas = signal<FacturaResponse[]>([]);
   readonly compras = signal<FacturaCompra[]>([]);
@@ -36,7 +37,18 @@ export class ReportesComponent implements OnInit {
   readonly loadingGlobalPdf = signal(false);
 
   readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
-  readonly fechaFiltroCompras = signal<string>('');
+  readonly fechaFiltroCompras = signal<string>(new Date().toISOString().split('T')[0]);
+  metodoPagoFiltro = signal<string>('todos');
+
+  // Computed para filtrar facturas
+  facturasFiltradas = computed(() => {
+    const list = this.facturas();
+    const filter = this.metodoPagoFiltro();
+    if (filter === 'todos') {
+      return list;
+    }
+    return list.filter(f => (f.metodo_pago || 'efectivo').toLowerCase().trim() === filter);
+  });
   
   readonly compraDetalle = signal<FacturaCompra | null>(null);
 
@@ -62,7 +74,12 @@ export class ReportesComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
     
-    this.reportesService.getVentas(this.startDate(), this.endDate(), this.categoria()).subscribe({
+    this.reportesService.getVentas(
+      this.startDate(),
+      this.endDate(),
+      this.categoria(),
+      this.metodoPagoVentas()
+    ).subscribe({
       next: (data) => {
         this.items.set(data || []);
         this.loading.set(false);
@@ -232,7 +249,7 @@ export class ReportesComponent implements OnInit {
         const mappedItems: ItemRecibo[] = items.map((i: any) => ({
           cantidad: i.cantidad,
           producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado },
-          metodo_pago: i.metodo_pago || 'efectivo'
+          metodo_pago: (i.metodo_pago || 'efectivo').toLowerCase().trim()
         }));
         
         const doc = this.pdfService.generarPdfReciboGlobal(

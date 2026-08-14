@@ -43,6 +43,20 @@ func main() {
 		log.Printf("Error al aplicar migracion metodo_pago: %v", err)
 	}
 
+	// RUN TEMP MIGRATION FOR NEW COLUMNS
+	_, err = db.Exec(`
+		ALTER TABLE seguridad.usuarios ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE seguridad.usuarios ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(100) DEFAULT NULL;
+		ALTER TABLE seguridad.usuarios ADD COLUMN IF NOT EXISTS email_verificado BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE seguridad.usuarios ADD COLUMN IF NOT EXISTS codigo_verificacion VARCHAR(6) DEFAULT NULL;
+		ALTER TABLE seguridad.usuarios ADD COLUMN IF NOT EXISTS codigo_verificacion_expira TIMESTAMP DEFAULT NULL;
+	`)
+	if err != nil {
+		log.Printf("Advertencia: Falló migración temporal: %v", err)
+	} else {
+		log.Println("Migración temporal de columnas aplicada correctamente.")
+	}
+
 	// Migración automática para añadir saldo_caja si no existe
 	_, err = db.Exec(`ALTER TABLE configuracion.tiendas ADD COLUMN IF NOT EXISTS saldo_caja INT NOT NULL DEFAULT 0`)
 	if err != nil {
