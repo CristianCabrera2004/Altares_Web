@@ -29,6 +29,7 @@ export interface FacturaResponse {
   subtotal: number;
   total_iva: number;
   total: number;
+  metodo_pago: string;
   items?: any[];
 }
 

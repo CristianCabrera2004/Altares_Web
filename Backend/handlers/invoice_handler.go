@@ -59,19 +59,47 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 		query := `
+			WITH ventas_del_dia AS (
+				SELECT 
+					p.id_producto,
+					p.nombre, 
+					SUM(d.cantidad) as total_cantidad, 
+					d.precio_unitario, 
+					d.iva_aplicado, 
+					SUM(d.subtotal) as total_subtotal,
+					SUM(CASE WHEN v.metodo_pago = 'efectivo' THEN d.subtotal ELSE 0 END) as total_efectivo,
+					SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN d.subtotal ELSE 0 END) as total_transferencia
+				FROM operaciones.detalle_ventas d
+				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				JOIN inventario.productos p ON d.id_producto = p.id_producto
+				WHERE DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
+				GROUP BY p.id_producto, p.nombre, d.precio_unitario, d.iva_aplicado
+			),
+			devoluciones_del_dia AS (
+				SELECT
+					dev.id_producto,
+					SUM(dev.cantidad_devuelta) as total_devuelta,
+					SUM(dev.cantidad_devuelta * p.precio_venta) as total_dinero_devuelto,
+					SUM(CASE WHEN v.metodo_pago = 'efectivo' THEN (dev.cantidad_devuelta * p.precio_venta) ELSE 0 END) as devuelto_efectivo,
+					SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN (dev.cantidad_devuelta * p.precio_venta) ELSE 0 END) as devuelto_transferencia
+				FROM operaciones.devoluciones dev
+				JOIN inventario.productos p ON dev.id_producto = p.id_producto
+				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
+				WHERE DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1 AND dev.id_tienda = $2
+				GROUP BY dev.id_producto
+			)
 			SELECT 
-				p.nombre, 
-				SUM(d.cantidad) as total_cantidad, 
-				d.precio_unitario, 
-				d.iva_aplicado, 
-				SUM(d.subtotal) as total_subtotal,
-				SUM(CASE WHEN v.metodo_pago = 'efectivo' THEN d.subtotal ELSE 0 END) as total_efectivo,
-				SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN d.subtotal ELSE 0 END) as total_transferencia
-			FROM operaciones.detalle_ventas d
-			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
-			JOIN inventario.productos p ON d.id_producto = p.id_producto
-			WHERE DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
-			GROUP BY p.nombre, d.precio_unitario, d.iva_aplicado
+				COALESCE(vd.nombre, p.nombre) as nombre,
+				COALESCE(vd.total_cantidad, 0) - COALESCE(dd.total_devuelta, 0) as total_cantidad,
+				COALESCE(vd.precio_unitario, p.precio_venta) as precio_unitario,
+				COALESCE(vd.iva_aplicado, p.tasa_iva) as iva_aplicado,
+				COALESCE(vd.total_subtotal, 0) - COALESCE(dd.total_dinero_devuelto, 0) as total_subtotal,
+				COALESCE(vd.total_efectivo, 0) - COALESCE(dd.devuelto_efectivo, 0) as total_efectivo,
+				COALESCE(vd.total_transferencia, 0) - COALESCE(dd.devuelto_transferencia, 0) as total_transferencia
+			FROM ventas_del_dia vd
+			FULL OUTER JOIN devoluciones_del_dia dd ON vd.id_producto = dd.id_producto
+			LEFT JOIN inventario.productos p ON p.id_producto = COALESCE(vd.id_producto, dd.id_producto)
+			WHERE (COALESCE(vd.total_cantidad, 0) - COALESCE(dd.total_devuelta, 0)) > 0
 		`
 
 		rows, err := db.Query(query, hoy, idTienda)
@@ -181,6 +209,7 @@ type FacturaResponse struct {
 	Subtotal              int             `json:"subtotal"`
 	TotalIva              int             `json:"total_iva"`
 	Total                 int             `json:"total"`
+	MetodoPago            string          `json:"metodo_pago"`
 	Items                 []InvoiceDetail `json:"items,omitempty"`
 }
 
@@ -331,7 +360,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
 			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
-			       v.subtotal, v.total_iva, v.total
+			       v.subtotal, v.total_iva, v.total, COALESCE(v.metodo_pago, 'efectivo')
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
 			JOIN operaciones.ventas v ON f.id_venta = v.id_venta
@@ -350,7 +379,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
 			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
-			       v.subtotal, v.total_iva, v.total
+			       v.subtotal, v.total_iva, v.total, COALESCE(v.metodo_pago, 'efectivo')
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
 			JOIN operaciones.ventas v ON f.id_venta = v.id_venta
@@ -378,7 +407,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 			       f.id_cliente, f.cliente_identificacion, f.cliente_nombre,
 			       COALESCE(c.direccion, ''), COALESCE(c.telefono, ''), COALESCE(c.email, ''),
 			       COALESCE(f.archivo_pdf, ''), TO_CHAR(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI:SS'),
-			       v.subtotal, v.total_iva, v.total
+			       v.subtotal, v.total_iva, v.total, COALESCE(v.metodo_pago, 'efectivo')
 			FROM operaciones.facturas f
 			JOIN operaciones.tipo_factura tf ON f.id_tipo_factura = tf.id_tipo_factura
 			JOIN operaciones.ventas v ON f.id_venta = v.id_venta
@@ -403,7 +432,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 				&f.IdFactura, &f.IdVenta, &f.IdTipoFactura, &f.NombreTipoFactura,
 				&f.IdCliente, &f.ClienteIdentificacion, &f.ClienteNombre,
 				&f.ClienteDireccion, &f.ClienteTelefono, &f.ClienteEmail,
-				&f.ArchivoPdf, &f.FechaEmision, &f.Subtotal, &f.TotalIva, &f.Total,
+				&f.ArchivoPdf, &f.FechaEmision, &f.Subtotal, &f.TotalIva, &f.Total, &f.MetodoPago,
 			)
 			if err != nil {
 				continue
@@ -419,7 +448,7 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		&f.IdFactura, &f.IdVenta, &f.IdTipoFactura, &f.NombreTipoFactura,
 		&f.IdCliente, &f.ClienteIdentificacion, &f.ClienteNombre,
 		&f.ClienteDireccion, &f.ClienteTelefono, &f.ClienteEmail,
-		&f.ArchivoPdf, &f.FechaEmision, &f.Subtotal, &f.TotalIva, &f.Total,
+		&f.ArchivoPdf, &f.FechaEmision, &f.Subtotal, &f.TotalIva, &f.Total, &f.MetodoPago,
 	)
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)

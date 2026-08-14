@@ -43,7 +43,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly productosCount = signal<number>(0);
   readonly usuariosCount = signal<number>(0);
   readonly ventasHoy = signal<number>(0);
-
+  readonly ventasEfectivoHoy = signal<number>(0);
+  readonly ventasTransferenciaHoy = signal<number>(0);
+  readonly filtroMetodoPago = signal<'total' | 'efectivo' | 'transferencia'>('total');
   readonly nombreUsuario = signal('');
   readonly rolUsuario = signal('');
   readonly fechaActual = signal('');
@@ -269,6 +271,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         const hoyStr = new Date().toISOString().split('T')[0];
         const hoyVentas = data.find(d => d.fecha === hoyStr);
         this.ventasHoy.set(hoyVentas ? hoyVentas.total : 0);
+        this.ventasEfectivoHoy.set(hoyVentas ? hoyVentas.total_efectivo : 0);
+        this.ventasTransferenciaHoy.set(hoyVentas ? hoyVentas.total_transferencia : 0);
 
         const labels = data.map(d => {
           if (d.fecha.length === 10) { // YYYY-MM-DD
@@ -284,7 +288,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             return d.fecha; // e.g. "2026"
           }
         });
-        const values = data.map(d => d.total / 100);
+        const values = data.map(d => {
+          const filtro = this.filtroMetodoPago();
+          if (filtro === 'efectivo') return d.total_efectivo / 100;
+          if (filtro === 'transferencia') return d.total_transferencia / 100;
+          return d.total / 100;
+        });
+        const chartLabel = this.filtroMetodoPago() === 'efectivo'
+          ? 'Efectivo (USD)'
+          : this.filtroMetodoPago() === 'transferencia'
+            ? 'Transferencia (USD)'
+            : 'Ventas (USD)';
+        const chartColor = this.filtroMetodoPago() === 'efectivo'
+          ? '#22c55e'
+          : this.filtroMetodoPago() === 'transferencia'
+            ? '#a78bfa'
+            : '#4F8EF7';
 
         if (!this.salesChartRef?.nativeElement) return;
         const ctx = this.salesChartRef.nativeElement.getContext('2d');
@@ -293,6 +312,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           // Actualizar datos sin destruir el chart (más fluido)
           this.chartInstance.data.labels = labels;
           this.chartInstance.data.datasets[0].data = values;
+          (this.chartInstance.data.datasets[0] as any).label = chartLabel;
+          (this.chartInstance.data.datasets[0] as any).borderColor = chartColor;
+          (this.chartInstance.data.datasets[0] as any).backgroundColor = chartColor.replace(')', ', 0.1)').replace('rgb', 'rgba');
           this.chartInstance.update();
           return;
         }
@@ -309,12 +331,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           data: {
             labels,
             datasets: [{
-              label: 'Ventas (USD)',
+              label: chartLabel,
               data: values,
-              borderColor: '#4F8EF7',
-              backgroundColor: 'rgba(79, 142, 247, 0.1)',
+              borderColor: chartColor,
+              backgroundColor: chartColor + '1a',
               borderWidth: 3,
-              pointBackgroundColor: '#22c55e',
+              pointBackgroundColor: chartColor,
               pointBorderColor: bgSurface,
               pointBorderWidth: 2,
               pointRadius: 4,
@@ -535,6 +557,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   setPeriodo(valor: '7' | '15' | '30' | '365' | '0'): void {
     this.periodoGrafica.set(valor);
     this.cargarGrafica(valor);
+  }
+
+  setFiltroMetodoPago(filtro: 'total' | 'efectivo' | 'transferencia'): void {
+    this.filtroMetodoPago.set(filtro);
+    // Destruir y recrear el chart para aplicar el nuevo color
+    if (this.chartInstance) {
+      this.chartInstance.destroy();
+      this.chartInstance = null;
+    }
+    this.cargarGrafica();
   }
 
   getLastDayOfMonth(yearStr: string, monthStr: string): string {

@@ -621,7 +621,8 @@ export class CuadernoComponent implements OnInit {
       this.clienteIdentificacion(),
       items,
       this.clienteDireccion(),
-      this.clienteCorreo()
+      this.clienteCorreo(),
+      this.metodoPago()
     );
     
     if (this.tipoFactura() === 'digital' || (this.clienteCorreo() && this.clienteCorreo().trim() !== '')) {
@@ -660,7 +661,8 @@ export class CuadernoComponent implements OnInit {
           this.tipoCliente() === 'datos' ? this.clienteIdentificacion() : '9999999999999',
           items,
           this.tipoCliente() === 'datos' ? this.clienteDireccion() : '',
-          this.tipoCliente() === 'datos' ? this.clienteCorreo() : ''
+          this.tipoCliente() === 'datos' ? this.clienteCorreo() : '',
+          this.metodoPago()
         );
         const docName = idTipoFactura === 3 
           ? `Recibo_Electronico_${idVenta.toString().padStart(6, '0')}.pdf`

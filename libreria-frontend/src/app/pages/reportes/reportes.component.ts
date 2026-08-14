@@ -147,7 +147,8 @@ export class ReportesComponent implements OnInit {
           data.cliente_identificacion,
           mappedItems,
           data.cliente_direccion || '',
-          data.cliente_email || ''
+          data.cliente_email || '',
+          data.metodo_pago
         );
         const name = data.id_tipo_factura === 3 
           ? `Recibo_Electronico_${data.id_venta.toString().padStart(6, '0')}.pdf`
@@ -187,7 +188,8 @@ export class ReportesComponent implements OnInit {
           data.cliente_identificacion,
           mappedItems,
           data.cliente_direccion || '',
-          data.cliente_email || ''
+          data.cliente_email || '',
+          data.metodo_pago
         );
         
         const pdfDataUri = doc.output('datauristring');
@@ -239,7 +241,9 @@ export class ReportesComponent implements OnInit {
           data.cliente_nombre,
           data.cliente_identificacion,
           mappedItems,
-          data.cliente_direccion || ''
+          data.cliente_direccion || '',
+          data.cliente_email || '',
+          data.metodo_pago
         );
         
         const name = `Factura_Global_Diaria_${fechaHoy}.pdf`;

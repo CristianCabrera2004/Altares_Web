@@ -176,6 +176,15 @@ func main() {
 	mux.HandleFunc("/api/deudores/abonos", middleware.RequireRole(db, "operador_caja")(handlers.AbonosListHandler(db)))
 	mux.HandleFunc("/api/deudores", middleware.RequireRole(db, "operador_caja")(handlers.DeudorHandler(db)))
 
+	mux.HandleFunc("/api/wipe-test-sales", func(w http.ResponseWriter, r *http.Request) {
+		db.Exec(`DELETE FROM operaciones.detalle_ventas WHERE id_venta IN (4111, 4112, 4113)`)
+		db.Exec(`DELETE FROM operaciones.facturas WHERE id_venta IN (4111, 4112, 4113)`)
+		db.Exec(`DELETE FROM inventario.movimientos_stock WHERE referencia_id IN (4111, 4112, 4113) AND tipo_movimiento = 'VENTA'`)
+		db.Exec(`DELETE FROM operaciones.ventas WHERE id_venta IN (4111, 4112, 4113)`)
+		db.Exec(`UPDATE inventario.stock_tiendas SET stock_actual = stock_actual + 3 WHERE id_producto = (SELECT id_producto FROM inventario.productos WHERE nombre = 'Golpes 0.25' LIMIT 1)`)
+		w.Write([]byte("Borradas las ventas de prueba 4111, 4112, 4113 y stock restaurado."))
+	})
+
 	// 4. Puerto del servidor
 	port := os.Getenv("PORT")
 	if port == "" {

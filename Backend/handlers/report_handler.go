@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -97,8 +98,10 @@ func ReportesVentasHandler(db *sql.DB) http.HandlerFunc {
 }
 
 type GraficaData struct {
-	Fecha string `json:"fecha"`
-	Total int    `json:"total"` // en centavos
+	Fecha              string `json:"fecha"`
+	Total              int    `json:"total"` // en centavos
+	TotalEfectivo      int    `json:"total_efectivo"`
+	TotalTransferencia int    `json:"total_transferencia"`
 }
 
 // ReporteGraficaHandler devuelve las ventas totales agrupadas por día.
@@ -142,16 +145,49 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 			groupClause = "TO_CHAR(fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD')"
 		}
 
+		// Construir cláusulas equivalentes para devoluciones reemplazando 'fecha_venta' por 'd.fecha_devolucion'
+		devSelectClause := selectClause
+		devGroupClause := groupClause
+		devWhereClause := whereClause
+		// Reemplazos simples:
+		devSelectClause = strings.ReplaceAll(devSelectClause, "fecha_venta", "d.fecha_devolucion")
+		devGroupClause = strings.ReplaceAll(devGroupClause, "fecha_venta", "d.fecha_devolucion")
+		devWhereClause = strings.ReplaceAll(devWhereClause, "fecha_venta", "d.fecha_devolucion")
+
 		query := fmt.Sprintf(`
+			WITH ventas_diarias AS (
+				SELECT 
+					%s,
+					SUM(total) as total_ventas,
+					SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END) as ventas_efectivo,
+					SUM(CASE WHEN metodo_pago = 'transferencia' THEN total ELSE 0 END) as ventas_transferencia
+				FROM operaciones.ventas
+				WHERE estado = 'completada' AND id_tienda = $1
+				  %s
+				GROUP BY %s
+			),
+			devoluciones_diarias AS (
+				SELECT 
+					%s,
+					SUM(d.cantidad_devuelta * p.precio_venta) as total_devoluciones,
+					SUM(CASE WHEN v.metodo_pago = 'efectivo' THEN d.cantidad_devuelta * p.precio_venta ELSE 0 END) as devoluciones_efectivo,
+					SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN d.cantidad_devuelta * p.precio_venta ELSE 0 END) as devoluciones_transferencia
+				FROM operaciones.devoluciones d
+				JOIN inventario.productos p ON d.id_producto = p.id_producto
+				LEFT JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				WHERE d.id_tienda = $1
+				  %s
+				GROUP BY %s
+			)
 			SELECT 
-				%s,
-				SUM(total) as total
-			FROM operaciones.ventas
-			WHERE estado = 'completada' AND id_tienda = $1
-			  %s
-			GROUP BY %s
-			ORDER BY %s ASC
-		`, selectClause, whereClause, groupClause, groupClause)
+				v.fecha,
+				(v.total_ventas - COALESCE(d.total_devoluciones, 0)) as total,
+				(v.ventas_efectivo - COALESCE(d.devoluciones_efectivo, 0)) as total_efectivo,
+				(v.ventas_transferencia - COALESCE(d.devoluciones_transferencia, 0)) as total_transferencia
+			FROM ventas_diarias v
+			LEFT JOIN devoluciones_diarias d ON v.fecha = d.fecha
+			ORDER BY v.fecha ASC
+		`, selectClause, whereClause, groupClause, devSelectClause, devWhereClause, devGroupClause)
 
 		rows, err := db.Query(query, idTienda)
 		if err != nil {
@@ -164,7 +200,7 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 		var data []GraficaData
 		for rows.Next() {
 			var g GraficaData
-			if err := rows.Scan(&g.Fecha, &g.Total); err != nil {
+			if err := rows.Scan(&g.Fecha, &g.Total, &g.TotalEfectivo, &g.TotalTransferencia); err != nil {
 				continue
 			}
 			data = append(data, g)
@@ -196,21 +232,46 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 
 		// Agrupar los detalles de ventas del día actual para consumidor final
 		query := `
+			WITH ventas_del_dia AS (
+				SELECT 
+					p.id_producto,
+					p.nombre, 
+					SUM(d.cantidad) as total_cantidad, 
+					d.precio_unitario, 
+					COALESCE(d.iva_aplicado, 0) as iva_aplicado, 
+					SUM(d.subtotal) as total_subtotal
+				FROM operaciones.detalle_ventas d
+				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				JOIN inventario.productos p ON d.id_producto = p.id_producto
+				WHERE v.id_tienda = $1 
+				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+				  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
+				  AND v.estado = 'completada'
+				GROUP BY p.id_producto, p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
+			),
+			devoluciones_del_dia AS (
+				SELECT
+					dev.id_producto,
+					SUM(dev.cantidad_devuelta) as total_devuelta,
+					SUM(dev.cantidad_devuelta * p.precio_venta) as total_dinero_devuelto
+				FROM operaciones.devoluciones dev
+				JOIN inventario.productos p ON dev.id_producto = p.id_producto
+				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
+				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2 
+				  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
+				GROUP BY dev.id_producto
+			)
 			SELECT 
-				p.nombre, 
-				SUM(d.cantidad) as cantidad, 
-				d.precio_unitario, 
-				COALESCE(d.iva_aplicado, 0) as iva_aplicado, 
-				SUM(d.subtotal) as subtotal
-			FROM operaciones.detalle_ventas d
-			JOIN operaciones.ventas v ON d.id_venta = v.id_venta
-			JOIN inventario.productos p ON d.id_producto = p.id_producto
-			WHERE v.id_tienda = $1 
-			  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
-			  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
-			  AND v.estado = 'completada'
-			GROUP BY p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
-			ORDER BY p.nombre ASC
+				COALESCE(vd.nombre, p.nombre) as nombre,
+				COALESCE(vd.total_cantidad, 0) - COALESCE(dd.total_devuelta, 0) as cantidad,
+				COALESCE(vd.precio_unitario, p.precio_venta) as precio_unitario,
+				COALESCE(vd.iva_aplicado, p.tasa_iva) as iva_aplicado,
+				COALESCE(vd.total_subtotal, 0) - COALESCE(dd.total_dinero_devuelto, 0) as subtotal
+			FROM ventas_del_dia vd
+			FULL OUTER JOIN devoluciones_del_dia dd ON vd.id_producto = dd.id_producto
+			LEFT JOIN inventario.productos p ON p.id_producto = COALESCE(vd.id_producto, dd.id_producto)
+			WHERE (COALESCE(vd.total_cantidad, 0) - COALESCE(dd.total_devuelta, 0)) > 0
+			ORDER BY nombre ASC
 		`
 
 		rows, err := db.Query(query, idTienda, fechaStr)

@@ -6,6 +6,8 @@ import { Observable, map } from 'rxjs';
 export interface GraficaData {
   fecha: string;
   total: number;
+  total_efectivo: number;
+  total_transferencia: number;
 }
 
 interface ProductoStock {

@@ -60,6 +60,10 @@
       <div class="kpi-info">
         <span class="kpi-label">Ventas Hoy</span>
         <span class="kpi-value">{{ formatCurrency(ventasHoy()) }}</span>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 8px;">
+          <span title="Efectivo">💵 {{ formatCurrency(ventasEfectivoHoy()) }}</span>
+          <span title="Transferencia">💳 {{ formatCurrency(ventasTransferenciaHoy()) }}</span>
+        </div>
       </div>
     </div>
     <div class="kpi-card" [class.kpi-alert]="(stockBajoCount() ?? 0) > 0">
@@ -140,6 +144,34 @@
             @case ('0')   { Historial completo }
           }
         </p>
+      </div>
+
+      <!-- Pestañas de método de pago -->
+      <div style="display: flex; gap: 0; background: var(--border-subtle); padding: 4px; border-radius: 10px; border: 1px solid var(--border-strong);">
+        <button
+          id="tab-metodo-total"
+          (click)="setFiltroMetodoPago('total')"
+          style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s;"
+          [style.background]="filtroMetodoPago() === 'total' ? '#4F8EF7' : 'transparent'"
+          [style.color]="filtroMetodoPago() === 'total' ? '#ffffff' : 'var(--text-muted)'">
+          General
+        </button>
+        <button
+          id="tab-metodo-efectivo"
+          (click)="setFiltroMetodoPago('efectivo')"
+          style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s;"
+          [style.background]="filtroMetodoPago() === 'efectivo' ? '#22c55e' : 'transparent'"
+          [style.color]="filtroMetodoPago() === 'efectivo' ? '#ffffff' : 'var(--text-muted)'">
+          💵 Efectivo
+        </button>
+        <button
+          id="tab-metodo-transferencia"
+          (click)="setFiltroMetodoPago('transferencia')"
+          style="padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s;"
+          [style.background]="filtroMetodoPago() === 'transferencia' ? '#a78bfa' : 'transparent'"
+          [style.color]="filtroMetodoPago() === 'transferencia' ? '#ffffff' : 'var(--text-muted)'">
+          💳 Transferencia
+        </button>
       </div>
 
       <!-- Botones de periodo -->
