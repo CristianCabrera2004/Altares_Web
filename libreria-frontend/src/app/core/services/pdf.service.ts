@@ -248,7 +248,7 @@ export class PdfService {
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(`GRAN TOTAL DEL DÍA: ${this.currency(totalGlobal)}`, 10, startY);
+    doc.text(`TOTAL DEL DÍA: ${this.currency(totalGlobal)}`, 10, startY);
 
     return doc;
   }

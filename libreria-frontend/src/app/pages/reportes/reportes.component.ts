@@ -232,7 +232,7 @@ export class ReportesComponent implements OnInit {
         const mappedItems: ItemRecibo[] = items.map((i: any) => ({
           cantidad: i.cantidad,
           producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado },
-          metodo_pago: i.metodo_pago || 'efectivo'
+          metodo_pago: (i.metodo_pago || 'efectivo').toLowerCase().trim()
         }));
         
         const doc = this.pdfService.generarPdfReciboGlobal(
