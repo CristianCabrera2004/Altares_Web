@@ -218,7 +218,7 @@ export class ReportesComponent implements OnInit {
     this.loadingGlobalPdf.set(true);
     this.errorMsg.set('');
     
-    const fechaFiltro = this.fechaFiltro();
+    const fechaFiltro = this.fechaFiltroFacturas();
     
     this.reportesService.getFacturaDiaria(fechaFiltro).subscribe({
       next: (data) => {
