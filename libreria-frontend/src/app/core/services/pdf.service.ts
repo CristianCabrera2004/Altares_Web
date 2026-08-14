@@ -62,11 +62,17 @@ export class PdfService {
     doc.text('Teléfono: 098 321 9219', 74, 30, { align: 'center' });
     
     doc.setFontSize(10);
-    doc.text(`Recibo N.- ${numRecibo}`, 10, 40);
+    if (idVenta > 0) {
+      doc.text(`Recibo N.- ${numRecibo}`, 10, 40);
+    } else {
+      doc.text(`Recibo Global Diario`, 10, 40);
+    }
     doc.text(`Fecha: ${fecha}`, 10, 45);
     doc.text(`Cliente: ${clienteNombre}`, 10, 50);
     doc.text(`RUC/CI: ${clienteIdentificacion}`, 10, 55);
-    doc.text(`Método de Pago: ${metodoPago.charAt(0).toUpperCase() + metodoPago.slice(1)}`, 10, 60);
+    
+    const metPagoStr = metodoPago ? (metodoPago.charAt(0).toUpperCase() + metodoPago.slice(1)) : 'Varios';
+    doc.text(`Método de Pago: ${metPagoStr}`, 10, 60);
 
     let startY = 66;
     if (clienteDireccion && clienteDireccion.trim() !== '') {
@@ -114,7 +120,13 @@ export class PdfService {
     });
 
     // Summary
-    const finalY = (doc as any).lastAutoTable.finalY || 60;
+    let finalY = (doc as any).lastAutoTable.finalY || 60;
+    
+    // Check if we need to add a new page for the summary to avoid being cut off
+    if (finalY + 40 > doc.internal.pageSize.getHeight()) {
+      doc.addPage();
+      finalY = 15;
+    }
     
     doc.setFontSize(9);
     doc.text(`Subtotal: ${this.currency(subtotal)}`, 85, finalY + 10);
