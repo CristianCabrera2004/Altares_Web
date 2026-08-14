@@ -218,35 +218,29 @@ export class ReportesComponent implements OnInit {
     this.loadingGlobalPdf.set(true);
     this.errorMsg.set('');
     
-    // Podemos obtener el día de hoy, o permitir pasar una fecha (para empezar, usaremos hoy)
-    const fechaHoy = new Date().toISOString().split('T')[0];
+    const fechaFiltro = this.fechaFiltro();
     
-    this.reportesService.getFacturaDiaria(fechaHoy).subscribe({
+    this.reportesService.getFacturaDiaria(fechaFiltro).subscribe({
       next: (data) => {
         const items = data.items || [];
         if (items.length === 0) {
-          this.errorMsg.set('No hay ventas a Consumidor Final registradas el día de hoy.');
+          this.errorMsg.set('No hay ventas a Consumidor Final registradas en esta fecha.');
           this.loadingGlobalPdf.set(false);
           return;
         }
         
-        const mappedItems: ItemRecibo[] = items.map(i => ({
+        const mappedItems: ItemRecibo[] = items.map((i: any) => ({
           cantidad: i.cantidad,
-          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado }
+          producto: { nombre: i.producto, precio_venta: i.precio_unitario, tasa_iva: i.iva_aplicado },
+          metodo_pago: i.metodo_pago || 'efectivo'
         }));
         
-        const doc = this.pdfService.generarPdfRecibo(
-          0, // 0 para que no salga un id_venta
-          data.fecha_emision,
-          data.cliente_nombre,
-          data.cliente_identificacion,
-          mappedItems,
-          data.cliente_direccion || '',
-          data.cliente_email || '',
-          data.metodo_pago
+        const doc = this.pdfService.generarPdfReciboGlobal(
+          data.fecha_emision || fechaFiltro,
+          mappedItems
         );
         
-        const name = `Factura_Global_Diaria_${fechaHoy}.pdf`;
+        const name = `Factura_Global_Diaria_${fechaFiltro}.pdf`;
         doc.save(name);
         this.loadingGlobalPdf.set(false);
       },

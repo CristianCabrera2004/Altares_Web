@@ -9,6 +9,7 @@ export interface ItemRecibo {
     precio_venta: number; // en centavos, base + iva si aplica
     tasa_iva: number; // 0 o 15
   };
+  metodo_pago?: string;
 }
 
 @Injectable({
@@ -138,6 +139,116 @@ export class PdfService {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text('¡Gracias por su compra!', 74, finalY + 35, { align: 'center' });
+
+    return doc;
+  }
+
+  /**
+   * Genera un recibo global en PDF agrupado por Método de Pago (Efectivo y Transferencia)
+   */
+  generarPdfReciboGlobal(
+    fechaEmision: string | null,
+    itemsFactura: ItemRecibo[]
+  ): jsPDF {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a5'
+    });
+
+    const fecha = fechaEmision ? new Date(fechaEmision).toLocaleString('es-EC') : new Date().toLocaleString('es-EC');
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Libreria y Papelería "Los Altares"', 74, 15, { align: 'center' });
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('RUC: 0604928325001', 74, 20, { align: 'center' });
+    doc.text('Dirección: Quimiag Centro', 74, 25, { align: 'center' });
+    doc.text('Teléfono: 098 321 9219', 74, 30, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.text(`Recibo Global Diario`, 10, 40);
+    doc.text(`Fecha: ${fecha}`, 10, 45);
+
+    let startY = 55;
+    let totalGlobal = 0;
+
+    const renderTable = (metodo: string, items: ItemRecibo[]) => {
+      if (items.length === 0) return;
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Ventas por ${metodo.charAt(0).toUpperCase() + metodo.slice(1)}`, 10, startY);
+      startY += 5;
+
+      let subtotal = 0;
+      let totalIva = 0;
+
+      const tableData = items.map(item => {
+        const totalLinea = this.totalLinea(item);
+        let lineaBase = totalLinea;
+        let ivaLinea = 0;
+        if (item.producto.tasa_iva > 0) {
+          lineaBase = Math.round(totalLinea / (1 + item.producto.tasa_iva / 100));
+          ivaLinea = totalLinea - lineaBase;
+        }
+        subtotal += lineaBase;
+        totalIva += ivaLinea;
+
+        return [
+          item.cantidad.toString(),
+          item.producto.nombre,
+          this.currency(item.producto.precio_venta),
+          this.currency(totalLinea)
+        ];
+      });
+
+      autoTable(doc, {
+        startY: startY,
+        head: [['Cant', 'Descripción', 'V. Unit', 'Total']],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: metodo === 'efectivo' ? [76, 175, 80] : [156, 39, 176] },
+        margin: { left: 10, right: 10 }
+      });
+
+      let finalY = (doc as any).lastAutoTable.finalY || startY;
+      
+      if (finalY + 30 > doc.internal.pageSize.getHeight()) {
+        doc.addPage();
+        finalY = 15;
+      }
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Subtotal ${metodo}: ${this.currency(subtotal)}`, 85, finalY + 8);
+      doc.text(`IVA: ${this.currency(totalIva)}`, 85, finalY + 13);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      const methodTotal = subtotal + totalIva;
+      totalGlobal += methodTotal;
+      doc.text(`Total ${metodo}: ${this.currency(methodTotal)}`, 85, finalY + 19);
+
+      startY = finalY + 30;
+      
+      if (startY > doc.internal.pageSize.getHeight() - 40) {
+        doc.addPage();
+        startY = 20;
+      }
+    };
+
+    const itemsEfectivo = itemsFactura.filter(i => i.metodo_pago === 'efectivo');
+    const itemsTransferencia = itemsFactura.filter(i => i.metodo_pago === 'transferencia');
+
+    renderTable('efectivo', itemsEfectivo);
+    renderTable('transferencia', itemsTransferencia);
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`GRAN TOTAL DEL DÍA: ${this.currency(totalGlobal)}`, 10, startY);
 
     return doc;
   }
