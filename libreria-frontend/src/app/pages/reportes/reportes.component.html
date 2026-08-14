@@ -120,6 +120,13 @@
         <label for="fechaFiltro" style="font-weight: 500; font-size: 14px; color: #555;">Filtrar por Día:</label>
         <input type="date" id="fechaFiltro" class="form-control" style="width: auto;"
                [ngModel]="fechaFiltroFacturas()" (ngModelChange)="fechaFiltroFacturas.set($event); cargarFacturas()" />
+               
+        <label for="metodoFiltro" style="font-weight: 500; font-size: 14px; color: #555; margin-left: 10px;">Método de Pago:</label>
+        <select id="metodoFiltro" class="form-control" style="width: auto;" [ngModel]="metodoPagoFiltro()" (ngModelChange)="metodoPagoFiltro.set($event)">
+          <option value="todos">Todos</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+        </select>
       </div>
 
       <button class="btn btn-primary" (click)="descargarFacturaGlobal()" [disabled]="loadingGlobalPdf()">
@@ -149,9 +156,9 @@
         <div class="spinner"></div>
         <p>Cargando recibos...</p>
       </div>
-    } @else if (facturas().length === 0) {
+    } @else if (facturasFiltradas().length === 0) {
       <div class="empty-state">
-        <p>No hay recibos registrados.</p>
+        <p>No hay recibos para este filtro.</p>
       </div>
     } @else {
       <div class="table-container">
@@ -161,16 +168,18 @@
               <th>Recibo N.-</th>
               <th>Fecha</th>
               <th>Cliente</th>
+              <th>Método Pago</th>
               <th class="text-right">Total</th>
               <th class="text-right">Acción</th>
             </tr>
           </thead>
           <tbody>
-            @for (f of facturas(); track f.id_factura) {
+            @for (f of facturasFiltradas(); track f.id_factura) {
               <tr>
                 <td>{{ f.id_venta.toString().padStart(6, '0') }}</td>
                 <td>{{ f.fecha_emision }}</td>
                 <td>{{ f.cliente_nombre }}</td>
+                <td><span class="badge" [class.badge-efectivo]="(f.metodo_pago || 'efectivo').toLowerCase().trim() === 'efectivo'" [class.badge-transferencia]="(f.metodo_pago || 'efectivo').toLowerCase().trim() === 'transferencia'">{{ (f.metodo_pago || 'Efectivo') | titlecase }}</span></td>
                 <td class="text-right">{{ formatCurrency(f.total) }}</td>
                 <td class="text-right" style="display: flex; gap: 8px; justify-content: flex-end;">
                   <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" (click)="descargarFactura(f)" [disabled]="loadingPdfId() === f.id_factura || reenviandoId() === f.id_factura">

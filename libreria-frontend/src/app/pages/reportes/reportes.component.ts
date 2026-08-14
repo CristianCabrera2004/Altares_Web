@@ -36,7 +36,18 @@ export class ReportesComponent implements OnInit {
   readonly loadingGlobalPdf = signal(false);
 
   readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
-  readonly fechaFiltroCompras = signal<string>('');
+  readonly fechaFiltroCompras = signal<string>(new Date().toISOString().split('T')[0]);
+  metodoPagoFiltro = signal<string>('todos');
+
+  // Computed para filtrar facturas
+  facturasFiltradas = computed(() => {
+    const list = this.facturas();
+    const filter = this.metodoPagoFiltro();
+    if (filter === 'todos') {
+      return list;
+    }
+    return list.filter(f => (f.metodo_pago || 'efectivo').toLowerCase().trim() === filter);
+  });
   
   readonly compraDetalle = signal<FacturaCompra | null>(null);
 
