@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { FormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { ScannerComponent } from '../../shared/components/scanner/scanner.component';
@@ -54,7 +54,7 @@ interface ProductoResponse {
 
 @Component({
   selector: 'app-inventario',
-  imports: [ReactiveFormsModule, ScannerComponent],
+  imports: [ReactiveFormsModule, FormsModule, ScannerComponent],
   templateUrl: './inventario.component.html',
   styleUrl: './inventario.component.css',
   standalone: true
