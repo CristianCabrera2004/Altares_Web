@@ -83,6 +83,7 @@ export class InventarioComponent implements OnInit {
   readonly scannerTarget = signal<'busqueda' | 'edicion' | 'ingreso'>('busqueda');
   readonly successMsg   = signal('');
   readonly busqueda     = signal('');
+  readonly busquedaModal = signal('');
   readonly proveedorIngresoId = signal<number>(0);
 
   // ─── Modal de Confirmación ──────────────────────────────────────────────
@@ -192,6 +193,16 @@ export class InventarioComponent implements OnInit {
     }
   }
 
+  // Autocomplete search for the modal
+  readonly resultadosModal = computed<Producto[]>(() => {
+    const t = this.busquedaModal().trim().toLowerCase();
+    if (!t) return [];
+    return this.productos()
+      .filter(p => p.nombre.toLowerCase().includes(t) || p.id_producto.toString() === t)
+      .slice(0, 5); // 5 max
+  });
+
+  // Computed properties
   readonly totalDineroInventario = computed(() => {
     return this.productosFiltrados().reduce((sum, p) => sum + (p.stock_actual > 0 ? (p.precio_venta * p.stock_actual) : 0), 0);
   });
@@ -366,8 +377,16 @@ export class InventarioComponent implements OnInit {
     this.form.get('codigos_barras')?.setValue('');
     this.productoEncontrado.set(null);
     this.modoModal.set('crear');
+    this.busquedaModal.set('');
     this.errorMsg.set('');
     setTimeout(() => (document.getElementById('input-codigo-barras') as HTMLInputElement)?.focus(), 50);
+  }
+
+  seleccionarProductoBusqueda(p: Producto): void {
+    this.productoEncontrado.set(p);
+    this.modoModal.set('actualizar_stock');
+    this.cantidadAgregar.setValue(1);
+    this.busquedaModal.set('');
   }
 
   guardarIngreso(): void {
