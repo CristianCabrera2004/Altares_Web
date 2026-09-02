@@ -398,12 +398,13 @@ func getFactura(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		}
 		arg = idFactura
 	} else {
+		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 		fechaStr := r.URL.Query().Get("fecha")
-		whereClause := ""
-		args := []interface{}{}
+		whereClause := "WHERE v.id_tienda = $1"
+		args := []interface{}{idTienda}
 
 		if fechaStr != "" {
-			whereClause = "WHERE DATE(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1"
+			whereClause += " AND DATE(f.fecha_emision AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2"
 			args = append(args, fechaStr)
 		}
 
