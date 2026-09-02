@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -282,8 +283,9 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 
 		rows, err := db.Query(query, idTienda, fechaStr)
 		if err != nil {
+			log.Printf("ERROR factura-diaria: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Error al consultar la factura diaria."})
+			json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Error SQL: %v", err)})
 			return
 		}
 		defer rows.Close()
