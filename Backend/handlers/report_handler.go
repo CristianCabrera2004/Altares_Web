@@ -251,7 +251,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				JOIN inventario.productos p ON d.id_producto = p.id_producto
 				WHERE v.id_tienda = $1 
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
-				  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
+				  
 				  AND v.estado = 'completada'
 				GROUP BY p.id_producto, p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
 			),
@@ -264,14 +264,14 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				JOIN inventario.productos p ON dev.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
 				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2 
-				  AND (v.id_cliente = '9999999999999' OR v.id_cliente IS NULL)
+				  
 				GROUP BY dev.id_producto
 			)
 			SELECT 
 				COALESCE(vd.nombre, p.nombre) as nombre,
 				COALESCE(vd.total_cantidad, 0) - COALESCE(dd.total_devuelta, 0) as cantidad,
 				COALESCE(vd.precio_unitario, p.precio_venta) as precio_unitario,
-				COALESCE(vd.iva_aplicado, p.tasa_iva) as iva_aplicado,
+				COALESCE(vd.iva_aplicado, 0) as iva_aplicado,
 				COALESCE(vd.total_subtotal, 0) - COALESCE(dd.total_dinero_devuelto, 0) as subtotal
 			FROM ventas_del_dia vd
 			FULL OUTER JOIN devoluciones_del_dia dd ON vd.id_producto = dd.id_producto
