@@ -95,10 +95,13 @@ export class ReportesService {
     });
   }
 
-  getFacturaDiaria(fecha?: string): Observable<FacturaResponse> {
+  getFacturaDiaria(fecha?: string, metodoPago?: string): Observable<FacturaResponse> {
     let url = `${environment.apiUrl}/reportes/factura-diaria`;
-    if (fecha) {
-      url += `?fecha=${fecha}`;
+    const params = new URLSearchParams();
+    if (fecha) params.append('fecha', fecha);
+    if (metodoPago && metodoPago !== 'todos') params.append('metodo_pago', metodoPago);
+    if (params.toString()) {
+      url += `?${params.toString()}`;
     }
     return this.http.get<FacturaResponse>(url);
   }

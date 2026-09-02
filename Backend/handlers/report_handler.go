@@ -231,6 +231,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 
 		q := r.URL.Query()
 		fechaStr := q.Get("fecha") // Formato YYYY-MM-DD
+		metodoPagoStr := q.Get("metodo_pago")
 		if fechaStr == "" {
 			fechaStr = time.Now().Format("2006-01-02")
 		}
@@ -252,7 +253,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				JOIN inventario.productos p ON d.id_producto = p.id_producto
 				WHERE v.id_tienda = $1 
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
-				  
+				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				  AND v.estado = 'completada'
 				GROUP BY p.id_producto, p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
 			),
@@ -265,7 +266,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				JOIN inventario.productos p ON dev.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
 				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2 
-				  
+				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				GROUP BY dev.id_producto
 			)
 			SELECT 
@@ -281,7 +282,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 			ORDER BY nombre ASC
 		`
 
-		rows, err := db.Query(query, idTienda, fechaStr)
+		rows, err := db.Query(query, idTienda, fechaStr, metodoPagoStr)
 		if err != nil {
 			log.Printf("ERROR factura-diaria: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -340,6 +341,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
 				WHERE v.id_tienda = $1 
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				  AND v.estado = 'completada'
 				GROUP BY v.metodo_pago
 			),
@@ -349,6 +351,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				JOIN inventario.productos p ON dev.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
 				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				GROUP BY v.metodo_pago
 			)
 			SELECT 
@@ -357,7 +360,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 			FROM ventas_del_dia vd
 			FULL OUTER JOIN devoluciones_del_dia dd ON vd.metodo_pago = dd.metodo_pago
 		`
-		rowsTotals, errTotals := db.Query(queryTotals, idTienda, fechaStr)
+		rowsTotals, errTotals := db.Query(queryTotals, idTienda, fechaStr, metodoPagoStr)
 		if errTotals == nil {
 			defer rowsTotals.Close()
 			for rowsTotals.Next() {

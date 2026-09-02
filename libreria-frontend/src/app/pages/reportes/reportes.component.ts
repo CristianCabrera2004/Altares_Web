@@ -236,8 +236,9 @@ export class ReportesComponent implements OnInit {
     this.errorMsg.set('');
     
     const fechaFiltro = this.fechaFiltroFacturas();
+    const metodoFiltro = this.metodoPagoFiltro();
     
-    this.reportesService.getFacturaDiaria(fechaFiltro).subscribe({
+    this.reportesService.getFacturaDiaria(fechaFiltro, metodoFiltro).subscribe({
       next: (data) => {
         const items = data.items || [];
         if (items.length === 0) {
