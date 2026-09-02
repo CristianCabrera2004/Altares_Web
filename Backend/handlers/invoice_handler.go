@@ -92,7 +92,7 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				COALESCE(vd.nombre, p.nombre) as nombre,
 				COALESCE(vd.total_cantidad, 0) - COALESCE(dd.total_devuelta, 0) as total_cantidad,
 				COALESCE(vd.precio_unitario, p.precio_venta) as precio_unitario,
-				COALESCE(vd.iva_aplicado, p.tasa_iva) as iva_aplicado,
+				COALESCE(vd.iva_aplicado, 0) as iva_aplicado,
 				COALESCE(vd.total_subtotal, 0) - COALESCE(dd.total_dinero_devuelto, 0) as total_subtotal,
 				COALESCE(vd.total_efectivo, 0) - COALESCE(dd.devuelto_efectivo, 0) as total_efectivo,
 				COALESCE(vd.total_transferencia, 0) - COALESCE(dd.devuelto_transferencia, 0) as total_transferencia
