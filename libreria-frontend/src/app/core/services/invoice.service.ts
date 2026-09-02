@@ -33,8 +33,12 @@ export class InvoiceService {
   private readonly apiUrlCierre = `${environment.apiUrl}/ventas/factura-cierre`;
   private readonly apiUrlFactura = `${environment.apiUrl}/facturas`;
 
-  generarCierre(): Observable<InvoiceSummary> {
-    return this.http.post<InvoiceSummary>(this.apiUrlCierre, {});
+  generarCierre(fecha?: string): Observable<InvoiceSummary> {
+    let url = this.apiUrlCierre;
+    if (fecha) {
+      url += `?fecha=${fecha}`;
+    }
+    return this.http.post<InvoiceSummary>(url, {});
   }
 
   crearFactura(payload: { id_venta: number; id_tipo_factura: number; id_cliente?: number | null; pdf_base64?: string }): Observable<any> {

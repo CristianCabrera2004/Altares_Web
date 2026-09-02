@@ -69,6 +69,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly modalInvoiceVisible = signal(false);
   readonly invoiceData = signal<InvoiceSummary | null>(null);
   readonly procesandoCierre = signal(false);
+  readonly fechaCierre = signal<string>(new Date().toISOString().split('T')[0]);
   readonly errorInvoice = signal('');
 
   @ViewChild('salesChart') salesChartRef!: ElementRef;
@@ -440,7 +441,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.procesandoCierre.set(true);
     this.errorInvoice.set('');
     
-    this.invoiceService.generarCierre().subscribe({
+    this.invoiceService.generarCierre(this.fechaCierre()).subscribe({
       next: (res) => {
         this.invoiceData.set(res);
         this.procesandoCierre.set(false);

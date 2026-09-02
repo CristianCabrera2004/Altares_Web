@@ -56,6 +56,9 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 			loc = time.FixedZone("ECT", -5*3600) // Fallback manual
 		}
 		hoy := time.Now().In(loc).Format("2006-01-02")
+		if paramFecha := r.URL.Query().Get("fecha"); paramFecha != "" {
+			hoy = paramFecha
+		}
 		idTienda := GetTiendaIDFromCtxOrDb(db, r)
 
 		query := `
