@@ -31,6 +31,8 @@ export interface FacturaResponse {
   total: number;
   metodo_pago: string;
   items?: any[];
+  total_efectivo?: number;
+  total_transferencia?: number;
 }
 
 export interface CompraDetail {

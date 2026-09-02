@@ -332,6 +332,48 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 			f.Items = make([]InvoiceDetail, 0)
 		}
 
+		// Segunda consulta para calcular los totales por método de pago
+		queryTotals := `
+			WITH ventas_del_dia AS (
+				SELECT v.metodo_pago, SUM(d.subtotal) as total_subtotal
+				FROM operaciones.detalle_ventas d
+				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				WHERE v.id_tienda = $1 
+				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+				  AND v.estado = 'completada'
+				GROUP BY v.metodo_pago
+			),
+			devoluciones_del_dia AS (
+				SELECT v.metodo_pago, SUM(dev.cantidad_devuelta * p.precio_venta) as total_dinero_devuelto
+				FROM operaciones.devoluciones dev
+				JOIN inventario.productos p ON dev.id_producto = p.id_producto
+				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
+				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
+				GROUP BY v.metodo_pago
+			)
+			SELECT 
+				COALESCE(vd.metodo_pago, dd.metodo_pago) as metodo_pago,
+				COALESCE(vd.total_subtotal, 0) - COALESCE(dd.total_dinero_devuelto, 0) as subtotal
+			FROM ventas_del_dia vd
+			FULL OUTER JOIN devoluciones_del_dia dd ON vd.metodo_pago = dd.metodo_pago
+		`
+		rowsTotals, errTotals := db.Query(queryTotals, idTienda, fechaStr)
+		if errTotals == nil {
+			defer rowsTotals.Close()
+			for rowsTotals.Next() {
+				var metodo string
+				var sub int
+				if err := rowsTotals.Scan(&metodo, &sub); err == nil {
+					metodoLower := strings.ToLower(strings.TrimSpace(metodo))
+					if metodoLower == "efectivo" {
+						f.TotalEfectivo += sub
+					} else if metodoLower == "transferencia" {
+						f.TotalTransferencia += sub
+					}
+				}
+			}
+		}
+
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(f)
 	}

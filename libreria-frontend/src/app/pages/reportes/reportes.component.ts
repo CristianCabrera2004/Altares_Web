@@ -17,7 +17,7 @@ export class ReportesComponent implements OnInit {
   private readonly reportesService = inject(ReportesService);
   private readonly pdfService = inject(PdfService);
 
-  readonly tab = signal<'ventas' | 'facturas' | 'compras'>('ventas');
+  readonly tab = signal<'ventas' | 'facturas' | 'compras'>('facturas');
 
   readonly startDate = signal('');
   readonly endDate = signal('');
@@ -254,7 +254,9 @@ export class ReportesComponent implements OnInit {
         
         const doc = this.pdfService.generarPdfReciboGlobal(
           data.fecha_emision || fechaFiltro,
-          mappedItems
+          mappedItems,
+          data.total_efectivo || 0,
+          data.total_transferencia || 0
         );
         
         const name = `Factura_Global_Diaria_${fechaFiltro}.pdf`;

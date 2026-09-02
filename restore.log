@@ -1,0 +1,525 @@
+[sudo] contraseña para cace: SET
+SET
+SET
+psql:/tmp/altares-db-backup.sql:13: ERROR:  unrecognized configuration parameter "transaction_timeout"
+SET
+SET
+ set_config 
+------------
+ 
+(1 row)
+
+SET
+SET
+SET
+SET
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE SCHEMA
+ALTER SCHEMA
+CREATE EXTENSION
+COMMENT
+CREATE EXTENSION
+COMMENT
+SET
+SET
+CREATE TABLE
+psql:/tmp/altares-db-backup.sql:100: ERROR:  role "backend_cinder_shape_4030" does not exist
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+psql:/tmp/altares-db-backup.sql:302: ERROR:  role "backend_cinder_shape_4030" does not exist
+CREATE SEQUENCE
+psql:/tmp/altares-db-backup.sql:317: ERROR:  role "backend_cinder_shape_4030" does not exist
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE MATERIALIZED VIEW
+ALTER MATERIALIZED VIEW
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+CREATE TABLE
+ALTER TABLE
+CREATE SEQUENCE
+ALTER SEQUENCE
+ALTER SEQUENCE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+COPY 1
+COPY 2
+COPY 0
+COPY 3
+COPY 2237
+COPY 0
+COPY 3
+COPY 49
+COPY 101702
+COPY 1873
+COPY 0
+COPY 1
+COPY 2463
+COPY 0
+COPY 0
+COPY 2
+COPY 5
+COPY 101649
+COPY 2
+COPY 4
+COPY 221
+COPY 3
+COPY 3550
+COPY 667
+COPY 211
+COPY 5
+ setval 
+--------
+      2
+(1 row)
+
+ setval 
+--------
+      1
+(1 row)
+
+ setval 
+--------
+      3
+(1 row)
+
+ setval 
+--------
+   5848
+(1 row)
+
+ setval 
+--------
+      1
+(1 row)
+
+ setval 
+--------
+      3
+(1 row)
+
+ setval 
+--------
+     49
+(1 row)
+
+ setval 
+--------
+ 118128
+(1 row)
+
+ setval 
+--------
+   1874
+(1 row)
+
+ setval 
+--------
+      1
+(1 row)
+
+ setval 
+--------
+      1
+(1 row)
+
+ setval 
+--------
+   4072
+(1 row)
+
+ setval 
+--------
+      1
+(1 row)
+
+ setval 
+--------
+      1
+(1 row)
+
+ setval 
+--------
+      2
+(1 row)
+
+ setval 
+--------
+      5
+(1 row)
+
+ setval 
+--------
+ 118076
+(1 row)
+
+ setval 
+--------
+      2
+(1 row)
+
+ setval 
+--------
+      4
+(1 row)
+
+ setval 
+--------
+    224
+(1 row)
+
+ setval 
+--------
+      3
+(1 row)
+
+ setval 
+--------
+   4201
+(1 row)
+
+ setval 
+--------
+    667
+(1 row)
+
+ setval 
+--------
+    211
+(1 row)
+
+ setval 
+--------
+      5
+(1 row)
+
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/altares-db-backup.sql:217008: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217009: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217016: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217017: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217024: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217025: ERROR:  role "operador_caja" does not exist
+REVOKE
+psql:/tmp/altares-db-backup.sql:217039: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217040: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217047: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217048: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217055: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217062: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217063: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217070: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217071: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217078: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217079: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217086: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217087: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217094: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217095: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217102: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217103: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217110: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217111: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217118: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217119: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217126: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217127: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217134: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217135: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217142: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217143: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217150: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217151: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217158: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217159: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217166: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217167: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217174: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217175: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217182: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217183: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217190: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217191: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217198: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217199: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217206: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217207: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217214: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217215: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217222: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217223: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217230: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217231: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217238: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217239: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217246: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217247: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217254: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217255: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217262: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217263: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217270: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217271: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217278: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217279: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217286: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217287: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217294: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217295: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217302: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217303: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217310: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217311: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217318: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217319: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217326: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217327: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217334: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217335: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217342: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217343: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217350: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217351: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217358: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217359: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217366: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217367: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217374: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217375: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217382: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217383: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217390: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217391: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217398: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217399: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217406: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217407: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217414: ERROR:  role "admin_libreria" does not exist
+psql:/tmp/altares-db-backup.sql:217415: ERROR:  role "operador_caja" does not exist
+psql:/tmp/altares-db-backup.sql:217422: ERROR:  role "admin_libreria" does not exist
+REFRESH MATERIALIZED VIEW

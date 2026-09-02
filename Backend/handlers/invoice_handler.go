@@ -212,6 +212,8 @@ type FacturaResponse struct {
 	Subtotal              int             `json:"subtotal"`
 	TotalIva              int             `json:"total_iva"`
 	Total                 int             `json:"total"`
+	TotalEfectivo         int             `json:"total_efectivo"`
+	TotalTransferencia    int             `json:"total_transferencia"`
 	MetodoPago            string          `json:"metodo_pago"`
 	Items                 []InvoiceDetail `json:"items,omitempty"`
 }
