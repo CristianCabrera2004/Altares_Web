@@ -71,7 +71,7 @@ func main() {
 	// Health check — útil para verificar que el servidor está activo
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"status":"ok","service":"API Librería Los Altares","version":"1.0.0"}`)
+		fmt.Fprint(w, `{"status":"ok","service":"API Librería Los Altares","version":"1.0.1"}`)
 	})
 
 	// ── HT-04: Endpoints de Autenticación (CA 51, 52, 53, 54) ─────────────────
