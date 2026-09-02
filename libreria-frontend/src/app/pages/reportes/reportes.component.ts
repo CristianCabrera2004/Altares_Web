@@ -39,6 +39,7 @@ export class ReportesComponent implements OnInit {
   readonly fechaFiltroFacturas = signal<string>(new Date().toISOString().split('T')[0]);
   readonly fechaFiltroCompras = signal<string>(new Date().toISOString().split('T')[0]);
   metodoPagoFiltro = signal<string>('todos');
+  readonly totalesDelDia = signal({ general: 0, efectivo: 0, transferencia: 0 });
 
   // Computed para filtrar facturas
   facturasFiltradas = computed(() => {
@@ -66,6 +67,7 @@ export class ReportesComponent implements OnInit {
     
     this.generarReporte();
     this.cargarFacturas();
+    this.cargarTotales();
   }
 
   generarReporte(): void {
@@ -112,6 +114,21 @@ export class ReportesComponent implements OnInit {
       error: () => {
         this.errorMsg.set('Error al cargar el historial de recibos.');
         this.loading.set(false);
+      }
+    });
+  }
+
+  cargarTotales(): void {
+    this.reportesService.getFacturaDiaria(this.fechaFiltroFacturas(), 'todos').subscribe({
+      next: (data) => {
+        this.totalesDelDia.set({
+          general: data.total || 0,
+          efectivo: data.total_efectivo || 0,
+          transferencia: data.total_transferencia || 0
+        });
+      },
+      error: () => {
+        this.totalesDelDia.set({ general: 0, efectivo: 0, transferencia: 0 });
       }
     });
   }
