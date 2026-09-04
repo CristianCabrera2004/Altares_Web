@@ -61,36 +61,53 @@ export class ScannerComponent implements OnInit, OnChanges, OnDestroy {
 
   startScanner(): void {
     if (!this.selectedCameraId) return;
-    
-    // Check if element exists
-    if (!document.getElementById('reader')) return;
 
-    this.html5QrCode = new Html5Qrcode("reader");
-    
-    this.html5QrCode.start(
-      this.selectedCameraId,
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 }
-      },
-      (decodedText) => {
-        // Reproducir sonido leve si es posible (opcional)
-        try {
-           const audio = new Audio('assets/beep.mp3');
-           audio.volume = 0.5;
-           audio.play().catch(e => {});
-        } catch (e) {}
+    // Esperar a que el DOM renderice el div#reader
+    setTimeout(() => {
+      const readerEl = document.getElementById('reader');
+      if (!readerEl) return;
 
-        this.stopScanner();
-        this.scanSuccess.emit(decodedText);
-      },
-      (errorMessage) => {
-        // Errores constantes de escaneo (cuando no ve código), se ignoran
+      // Limpiar instancia previa si existe
+      if (this.html5QrCode) {
+        try { this.html5QrCode.clear(); } catch(e) {}
+        this.html5QrCode = null;
       }
-    ).catch(err => {
-      this.cameraError = 'No se pudo iniciar el escáner.';
-      console.error(err);
-    });
+
+      this.html5QrCode = new Html5Qrcode("reader");
+
+      this.html5QrCode.start(
+        this.selectedCameraId,
+        {
+          fps: 10,
+          qrbox: { width: 200, height: 200 },
+          aspectRatio: 1.0
+        },
+        (decodedText) => {
+          // Beep simple con Web Audio API (sin necesitar archivo externo)
+          try {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 1000;
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.1);
+          } catch (e) {}
+
+          this.stopScanner();
+          this.scanSuccess.emit(decodedText);
+        },
+        (_errorMessage) => {
+          // Errores constantes de escaneo (cuando no ve código), se ignoran
+        }
+      ).catch(err => {
+        this.cameraError = 'No se pudo iniciar el escáner. Verifica los permisos de cámara.';
+        console.error(err);
+      });
+    }, 200);
   }
 
   stopScanner(): void {
