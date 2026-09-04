@@ -272,18 +272,22 @@ export class CuadernoComponent implements OnInit {
 
     // 1. Búsqueda local (por ID o nombre exacto)
     const localMatch = this.resultados().find(p => 
-      p.id_producto.toString() === t || p.nombre.toLowerCase() === t.toLowerCase()
+      p.id_producto.toString() === t || 
+      p.nombre.toLowerCase() === t.toLowerCase() ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === t.toLowerCase()))
     );
 
     if (localMatch) {
       this.agregarItem(localMatch);
+      this.termino.set('');
       return;
     }
 
-    // 2. Si no hay coincidencia local, busca por código de barras en el backend
+    // 2. Busca por código de barras en el backend (case-insensitive desde backend)
     this.cuadernoService.buscarProductoPorCodigo(t).subscribe({
       next: (producto) => {
         this.agregarItem(producto);
+        this.termino.set('');
       },
       error: () => {
         // Abrir modal de código desconocido
@@ -291,6 +295,7 @@ export class CuadernoComponent implements OnInit {
         this.modoBarcode.set('opciones');
         this.terminoEnlace.set('');
         this.errorEnlace.set('');
+        this.termino.set('');
       }
     });
   }
@@ -428,24 +433,25 @@ export class CuadernoComponent implements OnInit {
   }
 
   onScanSuccess(decodedText: string) {
-    const text = decodedText.trim().toLowerCase();
+    const rawText = decodedText.trim();
+    const textLower = rawText.toLowerCase();
     const found = this.catalogo().find(p => 
-      p.id_producto.toString() === text || 
-      p.nombre.toLowerCase() === text || 
-      p.nombre.toLowerCase().includes(text) ||
-      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === text))
+      p.id_producto.toString() === rawText || 
+      p.nombre.toLowerCase() === textLower || 
+      p.nombre.toLowerCase().includes(textLower) ||
+      (p.codigos_barras && p.codigos_barras.some(cb => cb.toLowerCase() === textLower))
     );
 
     if (found) {
       this.agregarItem(found);
     } else {
-      // Buscar en backend si no está en el catálogo en memoria local
-      this.cuadernoService.buscarProductoPorCodigo(text).subscribe({
+      // Buscar en backend con el código original (sin alterar mayúsculas)
+      this.cuadernoService.buscarProductoPorCodigo(rawText).subscribe({
         next: (producto) => {
           this.agregarItem(producto);
         },
         error: () => {
-          this.barcodeDesconocido.set(text);
+          this.barcodeDesconocido.set(rawText);
           this.modoBarcode.set('opciones');
           this.terminoEnlace.set('');
           this.errorEnlace.set('');

@@ -390,7 +390,7 @@ func BuscarProductoHandler(db *sql.DB) http.HandlerFunc {
 			JOIN inventario.productos p ON cb.id_producto = p.id_producto
 			JOIN inventario.categorias c ON p.id_categoria = c.id_categoria
 			LEFT JOIN inventario.stock_tiendas st ON p.id_producto = st.id_producto AND st.id_tienda = $2
-			WHERE cb.codigo = $1`, codigo, idTienda,
+			WHERE LOWER(cb.codigo) = LOWER($1)`, codigo, idTienda,
 		).Scan(&p.IdProducto, &p.Nombre, &p.IdCategoria, &p.NombreCategoria, &p.TipoIva, &p.TasaIva,
 			&p.StockActual, &p.StockAlertaMin, &p.PrecioVenta, &p.Estado, pq.Array(&p.CodigosBarras))
 
