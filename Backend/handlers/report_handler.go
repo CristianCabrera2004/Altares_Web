@@ -256,7 +256,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
 				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				  AND v.estado = 'completada'
-				  AND (f.id_factura IS NULL OR f.cliente_identificacion = '9999999999999')
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				GROUP BY p.id_producto, p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
 			),
 			devoluciones_del_dia AS (
@@ -267,8 +267,10 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				FROM operaciones.devoluciones dev
 				JOIN inventario.productos p ON dev.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
+				LEFT JOIN operaciones.facturas f ON f.id_venta = v.id_venta
 				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2 
 				  AND ($3::text = '' OR v.metodo_pago = $3::text)
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				GROUP BY dev.id_producto
 			)
 			SELECT 
@@ -346,7 +348,7 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
 				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				  AND v.estado = 'completada'
-				  AND (f.id_factura IS NULL OR f.cliente_identificacion = '9999999999999')
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				GROUP BY v.metodo_pago
 			),
 			devoluciones_del_dia AS (
@@ -354,8 +356,10 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				FROM operaciones.devoluciones dev
 				JOIN inventario.productos p ON dev.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
+				LEFT JOIN operaciones.facturas f ON f.id_venta = v.id_venta
 				WHERE dev.id_tienda = $1 AND DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
 				  AND ($3::text = '' OR v.metodo_pago = $3::text)
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				GROUP BY v.metodo_pago
 			)
 			SELECT 
