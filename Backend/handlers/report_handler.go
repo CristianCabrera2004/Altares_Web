@@ -169,7 +169,9 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 					SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END) as ventas_efectivo,
 					SUM(CASE WHEN metodo_pago = 'transferencia' THEN total ELSE 0 END) as ventas_transferencia
 				FROM operaciones.ventas
+				LEFT JOIN operaciones.facturas f ON operaciones.ventas.id_venta = f.id_venta
 				WHERE estado = 'completada' AND id_tienda = $1
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				  %s
 				GROUP BY %s
 			),
@@ -182,7 +184,9 @@ func ReporteGraficaHandler(db *sql.DB) http.HandlerFunc {
 				FROM operaciones.devoluciones d
 				JOIN inventario.productos p ON d.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				LEFT JOIN operaciones.facturas f ON v.id_venta = f.id_venta
 				WHERE d.id_tienda = $1
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				  %s
 				GROUP BY %s
 			)
