@@ -74,8 +74,10 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 					SUM(CASE WHEN v.metodo_pago = 'transferencia' THEN d.subtotal ELSE 0 END) as total_transferencia
 				FROM operaciones.detalle_ventas d
 				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				LEFT JOIN operaciones.facturas f ON v.id_venta = f.id_venta
 				JOIN inventario.productos p ON d.id_producto = p.id_producto
 				WHERE DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1 AND v.id_tienda = $2 AND v.estado = 'completada'
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				GROUP BY p.id_producto, p.nombre, d.precio_unitario, d.iva_aplicado
 			),
 			devoluciones_del_dia AS (
@@ -88,7 +90,9 @@ func InvoiceHandler(db *sql.DB) http.HandlerFunc {
 				FROM operaciones.devoluciones dev
 				JOIN inventario.productos p ON dev.id_producto = p.id_producto
 				LEFT JOIN operaciones.ventas v ON dev.id_venta = v.id_venta
+				LEFT JOIN operaciones.facturas f ON v.id_venta = f.id_venta
 				WHERE DATE(dev.fecha_devolucion AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $1 AND dev.id_tienda = $2
+				  AND (f.id_factura IS NULL OR (f.cliente_identificacion = '9999999999999' AND f.cliente_nombre = 'Consumidor Final'))
 				GROUP BY dev.id_producto
 			)
 			SELECT 
