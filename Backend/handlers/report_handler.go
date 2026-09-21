@@ -250,11 +250,13 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 					SUM(d.subtotal) as total_subtotal
 				FROM operaciones.detalle_ventas d
 				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				JOIN operaciones.facturas f ON f.id_venta = v.id_venta
 				JOIN inventario.productos p ON d.id_producto = p.id_producto
 				WHERE v.id_tienda = $1 
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
 				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				  AND v.estado = 'completada'
+				  AND f.cliente_identificacion = '9999999999999'
 				GROUP BY p.id_producto, p.nombre, d.precio_unitario, COALESCE(d.iva_aplicado, 0)
 			),
 			devoluciones_del_dia AS (
@@ -339,10 +341,12 @@ func FacturaDiariaConsumidorFinalHandler(db *sql.DB) http.HandlerFunc {
 				SELECT v.metodo_pago, SUM(d.subtotal) as total_subtotal
 				FROM operaciones.detalle_ventas d
 				JOIN operaciones.ventas v ON d.id_venta = v.id_venta
+				JOIN operaciones.facturas f ON f.id_venta = v.id_venta
 				WHERE v.id_tienda = $1 
 				  AND DATE(v.fecha_venta AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil') = $2
 				  AND ($3::text = '' OR v.metodo_pago = $3::text)
 				  AND v.estado = 'completada'
+				  AND f.cliente_identificacion = '9999999999999'
 				GROUP BY v.metodo_pago
 			),
 			devoluciones_del_dia AS (
